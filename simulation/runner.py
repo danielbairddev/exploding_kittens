@@ -1,26 +1,70 @@
+import json
+import os
 from collections import defaultdict
+from datetime import datetime
 from game.engine import GameEngine
 
 
-def run_simulation(agents: list, n_games: int = 1000, seed: int | None = None) -> dict:
+def run_simulation(agents: list, n_games: int = 1000, seed: int | None = None,
+                   log_dir: str | None = None, log_games: int = 0) -> dict:
     """
     Run n_games games with the given agents and return aggregated stats.
-    Agents are assigned player IDs 0..n-1 in the order provided.
+
+    log_dir:   directory to write game logs (created if needed)
+    log_games: how many games to log in full detail (0 = summary only)
     """
     n_players = len(agents)
     wins = defaultdict(int)
     total_turns = 0
-    elimination_counts = defaultdict(int)  # position -> count (0=first out, n-2=last out)
+    elimination_counts = defaultdict(int)
 
-    for i in range(n_games):
-        game_seed = (seed + i) if seed is not None else None
-        engine = GameEngine(agents, seed=game_seed, verbose=False)
-        result = engine.play_game(n_players)
+    agent_names = [getattr(a, "name", f"Agent{i}") for i, a in enumerate(agents)]
+    agent_types = [type(a).__name__ for a in agents]
 
-        wins[result["winner"]] += 1
-        total_turns += result["turns"]
-        for pos, pid in enumerate(result["elimination_order"]):
-            elimination_counts[(pid, pos)] += 1
+    log_file = None
+    if log_dir and log_games > 0:
+        os.makedirs(log_dir, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = os.path.join(log_dir, f"sim_{ts}.jsonl")
+        log_file = open(log_path, "w")
+        meta = {
+            "type": "simulation",
+            "n_games": n_games,
+            "log_games": log_games,
+            "seed": seed,
+            "players": [{"id": i, "name": n, "agent_type": t}
+                        for i, (n, t) in enumerate(zip(agent_names, agent_types))],
+        }
+        log_file.write(json.dumps(meta) + "\n")
+        print(f"  Logging first {log_games} games to {log_path}")
+
+    try:
+        for i in range(n_games):
+            game_seed = (seed + i) if seed is not None else None
+            collect = log_file is not None and i < log_games
+            engine = GameEngine(agents, seed=game_seed, verbose=False, collect_events=collect)
+            result = engine.play_game(n_players)
+
+            wins[result["winner"]] += 1
+            total_turns += result["turns"]
+            for pos, pid in enumerate(result["elimination_order"]):
+                elimination_counts[(pid, pos)] += 1
+
+            if collect:
+                record = {
+                    "type": "game",
+                    "game_id": i,
+                    "seed": game_seed,
+                    "winner": result["winner"],
+                    "winner_name": agent_names[result["winner"]],
+                    "turns": result["turns"],
+                    "elimination_order": result["elimination_order"],
+                    "events": result["events"],
+                }
+                log_file.write(json.dumps(record) + "\n")
+    finally:
+        if log_file:
+            log_file.close()
 
     agent_names = [getattr(a, "name", f"Agent{i}") for i, a in enumerate(agents)]
 

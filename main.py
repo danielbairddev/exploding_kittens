@@ -41,6 +41,9 @@ def main():
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", help="Watch a single game")
     parser.add_argument("--agent", choices=["random", "heuristic", "aggressive", "chaos"], default="random")
+    parser.add_argument("--log-dir", default="logs", help="Directory for game logs")
+    parser.add_argument("--log-games", type=int, default=0, metavar="N",
+                        help="Log first N games in full detail (0 = no logging)")
     args = parser.parse_args()
 
     cls = _AGENT_CLASSES[args.agent]
@@ -53,7 +56,8 @@ def main():
         print(f"\nResult: {result}")
     else:
         print(f"Running {args.games} games with {args.players} {args.agent} agents...")
-        stats = run_simulation(agents, n_games=args.games, seed=args.seed)
+        stats = run_simulation(agents, n_games=args.games, seed=args.seed,
+                               log_dir=args.log_dir, log_games=args.log_games)
         print_stats(stats)
 
 

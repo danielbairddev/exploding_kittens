@@ -5,14 +5,22 @@ from .actions import Action, ActionType
 
 
 class GameEngine:
-    def __init__(self, agents: list, seed: int | None = None, verbose: bool = False):
+    def __init__(self, agents: list, seed: int | None = None, verbose: bool = False,
+                 collect_events: bool = False):
         self.agents = agents
         self.verbose = verbose
+        self.collect_events = collect_events
         self.rng = random.Random(seed)
+        self._events: list[dict] = []
+        self._turn: int = 0
 
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    def _event(self, type: str, **kwargs):
+        if self.collect_events:
+            self._events.append({"turn": self._turn, "type": type, **kwargs})
 
     def _observable(self, state: GameState, for_player: int) -> ObservableState:
         me = state.players[for_player]
@@ -115,6 +123,9 @@ class GameEngine:
                         f"  Player {player.player_id} plays NOPE "
                         f"(action {'cancelled' if noped else 'restored'})"
                     )
+                    self._event("nope", player=player.player_id,
+                                action_type=action.action_type.name,
+                                result="cancelled" if noped else "restored")
             if not any_played:
                 break
         return noped
@@ -129,18 +140,20 @@ class GameEngine:
 
         if action.action_type == ActionType.PLAY_ATTACK:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_ATTACK")
                 return False
             player.remove(CardType.ATTACK)
             state.discard_pile.append(Card(CardType.ATTACK))
-            # Next player takes 2 turns (stacks if already under attack)
             next_pid = self._next_alive(state, pid)
             state.current_player = next_pid
             state.turns_remaining = state.turns_remaining + 1 if state.turns_remaining > 1 else 2
             self._log(f"  Player {pid} ATTACKs — player {next_pid} takes {state.turns_remaining} turns")
-            return False  # turn already advanced
+            self._event("attack", player=pid, target=next_pid, turns_imposed=state.turns_remaining)
+            return False
 
         if action.action_type == ActionType.PLAY_SKIP:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_SKIP")
                 return False
             player.remove(CardType.SKIP)
             state.discard_pile.append(Card(CardType.SKIP))
@@ -149,19 +162,23 @@ class GameEngine:
                 state.turns_remaining = 1
                 state.current_player = self._next_alive(state, pid)
             self._log(f"  Player {pid} SKIPs")
+            self._event("skip", player=pid)
             return False
 
         if action.action_type == ActionType.PLAY_SHUFFLE:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_SHUFFLE")
                 return False
             player.remove(CardType.SHUFFLE)
             state.discard_pile.append(Card(CardType.SHUFFLE))
             self.rng.shuffle(state.draw_pile)
             self._log(f"  Player {pid} SHUFFLEs the deck")
+            self._event("shuffle", player=pid)
             return False
 
         if action.action_type == ActionType.PLAY_SEE_THE_FUTURE:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_SEE_THE_FUTURE")
                 return False
             player.remove(CardType.SEE_THE_FUTURE)
             state.discard_pile.append(Card(CardType.SEE_THE_FUTURE))
@@ -170,10 +187,12 @@ class GameEngine:
             obs.known_top3 = top3
             self.agents[pid].see_future(obs, top3)
             self._log(f"  Player {pid} SEEs THE FUTURE: {top3}")
+            self._event("see_future", player=pid, top3=[c.card_type.name for c in top3])
             return False
 
         if action.action_type == ActionType.PLAY_FAVOR:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_FAVOR", target=action.target_player)
                 return False
             player.remove(CardType.FAVOR)
             state.discard_pile.append(Card(CardType.FAVOR))
@@ -182,16 +201,17 @@ class GameEngine:
                 return False
             obs = self._observable(state, action.target_player)
             given = self.agents[action.target_player].give_card(obs, pid)
-            # Validate — must be a card they actually hold
             if given not in [c.card_type for c in target.hand]:
                 given = target.hand[0].card_type
             card = target.remove(given)
             player.hand.append(card)
             self._log(f"  Player {pid} FAVORs player {action.target_player} — gets {card}")
+            self._event("favor", player=pid, from_player=action.target_player, card=card.card_type.name)
             return False
 
         if action.action_type == ActionType.PLAY_CAT_PAIR:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_CAT_PAIR", target=action.target_player)
                 return False
             player.remove(action.cat_type)
             player.remove(action.cat_type)
@@ -202,10 +222,13 @@ class GameEngine:
                 target.hand.remove(stolen)
                 player.hand.append(stolen)
                 self._log(f"  Player {pid} CAT-PAIRs player {action.target_player} — steals {stolen}")
+                self._event("cat_steal", player=pid, from_player=action.target_player,
+                            cat_type=action.cat_type.name, card=stolen.card_type.name, method="pair")
             return False
 
         if action.action_type == ActionType.PLAY_CAT_TRIPLE:
             if self._check_nope(state, action, pid):
+                self._event("action_noped", player=pid, action_type="PLAY_CAT_TRIPLE", target=action.target_player)
                 return False
             player.remove(action.cat_type)
             player.remove(action.cat_type)
@@ -213,7 +236,6 @@ class GameEngine:
             state.discard_pile.extend([Card(action.cat_type)] * 3)
             target = state.players[action.target_player]
             if target.hand:
-                # If agent named a specific card and target has it, take it; else random
                 wanted = action.named_card
                 if wanted and any(c.card_type == wanted for c in target.hand):
                     card = target.remove(wanted)
@@ -222,6 +244,9 @@ class GameEngine:
                     target.hand.remove(card)
                 player.hand.append(card)
                 self._log(f"  Player {pid} CAT-TRIPLEs player {action.target_player} — steals {card}")
+                self._event("cat_steal", player=pid, from_player=action.target_player,
+                            cat_type=action.cat_type.name, card=card.card_type.name, method="triple",
+                            demanded=wanted.name if wanted else None)
             return False
 
         return False
@@ -247,6 +272,7 @@ class GameEngine:
 
         if card.card_type != CardType.EXPLODING_KITTEN:
             player.hand.append(card)
+            self._event("draw", player=pid, card=card.card_type.name)
             return False
 
         # Exploding kitten!
@@ -258,13 +284,16 @@ class GameEngine:
             pos = max(0, min(pos, len(state.draw_pile)))
             state.draw_pile.insert(pos, Card(CardType.EXPLODING_KITTEN))
             self._log(f"  Player {pid} DEFUSEs — inserts EK at position {pos}")
+            self._event("defuse", player=pid, ek_position=pos, deck_size=len(state.draw_pile))
             return False
         else:
             player.alive = False
             self._log(f"  Player {pid} EXPLODES 💥")
+            self._event("explode", player=pid)
             return True
 
     def play_game(self, n_players: int) -> dict:
+        self._events = []
         state = self._setup(n_players)
 
         # Notify agents of their starting hands
@@ -276,6 +305,7 @@ class GameEngine:
 
         while len(state.alive_players) > 1 and state.turn_number < max_turns:
             state.turn_number += 1
+            self._turn = state.turn_number
             pid = state.current_player
             player = state.players[pid]
 
@@ -284,6 +314,9 @@ class GameEngine:
                 continue
 
             self._log(f"\nTurn {state.turn_number} — Player {pid} (hand: {len(player.hand)} cards, deck: {state.deck_size})")
+            self._event("turn_start", player=pid, hand_size=len(player.hand),
+                        deck_size=state.deck_size,
+                        alive=[p.player_id for p in state.alive_players])
 
             # Play phase: agent chooses actions until they DRAW
             while True:
@@ -315,10 +348,14 @@ class GameEngine:
 
         winner = state.alive_players[0].player_id if state.alive_players else -1
         self._log(f"\nGame over — Player {winner} wins in {state.turn_number} turns")
+        self._event("game_over", winner=winner)
 
-        return {
+        result = {
             "winner": winner,
             "turns": state.turn_number,
             "survivors": [p.player_id for p in state.alive_players],
             "elimination_order": [p.player_id for p in state.players if not p.alive],
         }
+        if self.collect_events:
+            result["events"] = list(self._events)
+        return result
