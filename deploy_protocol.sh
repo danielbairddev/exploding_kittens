@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SERVER="root@206.189.177.24"
+SERVER="root@162.243.161.27"
 PORT=8766
 APP_DIR="/opt/ek-protocol"
 
@@ -20,7 +20,7 @@ nohup python3 $APP_DIR/protocol_server.py $PORT > /tmp/ek-protocol.log 2>&1 </de
 
 sleep 1
 if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
-  echo "Protocol docs live at http://206.189.177.24:$PORT"
+  echo "Protocol docs live at http://162.243.161.27:$PORT"
 else
   echo "ERROR: server didn't start. Check /tmp/ek-protocol.log"
   exit 1
