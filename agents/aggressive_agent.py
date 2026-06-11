@@ -12,6 +12,9 @@ class AggressiveAgent(Agent):
     Only draws when there is literally nothing left to play.
     """
 
+    ARENA = {"name": "Maverick", "emoji": "\U0001F4A5", "color": "#f97316",
+             "blurb": "Attack first, ask never.", "author": "Daniel Baird"}
+
     def __init__(self, name: str = "Aggressive", seed: int | None = None):
         self.name = name
         self.rng = random.Random(seed)

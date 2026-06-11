@@ -41,6 +41,9 @@ class SurvivalAgentV2(SurvivalAgent):
     helper methods from SurvivalAgent unchanged.
     """
 
+    ARENA = {"name": "Sly2", "emoji": "\U0001F99D", "color": "#a78bfa",
+             "blurb": "Sly, but steals everything.", "author": "Daniel Baird"}
+
     def _known_list(self, state: ObservableState):
         """Validated known top cards (list of CardType) or None if stale."""
         if self._top is not None and state.deck_size == self._seen_deck and self._top:

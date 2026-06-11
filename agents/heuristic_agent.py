@@ -24,6 +24,9 @@ class HeuristicAgent(Agent):
     - Give the least valuable card when forced
     """
 
+    ARENA = {"name": "Professor", "emoji": "\U0001F9E0", "color": "#818cf8",
+             "blurb": "Counts cards, plays the odds.", "author": "Daniel Baird"}
+
     def __init__(self, name: str = "Heuristic", seed: int | None = None):
         self.name = name
         self.rng = random.Random(seed)

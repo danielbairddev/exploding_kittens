@@ -34,6 +34,7 @@ from agents.aggressive_agent import AggressiveAgent
 from agents.chaos_agent import ChaosAgent
 from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
+from agents.coyote_agent import CoyoteAgent
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
@@ -42,26 +43,27 @@ from game.engine import GameEngine
 # turn-order advantage and (if the pool grows past the table size) matchups
 # vary game to game.
 # --------------------------------------------------------------------------
-ROSTER = [
-    {"bot_id": 0, "name": "Professor", "emoji": "\U0001F9E0", "color": "#818cf8",
-     "cls": HeuristicAgent, "blurb": "Counts cards, plays the odds."},
-    {"bot_id": 1, "name": "Maverick", "emoji": "\U0001F4A5", "color": "#f97316",
-     "cls": AggressiveAgent, "blurb": "Attack first, ask never."},
-    {"bot_id": 2, "name": "Gremlin", "emoji": "\U0001F300", "color": "#4ade80",
-     "cls": ChaosAgent, "blurb": "An agent of pure chaos."},
-    {"bot_id": 3, "name": "Sly", "emoji": "\U0001F98A", "color": "#22d3ee",
-     "cls": SurvivalAgent, "blurb": "Survives by any means."},
-    {"bot_id": 4, "name": "Lucky", "emoji": "\U0001F3B2", "color": "#f472b6",
-     "cls": RandomAgent, "blurb": "No plan. Just vibes."},
-    {"bot_id": 5, "name": "Sly2", "emoji": "\U0001F99D", "color": "#a78bfa",
-     "cls": SurvivalAgentV2, "blurb": "Sly, but steals everything."},
+# The pool is just a list of agent classes; all display/attribution metadata
+# (name, emoji, color, blurb, author) lives on each class as its `ARENA` dict,
+# so a contributor's bot file is fully self-contained. To add a bot: ship the
+# agent file with an ARENA block and append the class here. Append (don't
+# reorder) to keep bot_ids stable; bump SNAPSHOT_PATH's version when you do.
+ARENA_BOTS = [
+    HeuristicAgent,    # Professor
+    AggressiveAgent,   # Maverick
+    ChaosAgent,        # Gremlin
+    SurvivalAgent,     # Sly
+    RandomAgent,       # Lucky
+    SurvivalAgentV2,   # Sly2
+    CoyoteAgent,       # Coyote
 ]
-PLAYERS_PER_GAME = 5             # full Exploding Kittens table (6-bot pool)
+ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
+PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v4.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v5.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -223,6 +225,7 @@ class Arena:
                 leaderboard.append({
                     "bot_id": b["bot_id"], "name": b["name"], "emoji": b["emoji"],
                     "color": b["color"], "type": b["cls"].__name__, "blurb": b["blurb"],
+                    "author": b.get("author", "—"),
                     "wins": bd["wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),

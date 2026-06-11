@@ -14,6 +14,9 @@ class ChaosAgent(Agent):
     - place_exploding_kitten: random position in deck
     """
 
+    ARENA = {"name": "Gremlin", "emoji": "\U0001F300", "color": "#4ade80",
+             "blurb": "An agent of pure chaos.", "author": "Daniel Baird"}
+
     def __init__(self, name: str = "Chaos", seed: int | None = None):
         self.name = name
         self.rng = random.Random(seed)

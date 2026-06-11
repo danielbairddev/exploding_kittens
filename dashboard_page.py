@@ -102,6 +102,7 @@ PAGE = r'''<!DOCTYPE html>
   .lb-main { flex:1; min-width:0; }
   .lb-name { font-weight:600; font-size:0.86rem; display:flex; align-items:center; gap:6px; }
   .lb-blurb{ font-size:0.66rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lb-author{ color:#64748b; font-style:italic; }
   .lb-bar { height:7px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-top:4px; }
   .lb-bar i { display:block; height:100%; border-radius:4px; transition: width .6s; }
   .lb-right { text-align:right; }
@@ -147,7 +148,7 @@ PAGE = r'''<!DOCTYPE html>
   <header>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
-      <p>Six bot personalities, locked in endless combat. The simulation never sleeps.</p>
+      <p>Seven bot personalities, locked in endless combat. The simulation never sleeps.</p>
     </div>
     <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>
@@ -250,7 +251,7 @@ function renderStats(s){
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
         <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
-        <div class="lb-blurb">${b.blurb}</div>
+        <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${(b.win_rate/maxRate*100).toFixed(1)}%;background:${b.color}"></i></div>
         <div class="spark">${spark}</div>
       </div>

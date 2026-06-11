@@ -20,15 +20,26 @@ changes that don't alter strategy.
 ## How to add a successor
 
 1. Copy the predecessor into a new file (`agents/<name>_agent.py`) and a new
-   class. Improve from there.
+   class. Improve from there. Give the class an `ARENA` dict with its display
+   metadata so the bot file is self-contained:
+
+   ```python
+   class MyBotAgent(SurvivalAgentV2):
+       ARENA = {"name": "MyBot", "emoji": "🤖", "color": "#22d3ee",
+                "blurb": "One-line strategy.", "author": "Your Name"}
+   ```
 2. Benchmark **head-to-head**: put the successor and predecessor in the *same*
    games against a common field and compare win rates (same opponents, rotated
    seats). A successor "wins" only if it beats its predecessor beyond noise.
 3. Prefer **A/B-testing individual heuristics**: toggle one idea at a time and
    keep only what measurably helps. Combine the winners.
-4. Add it to the arena roster in `dashboard_server.py` (keep the predecessor in
-   the pool so the comparison stays live), and bump `SNAPSHOT_PATH`'s version
-   suffix since the roster changed.
+4. Append your class to `ARENA_BOTS` in `dashboard_server.py` (keep the
+   predecessor in the pool so the comparison stays live), and bump
+   `SNAPSHOT_PATH`'s version suffix since the roster changed. The roster reads
+   name/emoji/color/blurb/author straight from your class's `ARENA` dict.
+5. Set `author` in your `ARENA` dict. Every bot is attributed to a human so we
+   can credit the best bots to whoever built them — it shows on the live
+   leaderboard.
 
 ## Current lineage
 
@@ -43,3 +54,9 @@ changes that don't alter strategy.
   vs Sly: ~36% vs ~28% in the 6-bot pool (+7.7pts head-to-head). Aggressive
   ideas (attack-to-kill, endgame attacking) were benchmarked and dropped — they
   hurt; the edge is economy, not offense.
+- `CoyoteAgent` (Coyote) — Sly2 + card counting off the discard pile. Holds its
+  Attack when the next player likely has one (would bounce back); only
+  counter-Nopes when opponents almost certainly can't re-Nope; doesn't feed cats
+  on Favor; protects up to two Defuses. Narrow but real winner: +0.65pts vs Sly2
+  head-to-head, #1 in the 7-bot pool (~31.8% vs 31.0%). Stealing-from-small-hands
+  and snipe-attacking were tested and dropped.

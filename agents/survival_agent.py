@@ -35,6 +35,9 @@ class SurvivalAgent(Agent):
       denial.
     """
 
+    ARENA = {"name": "Sly", "emoji": "\U0001F98A", "color": "#22d3ee",
+             "blurb": "Survives by any means.", "author": "Daniel Baird"}
+
     def __init__(self, name: str = "Survival", seed: int | None = None):
         self.name = name
         self.rng = random.Random(seed)
