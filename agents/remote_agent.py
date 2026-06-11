@@ -6,7 +6,6 @@ calls over JSON/HTTP to whatever process is listening at `url`.
 This is what makes agents language-agnostic — the remote server can be
 Python, Go, Rust, JS, anything that speaks HTTP and the protocol schema.
 """
-import requests
 from agents.base import Agent
 from game.state import ObservableState
 from game.actions import Action
@@ -19,6 +18,7 @@ from protocol.schema import (
 
 class RemoteAgent(Agent):
     def __init__(self, url: str, name: str = "Remote", timeout: float = 5.0):
+        import requests  # lazy: only needed to talk to a remote HTTP agent
         self.url = url.rstrip("/")
         self.name = name
         self._timeout = timeout

@@ -317,7 +317,8 @@ class GameEngine:
             self._log(f"\nTurn {state.turn_number} — Player {pid} (hand: {len(player.hand)} cards, deck: {state.deck_size})")
             self._event("turn_start", player=pid, hand_size=len(player.hand),
                         deck_size=state.deck_size,
-                        alive=[p.player_id for p in state.alive_players])
+                        alive=[p.player_id for p in state.alive_players],
+                        hand_sizes={p.player_id: len(p.hand) for p in state.players if p.alive})
 
             # Play phase: agent chooses actions until they DRAW
             while True:
