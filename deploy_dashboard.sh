@@ -5,6 +5,32 @@ SERVER="root@162.243.161.27"
 PORT=8767
 APP_DIR="/opt/ek-arena"
 
+# --------------------------------------------------------------------------
+# Guard: never deploy code that isn't committed and pushed to GitHub, so the
+# repo always reflects what's actually running. Bypass with ALLOW_DIRTY=1.
+# --------------------------------------------------------------------------
+if [ "${ALLOW_DIRTY:-0}" != "1" ]; then
+  branch=$(git rev-parse --abbrev-ref HEAD)
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "ERROR: uncommitted changes — commit & push before deploying (or ALLOW_DIRTY=1):"
+    git status --short
+    exit 1
+  fi
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+  if [ -z "$upstream" ]; then
+    echo "ERROR: branch '$branch' has no upstream. Push it first: git push -u origin $branch"
+    exit 1
+  fi
+  git fetch -q origin "$branch" 2>/dev/null || true
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$upstream")" ]; then
+    echo "ERROR: local '$branch' differs from '$upstream' — push your commits first (or ALLOW_DIRTY=1)."
+    echo "  local : $(git rev-parse --short HEAD)"
+    echo "  remote: $(git rev-parse --short "$upstream")"
+    exit 1
+  fi
+  echo "Git check OK: $branch @ $(git rev-parse --short HEAD) matches $upstream"
+fi
+
 echo "Deploying Live Arena dashboard to $SERVER:$PORT..."
 
 # The dashboard imports the game engine + agent packages, so ship those too.
