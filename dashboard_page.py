@@ -93,6 +93,10 @@ PAGE = r'''<!DOCTYPE html>
   .speed { display:flex; gap:4px; }
   .speed button { background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:0.72rem; padding:2px 8px; border-radius:6px; cursor:pointer; }
   .speed button.on { background:var(--accent2); color:#1a1d27; border-color:var(--accent2); font-weight:700; }
+  .ladtabs { display:inline-flex; gap:4px; }
+  .ladtabs button { background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:0.7rem; padding:2px 9px; border-radius:6px; cursor:pointer; font-weight:600; }
+  .ladtabs button.on { background:var(--accent2); color:#1a1d27; border-color:var(--accent2); font-weight:700; }
+  .lb-sub { font-size:0.68rem; color:var(--muted); margin:-0.3rem 0 0.7rem; }
 
   /* ---------------- leaderboard ---------------- */
   .lb-row { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0; border-bottom:1px solid var(--border); }
@@ -190,7 +194,14 @@ PAGE = r'''<!DOCTYPE html>
 
     <!-- LEADERBOARD -->
     <div class="card">
-      <h2>ELO Ladder <span class="sub" id="lb-sub"></span></h2>
+      <h2>Ladders
+        <span class="ladtabs">
+          <button data-m="elo" class="on">ELO</button>
+          <button data-m="win">Win %</button>
+          <button data-m="place">Avg Place</button>
+        </span>
+      </h2>
+      <div class="lb-sub" id="lb-sub"></div>
       <div id="leaderboard"></div>
     </div>
   </div>
@@ -237,6 +248,66 @@ function eloSpark(vals, color){
   return `<svg class="elo-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
+/* ---------------- ladders (ELO / Win% / Avg Place) ---------------- */
+let LAST_STATS = null;
+let LADDER = 'elo';
+const LAD_DESC = {
+  elo: 'rated ELO · top 4 + 1 challenger / game',
+  win: 'win rate · share of games finished 1st',
+  place: 'average finishing place · lower is better, steadier than ELO',
+};
+document.querySelectorAll('.ladtabs button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('.ladtabs button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); LADDER = btn.dataset.m; renderLadder();
+  };
+});
+function renderLadder(){
+  if(!LAST_STATS) return;
+  const m = LADDER, rows = [...LAST_STATS.leaderboard];
+  const place = b => (b.avg_place==null ? 99 : b.avg_place);
+  if(m==='elo') rows.sort((a,b)=>b.elo-a.elo);
+  else if(m==='win') rows.sort((a,b)=>b.win_rate-a.win_rate);
+  else rows.sort((a,b)=>place(a)-place(b));
+  $('lb-sub').textContent = LAD_DESC[m];
+
+  // bar scale for the active metric
+  const elos=rows.map(x=>x.elo), wins=rows.map(x=>x.win_rate), places=rows.map(place);
+  const emin=Math.min(...elos), espan=(Math.max(...elos)-emin)||1;
+  const wmax=Math.max(0.001,...wins);
+  const pmin=Math.min(...places), pmax=Math.max(...places), pspan=(pmax-pmin)||1;
+  const barOf = b => m==='elo' ? 8+(b.elo-emin)/espan*92
+                   : m==='win' ? 8+(b.win_rate/wmax)*92
+                   : 8+(pmax-place(b))/pspan*92;   // lower place -> fuller bar
+
+  const big = b => {
+    const prov = b.provisional ? `<span class="lb-prov" title="provisional (<10 rated games)">?</span>` : '';
+    const er=b.elo_recent||[]; let trend='';
+    if(er.length>=2){const d=er[er.length-1]-er[0];
+      trend = d>=0?`<span style="color:var(--green)">▲${Math.round(d)}</span>`:`<span style="color:var(--red)">▼${Math.round(-d)}</span>`;}
+    if(m==='elo') return `<div class="lb-elo" style="color:${b.color}">${b.elo}${prov}<span class="lb-unit">ELO ${trend}</span></div>
+        <div class="lb-wr">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN · ${b.avg_place??'–'} PLACE</span></div>`;
+    if(m==='win') return `<div class="lb-elo" style="color:${b.color}">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN</span></div>
+        <div class="lb-wr">${b.elo}<span class="lb-unit">ELO · ${b.avg_place??'–'} PLACE</span></div>`;
+    return `<div class="lb-elo" style="color:${b.color}">${b.avg_place??'–'}<span class="lb-unit">AVG PLACE</span></div>
+        <div class="lb-wr">${b.elo}<span class="lb-unit">ELO · ${(b.win_rate*100).toFixed(1)}% WIN</span></div>`;
+  };
+  $('leaderboard').innerHTML = rows.map((b,i)=>{
+    const streak = b.streak>=2 ? `<span class="streak">🔥${b.streak}</span>` : '';
+    return `<div class="lb-row">
+      <div class="lb-rank">${i+1}</div>
+      <div class="lb-av">${b.emoji}</div>
+      <div class="lb-main">
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
+        <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
+        <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
+        ${eloSpark(b.elo_recent, b.color)}
+      </div>
+      <div class="lb-right">${big(b)}</div>
+    </div>`;
+  }).join('');
+}
+
 /* ---------------- stats polling ---------------- */
 async function pollStats(){
   try{
@@ -251,35 +322,9 @@ function renderStats(s){
   $('c-turns').textContent = s.avg_turns;
   $('c-boom').textContent = (s.tallies.explosions||0).toLocaleString();
   $('c-up').textContent = fmtUptime(s.uptime_secs);
-  $('lb-sub').textContent = 'top 4 + 1 challenger / game';
 
-  // ELO ladder
-  const elos = s.leaderboard.map(x=>x.elo);
-  const emin = Math.min(...elos), emax = Math.max(...elos), espan = (emax-emin)||1;
-  $('leaderboard').innerHTML = s.leaderboard.map((b,i)=>{
-    const streak = b.streak>=2 ? `<span class="streak">🔥${b.streak}</span>` : '';
-    const prov = b.provisional ? `<span class="lb-prov" title="provisional — fewer than 10 rated games">?</span>` : '';
-    const er = b.elo_recent||[];
-    let trend = '';
-    if (er.length>=2){ const d = er[er.length-1]-er[0];
-      trend = d>=0 ? `<span style="color:var(--green)">▲${Math.round(d)}</span>`
-                   : `<span style="color:var(--red)">▼${Math.round(-d)}</span>`; }
-    const barPct = (8 + (b.elo-emin)/espan*92).toFixed(1);
-    return `<div class="lb-row">
-      <div class="lb-rank">${i+1}</div>
-      <div class="lb-av">${b.emoji}</div>
-      <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
-        <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
-        <div class="lb-bar"><i style="width:${barPct}%;background:${b.color}"></i></div>
-        ${eloSpark(er, b.color)}
-      </div>
-      <div class="lb-right">
-        <div class="lb-elo" style="color:${b.color}">${b.elo}${prov}<span class="lb-unit">ELO ${trend}</span></div>
-        <div class="lb-wr">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN</span></div>
-      </div>
-    </div>`;
-  }).join('');
+  LAST_STATS = s;
+  renderLadder();
 
   // tiles
   $('tiles').innerHTML = TILE_DEFS.map(([k,e,l])=>`

@@ -102,6 +102,7 @@ class Arena:
                 "recent": deque(maxlen=SPARKLINE_MAX),  # 1 win / 0 loss
                 "streak": 0, "best_streak": 0,
                 "deaths": 0, "first_outs": 0,
+                "place_sum": 0, "place_games": 0,  # for average finishing place
                 "elo": BASE_ELO, "elo_games": 0, "elo_peak": BASE_ELO,
                 "elo_recent": deque(maxlen=ELO_TREND_MAX),  # rating after each game
             }
@@ -182,6 +183,9 @@ class Arena:
                 finish_bot_ids = [seats[s]["bot_id"] for s in finish_seats]
                 if len(set(finish_bot_ids)) == len(finish_bot_ids):  # distinct bots
                     self._update_elo(finish_bot_ids)
+                    for place, bot_id in enumerate(finish_bot_ids):   # 0 -> place 1
+                        self.bots[bot_id]["place_sum"] += place + 1
+                        self.bots[bot_id]["place_games"] += 1
 
             # Tally per *distinct* bot in this game — win rate counts only the
             # games a bot actually played, and a bot occupying two seats still
@@ -288,6 +292,7 @@ class Arena:
                     "elo": round(bd["elo"]), "elo_peak": round(bd["elo_peak"]),
                     "elo_games": bd["elo_games"], "provisional": bd["elo_games"] < ELO_PROVISIONAL_GAMES,
                     "elo_recent": [round(x) for x in bd["elo_recent"]],
+                    "avg_place": round(bd["place_sum"] / bd["place_games"], 3) if bd["place_games"] else None,
                     "wins": bd["wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
@@ -352,6 +357,8 @@ class Arena:
                     self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
                     self.bots[bid]["deaths"] = bd.get("deaths", 0)
                     self.bots[bid]["first_outs"] = bd.get("first_outs", 0)
+                    self.bots[bid]["place_sum"] = bd.get("place_sum", 0)
+                    self.bots[bid]["place_games"] = bd.get("place_games", 0)
                     self.bots[bid]["elo"] = bd.get("elo", BASE_ELO)
                     self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
                     self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
@@ -373,6 +380,8 @@ class Arena:
                     "best_streak": self.bots[b["bot_id"]]["best_streak"],
                     "deaths": self.bots[b["bot_id"]]["deaths"],
                     "first_outs": self.bots[b["bot_id"]]["first_outs"],
+                    "place_sum": self.bots[b["bot_id"]]["place_sum"],
+                    "place_games": self.bots[b["bot_id"]]["place_games"],
                     "elo": self.bots[b["bot_id"]]["elo"],
                     "elo_games": self.bots[b["bot_id"]]["elo_games"],
                     "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
