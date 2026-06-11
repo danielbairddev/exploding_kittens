@@ -6,3 +6,8 @@ dist/
 build/
 logs/
 *.jsonl
+
+# Gorilla training artifacts (regenerated)
+gorilla/checkpoint.json
+gorilla/best_policy.json
+gorilla/*.tmp
