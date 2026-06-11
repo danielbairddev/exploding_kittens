@@ -50,6 +50,12 @@ The policy network is kept **identical in shape to Orangutan** (35 features →
 | run 2 | re-BC (52 feat) | ~28.5% | new Orangutan weights; BC ceiling unchanged (still clones Coyote) |
 | run 2 | PPO self-play, 52 feat | **31.6%** best | **DEPLOYED into Orangutan.** Head-to-head 5-way vs the top heuristics: Orangutan 24.7% > Coyote 21.6% > Sly2 20.8% — Orangutan is now the #1 bot. Training continues. |
 
+## TODO (next, once the Orangutan PPO run is exhausted)
+
+**Build Gorilla proper** — the big lever past Orangutan. Two changes that
+together make it its own bot (input size changes, so it can't fold into
+Orangutan):
+
 ## Roadmap for Gorilla proper (beyond Orangutan-compat)
 
 - Richer observation encoder with a **belief state** over EK/Defuse positions
