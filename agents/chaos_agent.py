@@ -21,7 +21,7 @@ class ChaosAgent(Agent):
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
         return self.rng.choice(valid_actions)
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
         has_nope = any(c.card_type == CardType.NOPE for c in state.my_hand)
         return has_nope and self.rng.random() < 0.5
 

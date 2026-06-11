@@ -26,8 +26,8 @@ class AggressiveAgent(Agent):
             return action
         return Action(ActionType.DRAW)
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
-        # Always Nope if we can
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
+        # Always spend a Nope if we have one — don't care whether it's a Nope or counter-Nope
         return any(c.card_type == CardType.NOPE for c in state.my_hand)
 
     def give_card(self, state: ObservableState, requester_id: int) -> CardType:

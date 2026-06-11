@@ -62,7 +62,8 @@ def want_to_nope():
     data = request.get_json()
     state = dict_to_observable(data["state"])
     action = dict_to_action(data["action"])
-    result = _agent.want_to_nope(state, action)
+    currently_noped = bool(data.get("currently_noped", False))
+    result = _agent.want_to_nope(state, action, currently_noped)
     return jsonify({"nope": bool(result)})
 
 

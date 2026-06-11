@@ -43,10 +43,11 @@ class RemoteAgent(Agent):
         })
         return dict_to_action(result)
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
         result = self._post("want_to_nope", {
             "state": observable_to_dict(state),
             "action": action_to_dict(action),
+            "currently_noped": currently_noped,
         })
         return bool(result.get("nope", False))
 

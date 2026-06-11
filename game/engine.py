@@ -94,19 +94,29 @@ class GameEngine:
 
 
     def _check_nope(self, state: GameState, action: Action, acting_player: int) -> bool:
-        """Ask other players if they want to Nope. Returns True if action is noped."""
+        """
+        Nope resolution loop. Any player (including the actor) can play a Nope.
+        Keeps asking in seat order until a full round passes with no Nopes played.
+        Each Nope flips whether the action is currently cancelled.
+        """
         noped = False
-        for player in state.alive_players:
-            if player.player_id == acting_player:
-                continue
-            if not player.has(CardType.NOPE):
-                continue
-            obs = self._observable(state, player.player_id)
-            if self.agents[player.player_id].want_to_nope(obs, action):
-                player.remove(CardType.NOPE)
-                state.discard_pile.append(Card(CardType.NOPE))
-                noped = not noped  # Nopes can be counter-Noped
-                self._log(f"  Player {player.player_id} plays NOPE (action {'cancelled' if noped else 'restored'})")
+        while True:
+            any_played = False
+            for player in state.alive_players:
+                if not player.has(CardType.NOPE):
+                    continue
+                obs = self._observable(state, player.player_id)
+                if self.agents[player.player_id].want_to_nope(obs, action, noped):
+                    player.remove(CardType.NOPE)
+                    state.discard_pile.append(Card(CardType.NOPE))
+                    noped = not noped
+                    any_played = True
+                    self._log(
+                        f"  Player {player.player_id} plays NOPE "
+                        f"(action {'cancelled' if noped else 'restored'})"
+                    )
+            if not any_played:
+                break
         return noped
 
     def _apply_action(self, state: GameState, action: Action) -> bool:
@@ -168,6 +178,8 @@ class GameEngine:
             player.remove(CardType.FAVOR)
             state.discard_pile.append(Card(CardType.FAVOR))
             target = state.players[action.target_player]
+            if not target.hand:
+                return False
             obs = self._observable(state, action.target_player)
             given = self.agents[action.target_player].give_card(obs, pid)
             # Validate — must be a card they actually hold

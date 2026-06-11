@@ -81,16 +81,28 @@ class HeuristicAgent(Agent):
 
         return Action(ActionType.DRAW)
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
         if not any(c.card_type == CardType.NOPE for c in state.my_hand):
             return False
-        # Nope attacks against us with high probability
+
+        i_am_actor = (state.my_id == state.current_player)
+
+        # Counter-Nope: my action was cancelled — restore it
+        if i_am_actor and currently_noped:
+            if action.action_type in (ActionType.PLAY_ATTACK, ActionType.PLAY_SEE_THE_FUTURE,
+                                      ActionType.PLAY_SHUFFLE, ActionType.PLAY_SKIP):
+                return self.rng.random() < 0.80
+            return self.rng.random() < 0.50
+
+        # Don't Nope things that don't affect us, and don't Nope if action is already cancelled
+        if currently_noped:
+            return False
+
+        # First Nope: block harmful actions aimed at us
         if action.action_type == ActionType.PLAY_ATTACK:
             return self.rng.random() < 0.70
-        # Nope favors that target us
         if action.action_type == ActionType.PLAY_FAVOR and action.target_player == state.my_id:
             return self.rng.random() < 0.50
-        # Nope cat steals targeting us
         if action.action_type in (ActionType.PLAY_CAT_PAIR, ActionType.PLAY_CAT_TRIPLE):
             if action.target_player == state.my_id:
                 return self.rng.random() < 0.40

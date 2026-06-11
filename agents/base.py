@@ -21,8 +21,12 @@ class Agent(ABC):
         DRAW ends your play phase and draws a card.
         """
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
-        """Called when another player plays a card. Return True to Nope it."""
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
+        """
+        Called during the Nope window after any card is played.
+        currently_noped: True means the action is presently cancelled — returning True counter-Nopes it (restores it).
+        Called repeatedly in rounds until nobody plays a Nope; each call costs one Nope card.
+        """
         return False
 
     def give_card(self, state: ObservableState, requester_id: int) -> CardType:

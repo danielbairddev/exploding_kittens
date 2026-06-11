@@ -15,10 +15,9 @@ class RandomAgent(Agent):
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
         return self.rng.choice(valid_actions)
 
-    def want_to_nope(self, state: ObservableState, action: Action) -> bool:
-        return self.rng.random() < 0.2 if state.my_hand and any(
-            c.card_type == CardType.NOPE for c in state.my_hand
-        ) else False
+    def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
+        has_nope = any(c.card_type == CardType.NOPE for c in state.my_hand)
+        return has_nope and self.rng.random() < 0.2
 
     def give_card(self, state: ObservableState, requester_id: int) -> CardType:
         # Give a random non-Defuse card if possible
