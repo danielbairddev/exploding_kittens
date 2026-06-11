@@ -70,11 +70,16 @@ class GameEngine:
                     if other.player_id != state.current_player and other.hand:
                         actions.append(Action(ActionType.PLAY_FAVOR, target_player=other.player_id))
             elif ct in CAT_CARDS:
-                # Check if we have a pair
-                if sum(1 for c in player.hand if c.card_type == ct) >= 2:
+                count = sum(1 for c in player.hand if c.card_type == ct)
+                if count >= 2:
                     for other in state.alive_players:
                         if other.player_id != state.current_player and other.hand:
                             actions.append(Action(ActionType.PLAY_CAT_PAIR, target_player=other.player_id, cat_type=ct))
+                if count >= 3:
+                    for other in state.alive_players:
+                        if other.player_id != state.current_player and other.hand:
+                            # named_card=None here; agents fill it in when they choose this action
+                            actions.append(Action(ActionType.PLAY_CAT_TRIPLE, target_player=other.player_id, cat_type=ct))
 
         # Deduplicate
         seen = set()
@@ -85,6 +90,8 @@ class GameEngine:
                 seen.add(key)
                 unique.append(a)
         return unique
+
+
 
     def _check_nope(self, state: GameState, action: Action, acting_player: int) -> bool:
         """Ask other players if they want to Nope. Returns True if action is noped."""
@@ -185,6 +192,26 @@ class GameEngine:
                 self._log(f"  Player {pid} CAT-PAIRs player {action.target_player} — steals {stolen}")
             return False
 
+        if action.action_type == ActionType.PLAY_CAT_TRIPLE:
+            if self._check_nope(state, action, pid):
+                return False
+            player.remove(action.cat_type)
+            player.remove(action.cat_type)
+            player.remove(action.cat_type)
+            state.discard_pile.extend([Card(action.cat_type)] * 3)
+            target = state.players[action.target_player]
+            if target.hand:
+                # If agent named a specific card and target has it, take it; else random
+                wanted = action.named_card
+                if wanted and any(c.card_type == wanted for c in target.hand):
+                    card = target.remove(wanted)
+                else:
+                    card = self.rng.choice(target.hand)
+                    target.hand.remove(card)
+                player.hand.append(card)
+                self._log(f"  Player {pid} CAT-TRIPLEs player {action.target_player} — steals {card}")
+            return False
+
         return False
 
     def _next_alive(self, state: GameState, current: int) -> int:
@@ -252,8 +279,10 @@ class GameEngine:
                 valid = self._valid_actions(state)
                 action = self.agents[pid].choose_action(obs, valid)
 
-                # Validate
-                if action.action_type not in [a.action_type for a in valid]:
+                # Validate action type is in valid set
+                valid_types = {(a.action_type, a.target_player, a.cat_type) for a in valid}
+                key = (action.action_type, action.target_player, action.cat_type)
+                if key not in valid_types and action.action_type not in {a.action_type for a in valid}:
                     action = Action(ActionType.DRAW)
 
                 self._log(f"  Player {pid} chooses {action}")

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Exploding Kittens simulation runner.
+Exploding Kittens simulation runner (in-process).
 
 Usage:
-  python main.py                    # 4 random agents, 1000 games
-  python main.py --games 5000       # run 5000 games
-  python main.py --players 3        # 3 players
-  python main.py --verbose          # watch a single game
-  python main.py --seed 42          # reproducible results
+  python main.py                         # 4 random agents, 1000 games
+  python main.py --agent heuristic       # use heuristic agents
+  python main.py --games 5000            # run 5000 games
+  python main.py --players 3             # 3 players
+  python main.py --verbose               # watch a single game
+  python main.py --seed 42               # reproducible results
+
+For distributed (agents as separate processes / other languages):
+  python simulation/controller.py --games 100 --agents heuristic random heuristic random
 """
 import argparse
 import sys
@@ -16,8 +20,11 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agents.random_agent import RandomAgent
+from agents.heuristic_agent import HeuristicAgent
 from simulation.runner import run_simulation, print_stats
 from game.engine import GameEngine
+
+_AGENT_CLASSES = {"random": RandomAgent, "heuristic": HeuristicAgent}
 
 
 def main():
@@ -26,9 +33,11 @@ def main():
     parser.add_argument("--players", type=int, default=4, choices=[2, 3, 4, 5])
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", help="Watch a single game")
+    parser.add_argument("--agent", choices=["random", "heuristic"], default="random")
     args = parser.parse_args()
 
-    agents = [RandomAgent(name=f"Random-{i}", seed=args.seed) for i in range(args.players)]
+    cls = _AGENT_CLASSES[args.agent]
+    agents = [cls(name=f"{args.agent.capitalize()}-{i}", seed=args.seed) for i in range(args.players)]
 
     if args.verbose:
         print(f"Watching 1 game with {args.players} players...\n")
@@ -36,7 +45,7 @@ def main():
         result = engine.play_game(args.players)
         print(f"\nResult: {result}")
     else:
-        print(f"Running {args.games} games with {args.players} random agents...")
+        print(f"Running {args.games} games with {args.players} {args.agent} agents...")
         stats = run_simulation(agents, n_games=args.games, seed=args.seed)
         print_stats(stats)
 
