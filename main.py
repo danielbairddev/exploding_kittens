@@ -21,10 +21,17 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from agents.random_agent import RandomAgent
 from agents.heuristic_agent import HeuristicAgent
+from agents.aggressive_agent import AggressiveAgent
+from agents.chaos_agent import ChaosAgent
 from simulation.runner import run_simulation, print_stats
 from game.engine import GameEngine
 
-_AGENT_CLASSES = {"random": RandomAgent, "heuristic": HeuristicAgent}
+_AGENT_CLASSES = {
+    "random": RandomAgent,
+    "heuristic": HeuristicAgent,
+    "aggressive": AggressiveAgent,
+    "chaos": ChaosAgent,
+}
 
 
 def main():
@@ -33,7 +40,7 @@ def main():
     parser.add_argument("--players", type=int, default=4, choices=[2, 3, 4, 5])
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", help="Watch a single game")
-    parser.add_argument("--agent", choices=["random", "heuristic"], default="random")
+    parser.add_argument("--agent", choices=["random", "heuristic", "aggressive", "chaos"], default="random")
     args = parser.parse_args()
 
     cls = _AGENT_CLASSES[args.agent]

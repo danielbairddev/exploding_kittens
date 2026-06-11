@@ -98,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--agents", nargs="*",
         metavar="TYPE",
-        help="Agent types per player (random|heuristic). Defaults to all heuristic.",
+        help="Agent types per player (random|heuristic|aggressive|chaos). Defaults to all heuristic.",
     )
     args = parser.parse_args()
 

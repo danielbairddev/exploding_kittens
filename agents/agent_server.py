@@ -93,7 +93,7 @@ def see_future():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Exploding Kittens agent HTTP server")
-    parser.add_argument("--agent", choices=["random", "heuristic"], default="heuristic")
+    parser.add_argument("--agent", choices=["random", "heuristic", "aggressive", "chaos"], default="heuristic")
     parser.add_argument("--port", type=int, default=5001)
     parser.add_argument("--name", default=None)
     parser.add_argument("--seed", type=int, default=None)
@@ -102,9 +102,15 @@ if __name__ == "__main__":
     if args.agent == "random":
         from agents.random_agent import RandomAgent
         _agent = RandomAgent(name=args.name or f"Random@{args.port}", seed=args.seed)
-    else:
+    elif args.agent == "heuristic":
         from agents.heuristic_agent import HeuristicAgent
         _agent = HeuristicAgent(name=args.name or f"Heuristic@{args.port}", seed=args.seed)
+    elif args.agent == "aggressive":
+        from agents.aggressive_agent import AggressiveAgent
+        _agent = AggressiveAgent(name=args.name or f"Aggressive@{args.port}", seed=args.seed)
+    elif args.agent == "chaos":
+        from agents.chaos_agent import ChaosAgent
+        _agent = ChaosAgent(name=args.name or f"Chaos@{args.port}", seed=args.seed)
 
     print(f"[agent-server] {_agent.name} ({args.agent}) listening on port {args.port}", flush=True)
     app.run(host="127.0.0.1", port=args.port, debug=False)
