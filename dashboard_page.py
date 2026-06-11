@@ -108,8 +108,9 @@ PAGE = r'''<!DOCTYPE html>
   .lb-right { text-align:right; }
   .lb-rate { font-weight:700; font-size:0.95rem; font-variant-numeric:tabular-nums; }
   .lb-games{ font-size:0.64rem; color:var(--muted); }
-  .lb-elo { font-weight:800; font-size:1.15rem; font-variant-numeric:tabular-nums; line-height:1.1; }
-  .lb-sub2{ font-size:0.64rem; color:var(--muted); margin-top:2px; }
+  .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
+  .lb-wr { font-weight:700; font-size:1.0rem; color:#cbd5e1; font-variant-numeric:tabular-nums; line-height:1.2; margin-top:1px; }
+  .lb-unit{ font-size:0.56rem; color:var(--muted); font-weight:700; letter-spacing:0.05em; margin-left:3px; }
   .lb-prov{ font-size:0.6rem; color:var(--yellow); border:1px solid var(--yellow); border-radius:3px; padding:0 3px; margin-left:3px; vertical-align:middle; font-weight:700;}
   .elo-spark { width:84px; height:20px; margin-top:5px; display:block; opacity:0.85; }
   .elo-spark-empty { height:25px; }
@@ -274,8 +275,8 @@ function renderStats(s){
         ${eloSpark(er, b.color)}
       </div>
       <div class="lb-right">
-        <div class="lb-elo" style="color:${b.color}">${b.elo}${prov}</div>
-        <div class="lb-sub2">${trend} · ${(b.win_rate*100).toFixed(0)}% wr</div>
+        <div class="lb-elo" style="color:${b.color}">${b.elo}${prov}<span class="lb-unit">ELO ${trend}</span></div>
+        <div class="lb-wr">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN</span></div>
       </div>
     </div>`;
   }).join('');
