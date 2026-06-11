@@ -48,7 +48,7 @@ The policy network is kept **identical in shape to Orangutan** (35 features →
 | run 1 | PPO self-play, 35 feat | **30.7%** best | confirmed PPO escapes the BC ceiling (stable, no collapse) |
 | — | **expanded features 35 → 52** | — | added explicit unseen/card-counting (12), attack-stack depth, my-defuse count, next-4 opponents' hand sizes in turn order |
 | run 2 | re-BC (52 feat) | ~28.5% | new Orangutan weights; BC ceiling unchanged (still clones Coyote) |
-| run 2 | PPO self-play, 52 feat | _running_ | targeting > 30.7% |
+| run 2 | PPO self-play, 52 feat | **31.6%** best | **DEPLOYED into Orangutan.** Head-to-head 5-way vs the top heuristics: Orangutan 24.7% > Coyote 21.6% > Sly2 20.8% — Orangutan is now the #1 bot. Training continues. |
 
 ## Roadmap for Gorilla proper (beyond Orangutan-compat)
 
