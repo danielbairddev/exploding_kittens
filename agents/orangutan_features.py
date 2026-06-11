@@ -14,6 +14,13 @@ _COUNT_TYPES = [
     CardType.TACO_CAT, CardType.HAIRY_POTATO_CAT, CardType.BEARD_CAT,
     CardType.RAINBOW_CAT, CardType.CATTERMELON,
 ]
+# Total copies of each type in the box (Defuse is always 6 for <=6 players).
+_TOTALS = {
+    CardType.DEFUSE: 6, CardType.ATTACK: 4, CardType.SKIP: 4, CardType.FAVOR: 4,
+    CardType.SHUFFLE: 4, CardType.SEE_THE_FUTURE: 5, CardType.NOPE: 5,
+    CardType.TACO_CAT: 4, CardType.HAIRY_POTATO_CAT: 4, CardType.BEARD_CAT: 4,
+    CardType.RAINBOW_CAT: 4, CardType.CATTERMELON: 4,
+}
 EK = CardType.EXPLODING_KITTEN
 DEF = CardType.DEFUSE
 
@@ -31,7 +38,16 @@ ACTIONS = [
     ActionType.PLAY_CAT_TRIPLE,
 ]
 N_ACTIONS = len(ACTIONS)
-N_FEATURES = 35
+N_FEATURES = 52
+
+
+def _turn_order(state):
+    """Live opponents in turn order starting after me (seat order, wrapping)."""
+    order = sorted(state.alive_players)
+    if state.my_id in order:
+        i = order.index(state.my_id)
+        return order[i + 1:] + order[:i]
+    return order
 
 
 def encode(state, known_top=None):
@@ -47,19 +63,28 @@ def encode(state, known_top=None):
             disc_ct[c.card_type] += 1
 
     f = []
-    f += [hand_ct[t] / 4.0 for t in _COUNT_TYPES]        # 12
-    f += [disc_ct[t] / 6.0 for t in _COUNT_TYPES]        # 12
+    f += [hand_ct[t] / 4.0 for t in _COUNT_TYPES]                         # 12 hand
+    f += [disc_ct[t] / 6.0 for t in _COUNT_TYPES]                         # 12 discard
+    # Explicit card counting: fraction of each type still unseen (deck + others).
+    f += [max(0, _TOTALS[t] - hand_ct[t] - disc_ct[t]) / _TOTALS[t]
+          for t in _COUNT_TYPES]                                          # 12 unseen
+
     deck = max(1, state.deck_size)
     alive = max(1, len(state.alive_players))
     opp = [h for pid, h in state.hand_sizes.items() if pid != state.my_id]
-    f.append(state.deck_size / 30.0)                     # deck size
-    f.append(1.0 if state.turns_remaining > 1 else 0.0)  # under attack
-    f.append(alive / 5.0)                                # players alive
-    f.append(len(hand) / 12.0)                           # my hand size
-    f.append((max(opp) if opp else 0) / 12.0)            # biggest opponent
-    f.append((min(opp) if opp else 0) / 12.0)            # smallest opponent
-    f.append((sum(opp) / len(opp) if opp else 0) / 12.0)  # avg opponent
-    f.append((alive - 1) / deck)                         # EK density
+    f.append(state.deck_size / 30.0)                                      # deck size
+    f.append(min(state.turns_remaining, 5) / 5.0)                        # attack stack depth
+    f.append(1.0 if state.turns_remaining > 1 else 0.0)                  # under attack
+    f.append(alive / 5.0)                                                 # players alive
+    f.append(len(hand) / 12.0)                                            # my hand size
+    f.append(hand_ct[DEF] / 2.0)                                          # my defuses
+    f.append((alive - 1) / deck)                                          # EK density
+    # opponents in turn order: next up to 4 hand sizes (0 if fewer alive)
+    ring = _turn_order(state)
+    sizes = [state.hand_sizes.get(pid, 0) / 12.0 for pid in ring[:4]]
+    f += sizes + [0.0] * (4 - len(sizes))                                 # 4 next opponents
+    f.append((max(opp) if opp else 0) / 12.0)                            # biggest opponent
+    f.append((sum(opp) / len(opp) if opp else 0) / 12.0)                 # avg opponent
     # known top (from See the Future): known?, top0 is EK?, EK anywhere in top3?
     if known_top:
         f.append(1.0)
@@ -67,7 +92,7 @@ def encode(state, known_top=None):
         f.append(1.0 if any(c == EK for c in known_top) else 0.0)
     else:
         f += [0.0, 0.0, 0.0]
-    return f                                             # len 35
+    return f                                                             # len 52
 
 
 def valid_action_mask(valid_actions):

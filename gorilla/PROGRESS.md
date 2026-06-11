@@ -44,8 +44,11 @@ The policy network is kept **identical in shape to Orangutan** (35 features →
 
 | date | change | eval win% vs fleet | notes |
 |------|--------|--------------------|-------|
-| (baseline) | BC clone of Coyote | ~28.3% | Orangutan's shipped weights |
-| _pending_ | PPO self-play warm-started from BC | _running_ | targeting > 28.3% |
+| (baseline) | BC clone of Coyote (35 feat) | ~28.3% | original Orangutan weights |
+| run 1 | PPO self-play, 35 feat | **30.7%** best | confirmed PPO escapes the BC ceiling (stable, no collapse) |
+| — | **expanded features 35 → 52** | — | added explicit unseen/card-counting (12), attack-stack depth, my-defuse count, next-4 opponents' hand sizes in turn order |
+| run 2 | re-BC (52 feat) | ~28.5% | new Orangutan weights; BC ceiling unchanged (still clones Coyote) |
+| run 2 | PPO self-play, 52 feat | _running_ | targeting > 30.7% |
 
 ## Roadmap for Gorilla proper (beyond Orangutan-compat)
 
