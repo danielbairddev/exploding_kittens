@@ -38,3 +38,8 @@ changes that don't alter strategy.
 - `HeuristicAgent` (Professor) — first attempt at "smart"; underperforms random.
 - `SurvivalAgent` (Sly) — survival-first + information + weaponised EK placement.
   Big jump: ~35% in the 5-player arena (20% baseline).
+- `SurvivalAgentV2` (Sly2) — Sly + relentless stealing (always play cat pairs +
+  proactive Favor), See-the-Future conserved, last Defuse protected. A/B-tested
+  vs Sly: ~36% vs ~28% in the 6-bot pool (+7.7pts head-to-head). Aggressive
+  ideas (attack-to-kill, endgame attacking) were benchmarked and dropped — they
+  hurt; the edge is economy, not offense.

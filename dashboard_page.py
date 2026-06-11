@@ -147,7 +147,7 @@ PAGE = r'''<!DOCTYPE html>
   <header>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
-      <p>Five bot personalities, locked in endless combat. The simulation never sleeps.</p>
+      <p>Six bot personalities, locked in endless combat. The simulation never sleeps.</p>
     </div>
     <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>

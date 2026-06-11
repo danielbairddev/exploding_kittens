@@ -31,8 +31,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agents.random_agent import RandomAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.aggressive_agent import AggressiveAgent
-from agents.chaos_agent import ChaosAgent  # benched, kept for easy swap-in
+from agents.chaos_agent import ChaosAgent
 from agents.survival_agent import SurvivalAgent
+from agents.survival_agent_v2 import SurvivalAgentV2
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
@@ -52,13 +53,15 @@ ROSTER = [
      "cls": SurvivalAgent, "blurb": "Survives by any means."},
     {"bot_id": 4, "name": "Lucky", "emoji": "\U0001F3B2", "color": "#f472b6",
      "cls": RandomAgent, "blurb": "No plan. Just vibes."},
+    {"bot_id": 5, "name": "Sly2", "emoji": "\U0001F99D", "color": "#a78bfa",
+     "cls": SurvivalAgentV2, "blurb": "Sly, but steals everything."},
 ]
-PLAYERS_PER_GAME = 5             # full Exploding Kittens table
+PLAYERS_PER_GAME = 5             # full Exploding Kittens table (6-bot pool)
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v3.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v4.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
