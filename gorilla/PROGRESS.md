@@ -48,7 +48,18 @@ The policy network is kept **identical in shape to Orangutan** (35 features →
 | run 1 | PPO self-play, 35 feat | **30.7%** best | confirmed PPO escapes the BC ceiling (stable, no collapse) |
 | — | **expanded features 35 → 52** | — | added explicit unseen/card-counting (12), attack-stack depth, my-defuse count, next-4 opponents' hand sizes in turn order |
 | run 2 | re-BC (52 feat) | ~28.5% | new Orangutan weights; BC ceiling unchanged (still clones Coyote) |
-| run 2 | PPO self-play, 52 feat | **31.6%** best | **DEPLOYED into Orangutan.** Head-to-head 5-way vs the top heuristics: Orangutan 24.7% > Coyote 21.6% > Sly2 20.8% — Orangutan is now the #1 bot. Training continues. |
+| run 2 | PPO self-play, 52 feat | **40.1%** final | **DEPLOYED into Orangutan** (redeployed as it climbed: 31.6→35.4→37.4→40.1%). Now the clear #1 bot; head-to-head it beats Coyote/Sly2 by several points. Run concluded (plateau). |
+
+## Gorilla proper — progress
+
+- **GameTracker** (`tracker.py`) built + validated. Reconstructs the full action
+  log from an agent's `want_to_nope` callbacks (fires for every play by every
+  player) → accurate per-opponent behavior profiles. Verified it fingerprints
+  bots correctly (Professor = 43% See-the-Future/30% Attack; Sly2 = 35%
+  cat-pair). This is the opponent-modeling foundation for Gorilla + Abaddon.
+- **Next:** belief-state encoder (deck-position probabilities) + a multi-head
+  Actor-Critic that also makes the Nope / give-card / placement decisions
+  (masked), with the tracker's profile features fed in.
 
 ## TODO (next, once the Orangutan PPO run is exhausted)
 
