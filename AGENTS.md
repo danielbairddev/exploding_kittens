@@ -60,3 +60,11 @@ changes that don't alter strategy.
   on Favor; protects up to two Defuses. Narrow but real winner: +0.65pts vs Sly2
   head-to-head, #1 in the 7-bot pool (~31.8% vs 31.0%). Stealing-from-small-hands
   and snipe-attacking were tested and dropped.
+- `OrangutanAgent` (Orangutan) — neural net (35→64→32→8 MLP) picks the action
+  type; other endpoints inherited from Coyote. Trained by behavioral cloning of
+  Coyote over ~580k decisions (99.7% action-match), reaching ~28% win / 2.62
+  place vs the fleet — i.e. it matches the top heuristics through a learned
+  policy. REINFORCE finetuning was tried and *degraded* it (drifts off the BC
+  optimum), so we ship the BC weights. Inference is pure-Python (weights in
+  agents/orangutan_weights.json); training is train_orangutan.py (numpy).
+  (Display blurb is deliberately uninformative.)

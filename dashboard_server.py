@@ -35,6 +35,7 @@ from agents.chaos_agent import ChaosAgent
 from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.coyote_agent import CoyoteAgent
+from agents.orangutan_agent import OrangutanAgent
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
@@ -56,6 +57,7 @@ ARENA_BOTS = [
     RandomAgent,       # Lucky
     SurvivalAgentV2,   # Sly2
     CoyoteAgent,       # Coyote
+    OrangutanAgent,    # Orangutan
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
@@ -63,7 +65,7 @@ PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v6.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v7.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -319,10 +321,17 @@ class Arena:
             return self.replay_buffer[random.randrange(len(self.replay_buffer))]
 
     def rated_lineup(self, rng):
-        """Matchmaking for a rated game: the top (PLAYERS_PER_GAME - 1) bots by
-        ELO, plus one random challenger from the rest, seated randomly."""
+        """Matchmaking for a rated game: the top (PLAYERS_PER_GAME - 1) bots,
+        plus one random challenger from the rest, seated randomly.
+
+        Ranked by average finishing place (lower = better) — steadier than ELO,
+        so the 'top' set doesn't thrash. Bots with little data sort to the middle
+        so they still get sampled."""
+        def avg_place(b):
+            bd = self.bots[b["bot_id"]]
+            return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
-            ordered = sorted(ROSTER, key=lambda b: self.bots[b["bot_id"]]["elo"], reverse=True)
+            ordered = sorted(ROSTER, key=avg_place)   # ascending: best place first
         n_top = min(PLAYERS_PER_GAME - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]

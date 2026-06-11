@@ -158,7 +158,7 @@ PAGE = r'''<!DOCTYPE html>
   <header>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
-      <p>Seven bots climbing a rated ELO ladder — top 4 plus a challenger every game. The simulation never sleeps.</p>
+      <p>Bots battling it out — ranked by win rate &amp; average placement. Top performers plus a challenger every game. The simulation never sleeps.</p>
     </div>
     <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>
@@ -196,9 +196,9 @@ PAGE = r'''<!DOCTYPE html>
     <div class="card">
       <h2>Ladders
         <span class="ladtabs">
-          <button data-m="elo" class="on">ELO</button>
-          <button data-m="win">Win %</button>
+          <button data-m="win" class="on">Win %</button>
           <button data-m="place">Avg Place</button>
+          <button data-m="elo">ELO</button>
         </span>
       </h2>
       <div class="lb-sub" id="lb-sub"></div>
@@ -250,11 +250,11 @@ function eloSpark(vals, color){
 
 /* ---------------- ladders (ELO / Win% / Avg Place) ---------------- */
 let LAST_STATS = null;
-let LADDER = 'elo';
+let LADDER = 'win';
 const LAD_DESC = {
-  elo: 'rated ELO · top 4 + 1 challenger / game',
   win: 'win rate · share of games finished 1st',
-  place: 'average finishing place · lower is better, steadier than ELO',
+  place: 'average finishing place · lower is better, the steadiest signal',
+  elo: 'rated ELO · noisy in a high-luck game, shown for reference',
 };
 document.querySelectorAll('.ladtabs button').forEach(btn=>{
   btn.onclick = ()=>{
@@ -301,7 +301,7 @@ function renderLadder(){
         <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
         <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
-        ${eloSpark(b.elo_recent, b.color)}
+        ${m==='elo' ? eloSpark(b.elo_recent, b.color) : ''}
       </div>
       <div class="lb-right">${big(b)}</div>
     </div>`;
