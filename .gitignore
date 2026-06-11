@@ -11,3 +11,5 @@ logs/
 gorilla/checkpoint.json
 gorilla/best_policy.json
 gorilla/*.tmp
+gorilla/checkpoint_g.json
+gorilla/best_policy_g.json

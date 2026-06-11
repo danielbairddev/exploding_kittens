@@ -17,9 +17,10 @@ PARAM_KEYS = ("W1", "b1", "W2", "b2", "W3", "b3", "Wv", "bv")
 
 
 class ActorCritic:
-    def __init__(self, seed=0):
+    def __init__(self, seed=0, n_features=N_FEATURES):
         rng = np.random.default_rng(seed)
-        self.W1 = rng.standard_normal((H1, N_FEATURES)) * np.sqrt(2 / N_FEATURES)
+        self.n_features = n_features
+        self.W1 = rng.standard_normal((H1, n_features)) * np.sqrt(2 / n_features)
         self.b1 = np.zeros(H1)
         self.W2 = rng.standard_normal((H2, H1)) * np.sqrt(2 / H1)
         self.b2 = np.zeros(H2)
@@ -70,7 +71,7 @@ class ActorCritic:
             getattr(self, k)[...] = np.array(d[k])
 
     def save_policy(self, path):
-        d = self.policy_weights(); d["arch"] = [N_FEATURES, H1, H2, N_ACTIONS]
+        d = self.policy_weights(); d["arch"] = [self.n_features, H1, H2, N_ACTIONS]
         tmp = path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(d, f)
