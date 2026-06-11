@@ -63,18 +63,18 @@ PAGE = r'''<!DOCTYPE html>
   .stage.flash-green { animation: flashGreen .5s; }
   .stage.shake .big { animation: shake .5s; }
 
-  .players { display:grid; grid-template-columns: repeat(4,1fr); gap:0.6rem; }
-  @media (max-width:560px){ .players{ grid-template-columns:repeat(2,1fr);} }
+  .players { display:grid; grid-template-columns: repeat(5,1fr); gap:0.45rem; }
+  @media (max-width:560px){ .players{ grid-template-columns:repeat(3,1fr);} }
   .player {
     background: var(--surface2); border:1px solid var(--border); border-radius:12px;
-    padding:0.7rem 0.6rem; text-align:center; position:relative; transition: all .25s;
+    padding:0.7rem 0.45rem; text-align:center; position:relative; transition: all .25s;
   }
-  .player .av { font-size:1.7rem; line-height:1; }
-  .player .nm { font-weight:600; font-size:0.84rem; margin-top:0.15rem; }
-  .player .ty { font-size:0.66rem; color:var(--muted); }
-  .player .hand { display:flex; justify-content:center; gap:2px; margin-top:0.5rem; height:26px; align-items:flex-end; }
+  .player .av { font-size:1.6rem; line-height:1; }
+  .player .nm { font-weight:600; font-size:0.8rem; margin-top:0.15rem; }
+  .player .ty { font-size:0.64rem; color:var(--muted); }
+  .player .hand { display:flex; justify-content:center; gap:2px; margin-top:0.5rem; height:26px; align-items:flex-end; overflow:hidden; }
   .player .hand i {
-    display:block; width:13px; height:20px; border-radius:3px;
+    display:block; width:10px; height:20px; border-radius:3px; flex:none;
     background: linear-gradient(160deg,#3b3f57,#262a3c); border:1px solid #454a66;
   }
   .player .hcount{ font-size:0.66rem; color:var(--muted); margin-top:2px;}
@@ -147,7 +147,7 @@ PAGE = r'''<!DOCTYPE html>
   <header>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
-      <p>Four bot personalities, locked in endless combat. The simulation never sleeps.</p>
+      <p>Five bot personalities, locked in endless combat. The simulation never sleeps.</p>
     </div>
     <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>
@@ -297,7 +297,7 @@ const sleep = ms => new Promise(r=>setTimeout(r, ms*SPEED));
 let table = null;
 function renderTable(highlightWinner=-1){
   $('players').innerHTML = table.seats.map((p,seat)=>{
-    const n = Math.min(p.hand, 12);
+    const n = Math.min(p.hand, 9);
     const cards = '<i></i>'.repeat(Math.max(0,n));
     let cls = 'player';
     if(seat===table.current && p.alive) cls+=' current';

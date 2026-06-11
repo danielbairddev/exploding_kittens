@@ -36,25 +36,29 @@ from agents.survival_agent import SurvivalAgent
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
-# Roster — stable bot identities. Each plays a rotating seat every game so no
-# bot gets a permanent turn-order advantage.
+# Roster — the full pool of bot personalities. Each game randomly draws
+# PLAYERS_PER_GAME of them into random seats, so no bot gets a permanent
+# turn-order advantage and (if the pool grows past the table size) matchups
+# vary game to game.
 # --------------------------------------------------------------------------
 ROSTER = [
     {"bot_id": 0, "name": "Professor", "emoji": "\U0001F9E0", "color": "#818cf8",
      "cls": HeuristicAgent, "blurb": "Counts cards, plays the odds."},
     {"bot_id": 1, "name": "Maverick", "emoji": "\U0001F4A5", "color": "#f97316",
      "cls": AggressiveAgent, "blurb": "Attack first, ask never."},
-    {"bot_id": 2, "name": "Sly", "emoji": "\U0001F98A", "color": "#22d3ee",
-     "cls": SurvivalAgent, "blurb": "Survives by any means. Weaponises the kitten."},
-    {"bot_id": 3, "name": "Lucky", "emoji": "\U0001F3B2", "color": "#f472b6",
+    {"bot_id": 2, "name": "Gremlin", "emoji": "\U0001F300", "color": "#4ade80",
+     "cls": ChaosAgent, "blurb": "An agent of pure chaos."},
+    {"bot_id": 3, "name": "Sly", "emoji": "\U0001F98A", "color": "#22d3ee",
+     "cls": SurvivalAgent, "blurb": "Survives by any means."},
+    {"bot_id": 4, "name": "Lucky", "emoji": "\U0001F3B2", "color": "#f472b6",
      "cls": RandomAgent, "blurb": "No plan. Just vibes."},
 ]
-N_PLAYERS = len(ROSTER)
+PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v2.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v3.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -298,15 +302,14 @@ GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.02"))   # ~50 games/sec
 
 
 def simulation_loop():
-    agents = [b["cls"](name=b["name"]) for b in ROSTER]
+    agents = {b["bot_id"]: b["cls"](name=b["name"]) for b in ROSTER}
     rng = random.Random()
+    n = min(PLAYERS_PER_GAME, len(ROSTER))
     while True:
-        order = list(range(N_PLAYERS))
-        rng.shuffle(order)                       # rotate seats
-        seats = [ROSTER[i] for i in order]
-        seat_agents = [agents[i] for i in order]
+        seats = rng.sample(ROSTER, n)            # random subset, already in random seat order
+        seat_agents = [agents[b["bot_id"]] for b in seats]
         engine = GameEngine(seat_agents, seed=None, collect_events=True)
-        result = engine.play_game(N_PLAYERS)
+        result = engine.play_game(n)
         ARENA.record_game(seats, result, result["events"])
         if GAME_SLEEP:
             time.sleep(GAME_SLEEP)
