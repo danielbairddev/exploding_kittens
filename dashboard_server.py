@@ -63,12 +63,25 @@ PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v5.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v6.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
+ELO_TREND_MAX = 60               # recent rating samples for the trend line
 MAX_LOG_FILES = 8                # *.jsonl files kept in logs/
 MAX_LOG_DIR_BYTES = 200 * 1024 * 1024
+
+# Multiplayer ELO. Each game's finishing order is decomposed into all pairwise
+# matchups (higher finish beats lower); each pair gets a standard ELO update,
+# summed and normalized by the opponent count (N-1) so one game moves a rating
+# by a sane amount. Exploding Kittens is high-variance, so we use a provisional
+# K for the first few games (move fast to the right bracket), then a low K to
+# absorb luck and reward consistency. All deltas are computed from PRE-game
+# ratings and committed together (zero-sum-safe).
+BASE_ELO = 1200.0
+ELO_K_PROVISIONAL = 32.0
+ELO_K_ESTABLISHED = 16.0
+ELO_PROVISIONAL_GAMES = 10
 
 
 class Arena:
@@ -89,6 +102,8 @@ class Arena:
                 "recent": deque(maxlen=SPARKLINE_MAX),  # 1 win / 0 loss
                 "streak": 0, "best_streak": 0,
                 "deaths": 0, "first_outs": 0,
+                "elo": BASE_ELO, "elo_games": 0, "elo_peak": BASE_ELO,
+                "elo_recent": deque(maxlen=ELO_TREND_MAX),  # rating after each game
             }
             for b in ROSTER
         }
@@ -148,12 +163,25 @@ class Arena:
             if t != "nope":
                 nope_run = 0
 
+        # Full finishing order (best -> worst): winner, then last-to-die ...
+        # first-to-die. death_seats is chronological (from explode events).
+        finish_seats = None
+        if winner_seat >= 0 and len(death_seats) == len(seats) - 1:
+            finish_seats = [winner_seat] + list(reversed(death_seats))
+
         with self.lock:
             self.total_games += 1
             self.total_turns += result["turns"]
 
             for k, v in ev_counts.items():
                 self.tallies[k] += v
+
+            # ELO first, so the provisional/established K reads each bot's
+            # game count from *before* this game.
+            if finish_seats is not None:
+                finish_bot_ids = [seats[s]["bot_id"] for s in finish_seats]
+                if len(set(finish_bot_ids)) == len(finish_bot_ids):  # distinct bots
+                    self._update_elo(finish_bot_ids)
 
             # Tally per *distinct* bot in this game — win rate counts only the
             # games a bot actually played, and a bot occupying two seats still
@@ -203,6 +231,37 @@ class Arena:
                 "events": events,
             })
 
+    def _update_elo(self, order):
+        """Pairwise multiplayer ELO. `order` is bot_ids best->worst.
+
+        Caller holds self.lock. Expected scores use PRE-game ratings for every
+        player; all deltas are computed first, then committed together so the
+        update is order-independent (zero-sum-safe, modulo the per-player K).
+        """
+        n = len(order)
+        if n < 2:
+            return
+        pre = {bid: self.bots[bid]["elo"] for bid in order}
+        place = {bid: i for i, bid in enumerate(order)}   # 0 = best finish
+        deltas = {}
+        for a in order:
+            expected = 0.0
+            actual = 0.0
+            for b in order:
+                if a == b:
+                    continue
+                expected += 1.0 / (1.0 + 10 ** ((pre[b] - pre[a]) / 400.0))
+                actual += 1.0 if place[a] < place[b] else 0.0
+            k = (ELO_K_PROVISIONAL if self.bots[a]["elo_games"] < ELO_PROVISIONAL_GAMES
+                 else ELO_K_ESTABLISHED)
+            deltas[a] = k * (actual - expected) / (n - 1)
+        for bid in order:
+            bd = self.bots[bid]
+            bd["elo"] += deltas[bid]
+            bd["elo_games"] += 1
+            bd["elo_peak"] = max(bd["elo_peak"], bd["elo"])
+            bd["elo_recent"].append(round(bd["elo"], 1))
+
     # --------------------------------------------------------------- serialize
     def sample_rate(self):
         now = time.time()
@@ -226,13 +285,16 @@ class Arena:
                     "bot_id": b["bot_id"], "name": b["name"], "emoji": b["emoji"],
                     "color": b["color"], "type": b["cls"].__name__, "blurb": b["blurb"],
                     "author": b.get("author", "—"),
+                    "elo": round(bd["elo"]), "elo_peak": round(bd["elo_peak"]),
+                    "elo_games": bd["elo_games"], "provisional": bd["elo_games"] < ELO_PROVISIONAL_GAMES,
+                    "elo_recent": [round(x) for x in bd["elo_recent"]],
                     "wins": bd["wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
                     "first_outs": bd["first_outs"],
                 })
-            leaderboard.sort(key=lambda x: (x["win_rate"], x["wins"]), reverse=True)
+            leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
 
             return {
                 "uptime_secs": int(now - self.started_at),
@@ -250,6 +312,25 @@ class Arena:
             if not self.replay_buffer:
                 return None
             return self.replay_buffer[random.randrange(len(self.replay_buffer))]
+
+    def rated_lineup(self, rng):
+        """Matchmaking for a rated game: the top (PLAYERS_PER_GAME - 1) bots by
+        ELO, plus one random challenger from the rest, seated randomly."""
+        with self.lock:
+            ordered = sorted(ROSTER, key=lambda b: self.bots[b["bot_id"]]["elo"], reverse=True)
+        n_top = min(PLAYERS_PER_GAME - 1, len(ordered))
+        top = ordered[:n_top]
+        rest = ordered[n_top:]
+        lineup = list(top)
+        if rest:
+            lineup.append(rng.choice(rest))
+        # If the pool is smaller than the ring, top up with distinct extras.
+        pool = [b for b in ROSTER if b not in lineup]
+        rng.shuffle(pool)
+        while len(lineup) < PLAYERS_PER_GAME and pool:
+            lineup.append(pool.pop())
+        rng.shuffle(lineup)
+        return lineup
 
     # ----------------------------------------------------------- persistence
     def _load_snapshot(self):
@@ -271,6 +352,10 @@ class Arena:
                     self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
                     self.bots[bid]["deaths"] = bd.get("deaths", 0)
                     self.bots[bid]["first_outs"] = bd.get("first_outs", 0)
+                    self.bots[bid]["elo"] = bd.get("elo", BASE_ELO)
+                    self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
+                    self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
+                    self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
             print(f"[arena] restored {self.total_games} games from snapshot", flush=True)
         except Exception as exc:  # never let a bad snapshot kill startup
             print(f"[arena] snapshot load skipped: {exc}", flush=True)
@@ -288,6 +373,10 @@ class Arena:
                     "best_streak": self.bots[b["bot_id"]]["best_streak"],
                     "deaths": self.bots[b["bot_id"]]["deaths"],
                     "first_outs": self.bots[b["bot_id"]]["first_outs"],
+                    "elo": self.bots[b["bot_id"]]["elo"],
+                    "elo_games": self.bots[b["bot_id"]]["elo_games"],
+                    "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
+                    "elo_recent": list(self.bots[b["bot_id"]]["elo_recent"]),
                 } for b in ROSTER},
             }
         tmp = SNAPSHOT_PATH + ".tmp"
@@ -333,7 +422,8 @@ def build_lineup(rng):
 def simulation_loop():
     rng = random.Random()
     while True:
-        seats = build_lineup(rng)
+        # Rated ladder: top bots by ELO + a random challenger each game.
+        seats = ARENA.rated_lineup(rng)
         # Fresh agent instance per seat so a repeated agent never shares state
         # across two seats in the same game.
         seat_agents = [b["cls"](name=b["name"]) for b in seats]

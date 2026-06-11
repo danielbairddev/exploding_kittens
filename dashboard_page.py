@@ -108,6 +108,11 @@ PAGE = r'''<!DOCTYPE html>
   .lb-right { text-align:right; }
   .lb-rate { font-weight:700; font-size:0.95rem; font-variant-numeric:tabular-nums; }
   .lb-games{ font-size:0.64rem; color:var(--muted); }
+  .lb-elo { font-weight:800; font-size:1.15rem; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .lb-sub2{ font-size:0.64rem; color:var(--muted); margin-top:2px; }
+  .lb-prov{ font-size:0.6rem; color:var(--yellow); border:1px solid var(--yellow); border-radius:3px; padding:0 3px; margin-left:3px; vertical-align:middle; font-weight:700;}
+  .elo-spark { width:84px; height:20px; margin-top:5px; display:block; opacity:0.85; }
+  .elo-spark-empty { height:25px; }
   .streak { font-size:0.64rem; color:var(--yellow); }
   .spark { display:flex; gap:2px; margin-top:4px; }
   .spark i { width:5px; height:5px; border-radius:1px; background:#333a52; }
@@ -148,7 +153,7 @@ PAGE = r'''<!DOCTYPE html>
   <header>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
-      <p>Seven bot personalities, locked in endless combat. The simulation never sleeps.</p>
+      <p>Seven bots climbing a rated ELO ladder — top 4 plus a challenger every game. The simulation never sleeps.</p>
     </div>
     <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>
@@ -184,7 +189,7 @@ PAGE = r'''<!DOCTYPE html>
 
     <!-- LEADERBOARD -->
     <div class="card">
-      <h2>Leaderboard <span class="sub" id="lb-sub"></span></h2>
+      <h2>ELO Ladder <span class="sub" id="lb-sub"></span></h2>
       <div id="leaderboard"></div>
     </div>
   </div>
@@ -224,6 +229,12 @@ function fmtUptime(s){
   if(h>0) return `${h}h ${m}m`;
   return `${m}m ${s%60}s`;
 }
+function eloSpark(vals, color){
+  if(!vals || vals.length<2) return '<div class="elo-spark-empty"></div>';
+  const w=84, h=20, min=Math.min(...vals), max=Math.max(...vals), span=(max-min)||1;
+  const pts = vals.map((v,i)=>`${(i/(vals.length-1)*w).toFixed(1)},${(h-2-((v-min)/span)*(h-4)).toFixed(1)}`).join(' ');
+  return `<svg class="elo-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
 
 /* ---------------- stats polling ---------------- */
 async function pollStats(){
@@ -239,25 +250,32 @@ function renderStats(s){
   $('c-turns').textContent = s.avg_turns;
   $('c-boom').textContent = (s.tallies.explosions||0).toLocaleString();
   $('c-up').textContent = fmtUptime(s.uptime_secs);
-  $('lb-sub').textContent = s.total_games.toLocaleString()+' games';
+  $('lb-sub').textContent = 'top 4 + 1 challenger / game';
 
-  // leaderboard
-  const maxRate = Math.max(0.001, ...s.leaderboard.map(x=>x.win_rate));
+  // ELO ladder
+  const elos = s.leaderboard.map(x=>x.elo);
+  const emin = Math.min(...elos), emax = Math.max(...elos), espan = (emax-emin)||1;
   $('leaderboard').innerHTML = s.leaderboard.map((b,i)=>{
-    const spark = b.recent.slice(-24).map(w=>`<i class="${w? 'w':''}"></i>`).join('');
     const streak = b.streak>=2 ? `<span class="streak">🔥${b.streak}</span>` : '';
+    const prov = b.provisional ? `<span class="lb-prov" title="provisional — fewer than 10 rated games">?</span>` : '';
+    const er = b.elo_recent||[];
+    let trend = '';
+    if (er.length>=2){ const d = er[er.length-1]-er[0];
+      trend = d>=0 ? `<span style="color:var(--green)">▲${Math.round(d)}</span>`
+                   : `<span style="color:var(--red)">▼${Math.round(-d)}</span>`; }
+    const barPct = (8 + (b.elo-emin)/espan*92).toFixed(1);
     return `<div class="lb-row">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
         <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
         <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
-        <div class="lb-bar"><i style="width:${(b.win_rate/maxRate*100).toFixed(1)}%;background:${b.color}"></i></div>
-        <div class="spark">${spark}</div>
+        <div class="lb-bar"><i style="width:${barPct}%;background:${b.color}"></i></div>
+        ${eloSpark(er, b.color)}
       </div>
       <div class="lb-right">
-        <div class="lb-rate" style="color:${b.color}">${(b.win_rate*100).toFixed(1)}%</div>
-        <div class="lb-games">${b.wins.toLocaleString()} / ${b.games.toLocaleString()}</div>
+        <div class="lb-elo" style="color:${b.color}">${b.elo}${prov}</div>
+        <div class="lb-sub2">${trend} · ${(b.win_rate*100).toFixed(0)}% wr</div>
       </div>
     </div>`;
   }).join('');
