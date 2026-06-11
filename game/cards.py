@@ -42,7 +42,7 @@ class Card:
 
 
 def build_deck(n_players: int) -> list[Card]:
-    """Build and return a shuffled deck (without exploding kittens/defuses — added separately)."""
+    """Build the action/cat deck — no Exploding Kittens or Defuses (both added separately in setup)."""
     counts = {
         CardType.ATTACK: 4,
         CardType.SKIP: 4,
@@ -55,7 +55,5 @@ def build_deck(n_players: int) -> list[Card]:
         CardType.BEARD_CAT: 4,
         CardType.RAINBOW_CAT: 4,
         CardType.CATTERMELON: 4,
-        # Extra defuses go in the deck (each player gets 1 dealt separately)
-        CardType.DEFUSE: max(0, 6 - n_players),
     }
     return [Card(ct) for ct, n in counts.items() for _ in range(n)]

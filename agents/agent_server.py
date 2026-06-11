@@ -32,10 +32,6 @@ app = Flask(__name__)
 _agent = None
 
 
-def _get_agent():
-    return _agent
-
-
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "name": getattr(_agent, "name", "unknown")})

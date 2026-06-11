@@ -1,6 +1,8 @@
-*.pyc
 __pycache__/
-*.egg-info/
-.DS_Store
-results/
+*.py[cod]
 .venv/
+*.egg-info/
+dist/
+build/
+logs/
+*.jsonl

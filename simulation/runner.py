@@ -16,7 +16,6 @@ def run_simulation(agents: list, n_games: int = 1000, seed: int | None = None,
     n_players = len(agents)
     wins = defaultdict(int)
     total_turns = 0
-    elimination_counts = defaultdict(int)
 
     agent_names = [getattr(a, "name", f"Agent{i}") for i, a in enumerate(agents)]
     agent_types = [type(a).__name__ for a in agents]
@@ -47,8 +46,6 @@ def run_simulation(agents: list, n_games: int = 1000, seed: int | None = None,
 
             wins[result["winner"]] += 1
             total_turns += result["turns"]
-            for pos, pid in enumerate(result["elimination_order"]):
-                elimination_counts[(pid, pos)] += 1
 
             if collect:
                 record = {
@@ -65,8 +62,6 @@ def run_simulation(agents: list, n_games: int = 1000, seed: int | None = None,
     finally:
         if log_file:
             log_file.close()
-
-    agent_names = [getattr(a, "name", f"Agent{i}") for i, a in enumerate(agents)]
 
     stats = {
         "n_games": n_games,

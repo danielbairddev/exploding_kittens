@@ -26,8 +26,5 @@ else
   exit 1
 fi
 
-# Auto-teardown after 1 hour
-nohup bash -c "sleep 3600 && pkill -f 'protocol_server.py' && echo 'Protocol server stopped'" \
-  > /tmp/ek-protocol-teardown.log 2>&1 </dev/null &
-echo "Auto-teardown scheduled in 1 hour"
+echo "Protocol server running (no auto-teardown)"
 REMOTE

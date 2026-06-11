@@ -45,8 +45,9 @@ class GameEngine:
             hand.append(Card(CardType.DEFUSE))
             players.append(PlayerState(player_id=i, hand=hand))
 
-        # Add exploding kittens and remaining defuses
-        deck.append(Card(CardType.DEFUSE))  # 1 spare defuse
+        # Add remaining defuses (6 total in box; n_players already dealt to hands)
+        for _ in range(max(0, 6 - n_players)):
+            deck.append(Card(CardType.DEFUSE))
         for _ in range(n_players - 1):
             deck.append(Card(CardType.EXPLODING_KITTEN))
         self.rng.shuffle(deck)
@@ -331,7 +332,7 @@ class GameEngine:
                     action = Action(ActionType.DRAW)
 
                 self._log(f"  Player {pid} chooses {action}")
-                end_turn = self._apply_action(state, action)
+                self._apply_action(state, action)
 
                 if action.action_type == ActionType.DRAW:
                     self._draw_card(state)

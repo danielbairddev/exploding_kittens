@@ -22,7 +22,8 @@ class AggressiveAgent(Agent):
             action = self.rng.choice(non_draw)
             # For triple combos, demand a Defuse if possible — otherwise any card
             if action.action_type == ActionType.PLAY_CAT_TRIPLE:
-                action.named_card = CardType.DEFUSE
+                from dataclasses import replace
+                action = replace(action, named_card=CardType.DEFUSE)
             return action
         return Action(ActionType.DRAW)
 

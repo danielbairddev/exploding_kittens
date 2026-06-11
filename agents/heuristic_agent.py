@@ -73,11 +73,11 @@ class HeuristicAgent(Agent):
         # Occasionally steal with cat pairs (20%)
         cat_actions = [a for a in valid_actions if a.action_type in (ActionType.PLAY_CAT_PAIR, ActionType.PLAY_CAT_TRIPLE)]
         if cat_actions and self.rng.random() < 0.20:
-            action = self.rng.choice(cat_actions)
-            if action.action_type == ActionType.PLAY_CAT_TRIPLE:
-                # Ask for a Defuse if possible — otherwise any card
-                action.named_card = CardType.DEFUSE
-            return action
+            chosen = self.rng.choice(cat_actions)
+            if chosen.action_type == ActionType.PLAY_CAT_TRIPLE:
+                from dataclasses import replace
+                chosen = replace(chosen, named_card=CardType.DEFUSE)
+            return chosen
 
         return Action(ActionType.DRAW)
 
