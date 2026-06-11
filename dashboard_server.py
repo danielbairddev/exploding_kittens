@@ -150,10 +150,14 @@ class Arena:
             for k, v in ev_counts.items():
                 self.tallies[k] += v
 
-            for seat, bot in enumerate(seats):
-                bd = self.bots[bot["bot_id"]]
+            # Tally per *distinct* bot in this game — win rate counts only the
+            # games a bot actually played, and a bot occupying two seats still
+            # counts as one game played / at most one win.
+            winner_bot_id = seats[winner_seat]["bot_id"] if winner_seat >= 0 else None
+            for bot_id in {b["bot_id"] for b in seats}:
+                bd = self.bots[bot_id]
                 bd["games"] += 1
-                won = (seat == winner_seat)
+                won = (bot_id == winner_bot_id)
                 bd["recent"].append(1 if won else 0)
                 if won:
                     bd["wins"] += 1
@@ -296,20 +300,39 @@ ARENA = Arena()
 # --------------------------------------------------------------------------
 # Background workers
 # --------------------------------------------------------------------------
-# The engine runs ~1500 games/s on one core. We throttle to keep the box cool
-# and let the live counter tick at a watchable pace. Override with EK_SLEEP.
-GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.02"))   # ~50 games/sec
+# The box is a single core, so we throttle the sim with a small per-game sleep
+# to leave CPU for the web servers. ~0.004s lands around 150 games/s at ~45% of
+# one core (measured: ~14% CPU at 44 games/s). Override with EK_SLEEP; set to 0
+# to run flat out (pins the core).
+GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.004"))   # ~150 games/sec
+
+
+def build_lineup(rng):
+    """Random PLAYERS_PER_GAME lineup, preferring distinct agents.
+
+    Fills the ring with distinct agents first (a random subset, randomly
+    seated); only repeats an agent if the pool is smaller than the ring. With
+    a 5-agent pool and a 5-seat ring every game uses each agent exactly once.
+    """
+    lineup, bag = [], []
+    while len(lineup) < PLAYERS_PER_GAME:
+        if not bag:                              # refill only when we run out of distinct agents
+            bag = list(ROSTER)
+            rng.shuffle(bag)
+        lineup.append(bag.pop())
+    rng.shuffle(lineup)                          # randomize seat order
+    return lineup
 
 
 def simulation_loop():
-    agents = {b["bot_id"]: b["cls"](name=b["name"]) for b in ROSTER}
     rng = random.Random()
-    n = min(PLAYERS_PER_GAME, len(ROSTER))
     while True:
-        seats = rng.sample(ROSTER, n)            # random subset, already in random seat order
-        seat_agents = [agents[b["bot_id"]] for b in seats]
+        seats = build_lineup(rng)
+        # Fresh agent instance per seat so a repeated agent never shares state
+        # across two seats in the same game.
+        seat_agents = [b["cls"](name=b["name"]) for b in seats]
         engine = GameEngine(seat_agents, seed=None, collect_events=True)
-        result = engine.play_game(n)
+        result = engine.play_game(len(seats))
         ARENA.record_game(seats, result, result["events"])
         if GAME_SLEEP:
             time.sleep(GAME_SLEEP)
