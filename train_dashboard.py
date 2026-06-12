@@ -7,10 +7,12 @@ Usage:
 Requires: pip3 install psutil
 Temperature: reads die-area temp from battery SMC sensor (Apple Silicon, no sudo needed).
 """
-import collections, json, os, re, subprocess, threading, time
+import collections, importlib, json, os, random, re, subprocess, sys, threading, time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import psutil
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOGS = os.path.join(HERE, 'logs')
@@ -198,6 +200,107 @@ def get_status():
     return out
 
 
+# ---- empirical battle eval ----
+
+BATTLE_INTERVAL = 300        # seconds between eval runs
+BATTLE_GAMES    = 500        # games per eval (fast enough ~60s, low CPU impact)
+_BATTLE_HISTORY = collections.deque(maxlen=72)   # ~6 hrs at 5-min intervals
+_BATTLE_LOCK    = threading.Lock()
+_BATTLE_RUNNING = threading.Event()
+
+
+CONTESTANTS = [
+    {'id': 'rhino',      'name': 'Rhino',      'emoji': '🦏', 'color': '#8b5cf6',
+     'module': 'agents.rhino_agent',      'cls': 'RhinoAgent'},
+    {'id': 'orangutan2', 'name': 'Orangutan2', 'emoji': '🦧', 'color': '#f97316',
+     'module': 'agents.orangutan2_agent', 'cls': 'Orangutan2Agent'},
+    {'id': 'orangutan',  'name': 'Orangutan',  'emoji': '🦍', 'color': '#a3e635',
+     'module': 'agents.orangutan_agent',  'cls': 'OrangutanAgent'},
+]
+FILLERS = [
+    ('agents.coyote_agent',        'CoyoteAgent'),
+    ('agents.survival_agent_v2',   'SurvivalAgentV2'),
+]
+
+
+def _fresh_class(module_name, class_name):
+    """Import (or reload) a module and return the named class with fresh weights."""
+    mod = importlib.import_module(module_name)
+    importlib.reload(mod)
+    return getattr(mod, class_name)
+
+
+def _run_battle():
+    """Run BATTLE_GAMES games, return {contestant_id: win_rate}."""
+    try:
+        from game.engine import GameEngine
+        contestants = [(c, _fresh_class(c['module'], c['cls'])) for c in CONTESTANTS]
+        fillers     = [_fresh_class(m, cn) for m, cn in FILLERS]
+        # 5-player game: 3 contestants + 2 fillers
+        rng = random.Random(int(time.time()))
+        wins = {c['id']: 0 for c in CONTESTANTS}
+        played = 0
+        for _ in range(BATTLE_GAMES):
+            agents = (
+                [cls(name=c['id']) for c, cls in contestants] +
+                [fc(name=f'filler{i}') for i, fc in enumerate(fillers)]
+            )
+            order = list(range(5)); rng.shuffle(order)
+            seats = {order[i]: i for i in range(5)}   # original_idx -> seat
+            try:
+                r = GameEngine([agents[order[i]] for i in range(5)]).play_game(5)
+            except Exception:
+                continue
+            if r['winner'] < 0:
+                continue
+            played += 1
+            for idx, (c, _) in enumerate(contestants):
+                if r['winner'] == seats[idx]:
+                    wins[c['id']] += 1
+        if played == 0:
+            return None
+        return {cid: round(w / played * 100, 2) for cid, w in wins.items()}, played
+    except Exception as e:
+        print(f'[battle] error: {e}', flush=True)
+        return None
+
+
+def _battle_loop():
+    """Background thread: runs eval every BATTLE_INTERVAL seconds."""
+    time.sleep(10)   # let dashboard start up first
+    while True:
+        _BATTLE_RUNNING.set()
+        t0 = time.time()
+        result = _run_battle()
+        elapsed = time.time() - t0
+        _BATTLE_RUNNING.clear()
+        if result is not None:
+            rates, played = result
+            snap = {'ts': time.time(), 'rates': rates, 'games': played, 'elapsed': round(elapsed)}
+            with _BATTLE_LOCK:
+                _BATTLE_HISTORY.append(snap)
+            names = ', '.join(f'{k}={v:.1f}%' for k, v in rates.items())
+            print(f'[battle] {played} games in {elapsed:.0f}s — {names}', flush=True)
+        # sleep until next interval, minus time already spent
+        sleep_for = max(30, BATTLE_INTERVAL - elapsed)
+        time.sleep(sleep_for)
+
+
+threading.Thread(target=_battle_loop, daemon=True).start()
+
+
+def get_battle():
+    with _BATTLE_LOCK:
+        history = list(_BATTLE_HISTORY)
+    return {
+        'history':    history,
+        'running':    _BATTLE_RUNNING.is_set(),
+        'interval':   BATTLE_INTERVAL,
+        'games':      BATTLE_GAMES,
+        'contestants': CONTESTANTS,
+    }
+
+
 # ---- HTML ----
 
 HTML = r"""<!DOCTYPE html>
@@ -290,6 +393,11 @@ HTML = r"""<!DOCTYPE html>
 <body>
 <h1>🧠 Training Dashboard</h1>
 <div id="last-update">—</div>
+
+<h2>⚔️ Battle</h2>
+<div id="battle-card" style="background:#1e2333;border:1px solid #7c3aed;border-radius:10px;padding:18px;margin-bottom:0">
+  <div style="color:#4b5563;font-size:0.75rem">First eval in ~10s…</div>
+</div>
 
 <h2>⚙️ System</h2>
 <div id="sys-card"><div style="color:#4b5563;font-size:0.75rem">Loading…</div></div>
@@ -418,14 +526,91 @@ function renderTraining(runs) {
   }).join('');
 }
 
+/* ---- battle card ---- */
+function renderBattle(b) {
+  const card = document.getElementById('battle-card');
+  if (!b || !b.contestants) return;
+
+  const history   = b.history || [];
+  const running   = b.running;
+  const latest    = history[history.length - 1] || null;
+  const contestants = b.contestants;
+
+  // current WR pills
+  const pills = contestants.map(c => {
+    const wr = latest ? (latest.rates[c.id] ?? '—') : '—';
+    const wrStr = typeof wr === 'number' ? wr.toFixed(1) + '%' : wr;
+    return `<div class="stat" style="border-left:3px solid ${c.color}">
+      <div class="stat-val" style="color:${c.color}">${wrStr}</div>
+      <div class="stat-lbl">${c.emoji} ${c.name}</div>
+    </div>`;
+  }).join('');
+
+  // multi-line time-series SVG
+  let chartHtml = '<div style="color:#4b5563;font-size:0.7rem;padding:8px 0">No data yet — first eval running…</div>';
+  if (history.length >= 2) {
+    const W = 560, H = 80, pad = 4;
+    const n = history.length;
+    const allWRs = history.flatMap(h => contestants.map(c => h.rates[c.id] ?? 0));
+    const lo = 0, hi = Math.max(35, ...allWRs) * 1.08;
+
+    const lines = contestants.map(c => {
+      const vals = history.map(h => h.rates[c.id] ?? 0);
+      const xs   = vals.map((_, i) => pad + (i / Math.max(n - 1, 1)) * (W - 2*pad));
+      const ys   = vals.map(v => H - pad - ((v - lo) / (hi - lo)) * (H - 2*pad));
+      const pts  = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+      const last = vals[vals.length - 1];
+      return `<polyline points="${pts}" fill="none" stroke="${c.color}" stroke-width="2" stroke-linejoin="round"/>
+              <text x="${(W-pad).toFixed(0)}" y="${(ys[ys.length-1]-3).toFixed(0)}" text-anchor="end"
+                    fill="${c.color}" font-size="8" font-family="monospace">${last.toFixed(1)}%</text>`;
+    }).join('');
+
+    // y-axis labels
+    const yLabels = [0, Math.round(hi * 0.5), Math.round(hi)].map(v => {
+      const y = H - pad - ((v - lo) / (hi - lo)) * (H - 2*pad);
+      return `<text x="0" y="${y.toFixed(0)}" fill="#374151" font-size="7" font-family="monospace">${v}%</text>`;
+    }).join('');
+
+    // x-axis time labels
+    const xLabels = [0, Math.floor((n-1)/2), n-1].map(i => {
+      if (!history[i]) return '';
+      const x = pad + (i / Math.max(n-1,1)) * (W - 2*pad);
+      const t = new Date(history[i].ts * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      return `<text x="${x.toFixed(0)}" y="${H+12}" text-anchor="middle" fill="#374151" font-size="7" font-family="monospace">${t}</text>`;
+    }).join('');
+
+    chartHtml = `<svg viewBox="0 0 ${W} ${H+16}" style="width:100%;height:90px;display:block;overflow:visible">
+      ${yLabels}${lines}${xLabels}
+    </svg>`;
+  }
+
+  const gameNote = latest
+    ? `${latest.games} games · ${latest.elapsed}s · ${new Date(latest.ts*1000).toLocaleTimeString()}`
+    : '';
+  const statusDot = running
+    ? `<span style="color:#fbbf24;font-size:0.65rem">⏳ running eval…</span>`
+    : `<span style="color:#4b5563;font-size:0.65rem">next in ~${b.interval/60|0}min · ${b.games} games</span>`;
+
+  card.innerHTML = `
+    <div class="card-header" style="margin-bottom:10px">
+      <span class="card-title">⚔️ Rhino vs Orangutan2 vs Orangutan</span>
+      ${statusDot}
+    </div>
+    <div class="stat-row">${pills}</div>
+    ${chartHtml}
+    <div style="font-size:0.6rem;color:#4b5563;margin-top:4px;text-align:right">${gameNote}</div>`;
+}
+
 /* ---- polling ---- */
 async function poll() {
-  const [trainRes, sysRes] = await Promise.all([
+  const [trainRes, sysRes, battleRes] = await Promise.all([
     fetch('/api/status').then(r => r.json()).catch(() => null),
     fetch('/api/system').then(r => r.json()).catch(() => null),
+    fetch('/api/battle').then(r => r.json()).catch(() => null),
   ]);
-  if (trainRes) renderTraining(trainRes);
-  if (sysRes)   renderSystem(sysRes);
+  if (trainRes)  renderTraining(trainRes);
+  if (sysRes)    renderSystem(sysRes);
+  if (battleRes) renderBattle(battleRes);
   document.getElementById('last-update').textContent =
     'Last updated: ' + new Date().toLocaleTimeString();
 }
@@ -447,6 +632,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.dumps(get_status()).encode()
         elif self.path == '/api/system':
             body = json.dumps(get_system()).encode()
+        elif self.path == '/api/battle':
+            body = json.dumps(get_battle()).encode()
         elif self.path in ('/', '/index.html'):
             body = HTML.encode()
             self.send_response(200)
