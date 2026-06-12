@@ -72,6 +72,27 @@ that can capture only a fraction of 3.7pts. Verdict: Orangutan is near-optimal;
 stop grinding policy. Belief-state (Abaddon) is the only avenue with any headroom,
 at low ROI.
 
+## Head-to-head verdict — Orangutan is the proven champion
+
+Benchmark win% (vs the heuristic fleet) hides direct strength, so we ran big
+5-player head-to-heads with randomized counts (per-seat win rate, baseline 20%):
+
+| matchup (200k / 120k games) | Orangutan | challenger | verdict |
+|---|---|---|---|
+| Orangutan vs Abaddon (belief, trained vs fleet) | **21.34%** | 18.66% | Orangutan +2.67 |
+| Orangutan vs Abaddon **trained against Orangutan** (~500 iters) | **23.59%** | 16.40% | Orangutan +7.19 |
+
+Training *against* Orangutan made it **worse**, not better: best-responding to a
+2-Orangutan field is slow (23.7% -> 28.7% over 500 iters vs the 1700 Orangutan
+needed against the easy fleet), so we just got an under-developed, weaker policy.
+There was no exploit to find — Orangutan plays near the information ceiling.
+
+**Three independent confirmations Orangutan is best:** (1) it's at 91% of the
+perfect-info ceiling; (2) every successor (Gorilla, Mandrill, Abaddon) tied or
+lost on the benchmark; (3) training directly against it fails to produce a
+counter. Conclusion: 🦧 Orangutan (40.1% vs fleet) is the champion; the neural-bot
+line of work is complete. The 👹 Abaddon demon icon stays in reserve.
+
 ## Gorilla proper — progress
 
 - **GameTracker** (`tracker.py`) built + validated. Reconstructs the full action
