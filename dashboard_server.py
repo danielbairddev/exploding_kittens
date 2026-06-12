@@ -526,16 +526,37 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        path = self.path.split("?", 1)[0]
+        from urllib.parse import urlsplit, parse_qs
+        u = urlsplit(self.path); path = u.path; q = parse_qs(u.query)
         if path == "/" or path == "/index.html":
             self._send(PAGE, "text/html")
+        elif path == "/play":
+            self._send(PLAY_PAGE, "text/html")
         elif path == "/api/stats":
             self._send(json.dumps(ARENA.stats_payload()))
         elif path == "/api/showcase":
             payload = ARENA.showcase_payload()
             self._send(json.dumps(payload) if payload else "null")
+        elif path == "/api/play/bots":
+            self._send(json.dumps([{"name": n, "emoji": e} for n, (c, e) in play.PLAYABLE.items()]))
+        elif path == "/api/play/state":
+            self._send(json.dumps(play.state(q.get("id", [""])[0])))
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
+        else:
+            self._send(json.dumps({"error": "not found"}))
+
+    def do_POST(self):
+        path = self.path.split("?", 1)[0]
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length) or "{}")
+        except (ValueError, TypeError):
+            body = {}
+        if path == "/api/play/new":
+            self._send(json.dumps(play.new_session(body.get("opponents", []), bool(body.get("coach", True)))))
+        elif path == "/api/play/act":
+            self._send(json.dumps(play.act(body.get("id", ""), int(body.get("index", 0)))))
         else:
             self._send(json.dumps({"error": "not found"}))
 
@@ -560,6 +581,8 @@ def main():
 
 # PAGE is defined in dashboard_page.py to keep this file readable.
 from dashboard_page import PAGE  # noqa: E402
+from play_page import PLAY_PAGE  # noqa: E402
+import play  # noqa: E402
 
 if __name__ == "__main__":
     main()

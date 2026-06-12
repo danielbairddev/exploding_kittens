@@ -38,7 +38,7 @@ echo "Deploying Live Arena dashboard to $SERVER:$PORT..."
 ssh "$SERVER" "mkdir -p $APP_DIR"
 rsync -az \
   --exclude '__pycache__' --exclude '*.pyc' --exclude '.venv' \
-  dashboard_server.py dashboard_page.py game agents protocol \
+  dashboard_server.py dashboard_page.py play.py play_page.py game agents protocol \
   "$SERVER:$APP_DIR/"
 
 ssh "$SERVER" bash <<REMOTE

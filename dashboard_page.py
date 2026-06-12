@@ -160,7 +160,7 @@ PAGE = r'''<!DOCTYPE html>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
       <p>Bots battling it out — ranked by win rate &amp; average placement. Top performers plus a challenger every game. The simulation never sleeps.</p>
     </div>
-    <div class="toplinks">📖 <a id="protolink" href="#">Agent protocol docs</a></div>
+    <div class="toplinks">📖 <a href="/play">🎮 Play vs the bots</a> &nbsp;·&nbsp; <a id="protolink" href="#">Agent protocol docs</a></div>
   </header>
 
   <div class="counters">

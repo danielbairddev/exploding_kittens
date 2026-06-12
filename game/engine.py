@@ -377,6 +377,20 @@ class GameEngine:
             agent.game_start(self._observable(state, i))
 
         state.turn_number = 0
+        return self._run(state)
+
+    def play_out(self, state: GameState) -> dict:
+        """Continue an already-in-progress game to completion (Monte-Carlo coach
+        rollouts). Agents are (re)initialised at this state; current_player must
+        already be set on `state`."""
+        self._events = []
+        for i, agent in enumerate(self.agents):
+            if i < len(state.players):
+                agent.game_start(self._observable(state, i))
+        return self._run(state)
+
+    def _run(self, state: GameState) -> dict:
+        self._state = state          # expose live state (interactive play / coach)
         max_turns = 500  # safety limit
 
         while len(state.alive_players) > 1 and state.turn_number < max_turns:
