@@ -1,137 +1,215 @@
-"""Rhino — GRU-based neural-net agent.
+"""Rhino — fully-ML GRU-based agent.
 
-Unlike Orangutan (which sees only a per-turn snapshot), Rhino maintains a GRU
-hidden state across the whole game, processing every public event as it arrives.
-The hidden state is concatenated with the standard snapshot features and fed to
-a small MLP for the policy.
+All decisions go through the learned policy — no heuristics inherited from Coyote.
+The GRU processes the full public event log; its hidden state plus the current
+snapshot are fed through a shared trunk and then five separate heads:
+  policy / value / target / want_to_nope / give_card / place_exploding_kitten.
 
-Falls back to Coyote logic if weights aren't present yet.
-Inference is pure Python — no third-party dependencies.
+Falls back to simple defaults (draw / pass / random give / top of deck) if
+weights aren't present yet. Inference is pure Python — no numpy dependency.
 """
-import json
-import math
-import os
-
-from agents.coyote_agent import CoyoteAgent
+import json, math, os
+from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
+from rhino.event_encode import CARD_NAMES, N_EVENT
 from game.actions import Action, ActionType
 from game.cards import CardType
 
-DEF = CardType.DEFUSE
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rhino_weights.json')
 
-# Must match rhino/net.py constants
-_GRU_H = 64
+_GRU_H     = 64
+_N_TARGETS = 5
+_N_CARDS   = 13
+_N_BUCKETS = 5
+_BUCKET_FRACS = [0.0, 0.25, 0.5, 0.75, 1.0]
+_CARD_NAMES_LIST = CARD_NAMES  # ['DEFUSE', 'ATTACK', ...]
 
 
-def _load_weights():
+def _load():
     try:
         with open(_WEIGHTS_PATH) as f:
             w = json.load(f)
-        required = ('Wz', 'Uz', 'bz', 'Wr', 'Ur', 'br', 'Wn', 'Un', 'bn',
-                    'W1', 'b1', 'W2', 'b2', 'W3', 'b3')
-        if all(k in w for k in required):
-            return w
+        required = ('Wz','Uz','bz','Wr','Ur','br','Wn','Un','bn',
+                    'W1','b1','W2','b2','W3','b3',
+                    'Wtgt','btgt','Wnope','bnope','Wgive','bgive','Wplace','bplace')
+        return w if all(k in w for k in required) else None
     except (OSError, ValueError):
-        pass
-    return None
+        return None
 
 
-def _matvec(W, v):
+# ---- Pure-Python forward helpers ----
+
+def _mv(W, v):
     return [sum(w * vi for w, vi in zip(row, v)) for row in W]
-
-
-def _sigmoid(v):
-    return [1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, x)))) for x in v]
-
-
-def _tanh_v(v):
-    return [math.tanh(x) for x in v]
-
 
 def _add(a, b):
     return [x + y for x, y in zip(a, b)]
 
+def _sigmoid(v):
+    return [1.0 / (1.0 + math.exp(-max(-20.0, min(20.0, x)))) for x in v]
 
-def _gru_step(x, h, w):
-    """Pure-Python single GRU step."""
-    z = _sigmoid(_add(_add(_matvec(w['Wz'], x), _matvec(w['Uz'], h)), w['bz']))
-    r = _sigmoid(_add(_add(_matvec(w['Wr'], x), _matvec(w['Ur'], h)), w['br']))
-    rh = [ri * hi for ri, hi in zip(r, h)]
-    n = _tanh_v(_add(_add(_matvec(w['Wn'], x), _matvec(w['Un'], rh)), w['bn']))
-    return [(1.0 - zi) * hi + zi * ni for zi, hi, ni in zip(z, h, n)]
+def _tanh_v(v):
+    return [math.tanh(x) for x in v]
 
+def _relu(v):
+    return [max(0.0, x) for x in v]
 
-def _mlp_forward(h, snap, w):
-    x = h + snap
-    a1 = [max(0.0, v) for v in _add(_matvec(w['W1'], x), w['b1'])]
-    a2 = [max(0.0, v) for v in _add(_matvec(w['W2'], a1), w['b2'])]
-    return _add(_matvec(w['W3'], a2), w['b3'])
+def _softmax(v):
+    m = max(v)
+    e = [math.exp(x - m) for x in v]
+    s = sum(e)
+    return [x / s for x in e]
 
-
-def _masked_argmax(logits, mask):
+def _masked_argmax(scores, mask):
     best_i, best_v = None, None
-    for i, (l, m) in enumerate(zip(logits, mask)):
-        if m and (best_v is None or l > best_v):
-            best_i, best_v = i, l
+    for i, (s, m) in enumerate(zip(scores, mask)):
+        if m and (best_v is None or s > best_v):
+            best_i, best_v = i, s
     return best_i
 
+def _gru_step(x, h, w):
+    z = _sigmoid(_add(_add(_mv(w['Wz'], x), _mv(w['Uz'], h)), w['bz']))
+    r = _sigmoid(_add(_add(_mv(w['Wr'], x), _mv(w['Ur'], h)), w['br']))
+    rh = [ri * hi for ri, hi in zip(r, h)]
+    n = _tanh_v(_add(_add(_mv(w['Wn'], x), _mv(w['Un'], rh)), w['bn']))
+    return [(1.0 - zi) * hi + zi * ni for zi, hi, ni in zip(z, h, n)]
 
-class RhinoAgent(CoyoteAgent):
+def _trunk(h, snap, w):
+    x  = list(h) + list(snap)
+    a1 = _relu(_add(_mv(w['W1'], x), w['b1']))
+    a2 = _relu(_add(_mv(w['W2'], a1), w['b2']))
+    return a2
+
+def _policy(a2, w):
+    return _add(_mv(w['W3'], a2), w['b3'])
+
+def _target_scores(a2, w):
+    return _add(_mv(w['Wtgt'], a2), w['btgt'])
+
+def _nope_prob(a2, currently_noped, w):
+    ext = list(a2) + [float(currently_noped)]
+    logit = _add(_mv(w['Wnope'], ext), w['bnope'])[0]
+    return _sigmoid([logit])[0]
+
+def _give_scores(a2, w):
+    return _add(_mv(w['Wgive'], a2), w['bgive'])
+
+def _place_probs(a2, w):
+    return _softmax(_add(_mv(w['Wplace'], a2), w['bplace']))
+
+
+class RhinoAgent(Agent):
     ARENA = {
         'name': 'Rhino', 'emoji': '🦏', 'color': '#6b7280',
         'blurb': 'Reads the room. Remembers everything.',
         'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 1,
     }
 
-    _WEIGHTS = _load_weights()
+    _WEIGHTS = _load()
 
     def __init__(self, name='Rhino', seed=None):
-        super().__init__(name=name, seed=seed)
+        self.name = name
         self._h = [0.0] * _GRU_H
         self._last_eid = -1
+        # Coyote-compatible state used by snap_encode
+        self._top = None; self._top_deck = -1
 
     def game_start(self, state):
-        super().game_start(state)
         self._h = [0.0] * _GRU_H
         self._last_eid = -1
+        self._top = None; self._top_deck = -1
 
-    def _absorb_events(self, state):
+    def see_future(self, state, top3):
+        self._top = [c.card_type for c in top3]
+        self._top_deck = state.deck_size
+
+    def _known_list(self, state):
+        if (self._top is not None and
+                state.deck_size == self._top_deck and len(self._top) >= 1):
+            return self._top
+        return None
+
+    def _absorb(self, state):
         if self._WEIGHTS is None:
             return
-        from rhino.event_encode import encode_event
-        new = sorted(
-            [e for e in state.recent_events if e.get('event_id', 0) > self._last_eid],
-            key=lambda e: e.get('event_id', 0),
-        )
+        new = sorted([e for e in state.recent_events
+                      if e.get('event_id', 0) > self._last_eid],
+                     key=lambda e: e.get('event_id', 0))
         for ev in new:
+            from rhino.event_encode import encode_event
             vec = encode_event(ev, state.my_id).tolist()
             self._h = _gru_step(vec, self._h, self._WEIGHTS)
             self._last_eid = ev.get('event_id', self._last_eid)
 
+    def _snap(self, state):
+        return snap_encode(state, self._known_list(state))
+
+    def _a2(self, state):
+        return _trunk(self._h, self._snap(state), self._WEIGHTS)
+
+    # ---- decision methods ----
+
     def choose_action(self, state, valid_actions):
         if self._WEIGHTS is None:
-            return super().choose_action(state, valid_actions)
-
-        self._absorb_events(state)
-
+            return Action(ActionType.DRAW)
+        self._absorb(state)
+        a2 = self._a2(state)
         by = {}
         for a in valid_actions:
             by.setdefault(a.action_type, []).append(a)
         mask = [1.0 if at in by else 0.0 for at in ACTIONS]
-        snap = snap_encode(state, self._known_list(state))
-
-        logits = _mlp_forward(self._h, snap, self._WEIGHTS)
+        logits = _policy(a2, self._WEIGHTS)
         idx = _masked_argmax(logits, mask)
         if idx is None:
             return Action(ActionType.DRAW)
-
         at = ACTIONS[idx]
         acts = by.get(at) or [Action(ActionType.DRAW)]
+
         if at in (ActionType.PLAY_FAVOR, ActionType.PLAY_CAT_PAIR, ActionType.PLAY_CAT_TRIPLE):
-            chosen = self._best_target(acts, state)
+            tgt_scores = _target_scores(a2, self._WEIGHTS)
+            tgt_by_rel = {}
+            for a in acts:
+                if a.target_player is not None:
+                    rel = (a.target_player - state.my_id) % _N_TARGETS
+                    tgt_by_rel[rel] = a
+            best_rel = _masked_argmax(tgt_scores,
+                                      [1.0 if r in tgt_by_rel else 0.0
+                                       for r in range(_N_TARGETS)])
+            chosen = tgt_by_rel.get(best_rel, acts[0])
             if at == ActionType.PLAY_CAT_TRIPLE:
                 from dataclasses import replace
-                chosen = replace(chosen, named_card=DEF)
+                chosen = replace(chosen, named_card=CardType.DEFUSE)
             return chosen
+
         return acts[0]
+
+    def want_to_nope(self, state, action, currently_noped=False):
+        if self._WEIGHTS is None:
+            return False
+        self._absorb(state)
+        a2 = self._a2(state)
+        return _nope_prob(a2, currently_noped, self._WEIGHTS) > 0.5
+
+    def give_card(self, state, requester_id):
+        if self._WEIGHTS is None or not state.my_hand:
+            return state.my_hand[0].card_type if state.my_hand else CardType.DEFUSE
+        self._absorb(state)
+        a2 = self._a2(state)
+        scores = _give_scores(a2, self._WEIGHTS)
+        hand_names = {c.card_type.name for c in state.my_hand}
+        mask = [1.0 if name in hand_names else 0.0 for name in _CARD_NAMES_LIST]
+        idx = _masked_argmax(scores, mask)
+        if idx is None:
+            return state.my_hand[0].card_type
+        try:
+            return CardType[_CARD_NAMES_LIST[idx]]
+        except KeyError:
+            return state.my_hand[0].card_type
+
+    def place_exploding_kitten(self, state, deck_size):
+        if self._WEIGHTS is None:
+            return 0
+        a2 = self._a2(state)
+        probs = _place_probs(a2, self._WEIGHTS)
+        bucket = probs.index(max(probs))
+        return min(deck_size, round(_BUCKET_FRACS[bucket] * deck_size))
