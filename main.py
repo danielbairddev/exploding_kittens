@@ -17,6 +17,8 @@ import argparse
 import sys
 import os
 
+from agents.ian1_agent import Ian1Agent
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from agents.random_agent import RandomAgent
@@ -31,6 +33,7 @@ _AGENT_CLASSES = {
     "heuristic": HeuristicAgent,
     "aggressive": AggressiveAgent,
     "chaos": ChaosAgent,
+    "ian1" : Ian1Agent
 }
 
 
@@ -40,7 +43,7 @@ def main():
     parser.add_argument("--players", type=int, default=4, choices=[2, 3, 4, 5])
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", help="Watch a single game")
-    parser.add_argument("--agent", choices=["random", "heuristic", "aggressive", "chaos"], default="random")
+    parser.add_argument("--agent", choices=["random", "heuristic", "aggressive", "chaos", "ian1"], default="random")
     parser.add_argument("--log-dir", default="logs", help="Directory for game logs")
     parser.add_argument("--log-games", type=int, default=0, metavar="N",
                         help="Log first N games in full detail (0 = no logging)")

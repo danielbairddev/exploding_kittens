@@ -38,46 +38,10 @@ class Ian1Agent(Agent):
         self._top = [c.card_type for c in top3]
         self._top_deck = state.deck_size
 
-    # --- the main decision: what to do on your turn ---
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        by_type = {a.action_type: a for a in valid_actions}
-
-        # Our peek is only valid if the deck hasn't changed since we looked.
-        top = self._top if state.deck_size == self._top_deck else None
-
-        have_defuse = any(c.card_type == DEFUSE for c in state.my_hand)
-
-        # 1) Peek at the deck if we have a See the Future and haven't already.
-        if top is None and ActionType.PLAY_SEE_THE_FUTURE in by_type:
-            return by_type[ActionType.PLAY_SEE_THE_FUTURE]
-
-        # 2) If we can see a kitten on top, dodge it with Skip/Attack.
-        if top and top[0] == EK:
-            if ActionType.PLAY_SKIP in by_type:
-                return by_type[ActionType.PLAY_SKIP]
-            if ActionType.PLAY_ATTACK in by_type:
-                return by_type[ActionType.PLAY_ATTACK]
-            return Action(ActionType.DRAW)   # forced — our Defuse will save us
-
-        # 3) Top is known safe → draw the free card.
-        if top and top[0] != EK:
-            return Action(ActionType.DRAW)
-
-        # 4) Top unknown. If we hold a Defuse it's our insurance, so drawing is fine.
-        if have_defuse:
-            return Action(ActionType.DRAW)
-
-        # 5) No Defuse and flying blind — dodge if we can, else draw and hope.
-        # TODO Ian: this is the core trade-off to tune. Try cat-pair steals or Favor too.
-        if ActionType.PLAY_SKIP in by_type:
-            return by_type[ActionType.PLAY_SKIP]
-        if ActionType.PLAY_ATTACK in by_type:
-            return by_type[ActionType.PLAY_ATTACK]
         return Action(ActionType.DRAW)
 
     def want_to_nope(self, state: ObservableState, action: Action, currently_noped: bool = False) -> bool:
-        # TODO Ian: return True (when you hold a Nope) to cancel an opponent's play —
-        # e.g. an Attack aimed at you. For now we never Nope.
         return False
 
     def give_card(self, state: ObservableState, requester_id: int) -> CardType:
@@ -88,6 +52,4 @@ class Ian1Agent(Agent):
         return state.my_hand[0].card_type
 
     def place_exploding_kitten(self, state: ObservableState, deck_size: int) -> int:
-        # Bury it at the bottom so it's safe for a while.
-        # TODO Ian: returning 0 puts it on TOP — the next player draws it. Risky but mean.
-        return deck_size
+        return 0
