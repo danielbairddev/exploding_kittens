@@ -23,6 +23,7 @@ class Ian1Agent(Agent):
     ARENA = {"name": "Ian1", "emoji": "\U0001F331", "color": "#14b8a6",
              "blurb": "Ian's bot — a work in progress.", "author": "Ian",
              # TODO: set llm_assisted once Ian confirms
+             "stats_version": 1,
              }
 
     def __init__(self, name: str = "Ian1", seed: int | None = None):

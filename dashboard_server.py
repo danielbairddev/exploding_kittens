@@ -123,6 +123,7 @@ class Arena:
                 "place_sum": 0, "place_games": 0,  # for average finishing place
                 "elo": BASE_ELO, "elo_games": 0, "elo_peak": BASE_ELO,
                 "elo_recent": deque(maxlen=ELO_TREND_MAX),  # rating after each game
+                "stats_version": b.get("stats_version", 1),
             }
             for b in ROSTER
         }
@@ -378,6 +379,11 @@ class Arena:
             for bid_str, bd in s.get("bots", {}).items():
                 bid = int(bid_str)
                 if bid in self.bots:
+                    # If stats_version was bumped in ARENA, discard old stats for this bot.
+                    current_version = self.bots[bid].get("stats_version", 1)
+                    if bd.get("stats_version", 1) != current_version:
+                        print(f"[arena] stats reset for bot_id {bid} (version mismatch)", flush=True)
+                        continue
                     self.bots[bid]["wins"] = bd.get("wins", 0)
                     self.bots[bid]["games"] = bd.get("games", 0)
                     self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
@@ -412,6 +418,7 @@ class Arena:
                     "elo_games": self.bots[b["bot_id"]]["elo_games"],
                     "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
                     "elo_recent": list(self.bots[b["bot_id"]]["elo_recent"]),
+                    "stats_version": self.bots[b["bot_id"]].get("stats_version", 1),
                 } for b in ROSTER},
             }
         tmp = SNAPSHOT_PATH + ".tmp"

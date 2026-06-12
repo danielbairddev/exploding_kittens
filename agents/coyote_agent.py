@@ -62,7 +62,7 @@ class CoyoteAgent(SurvivalAgentV2):
 
     ARENA = {"name": "Coyote", "emoji": "\U0001F43A", "color": "#d6a35c",
              "blurb": "Counts cards, hunts the leader.", "author": "Daniel Baird",
-             "llm_assisted": True}
+             "llm_assisted": True, "stats_version": 1}
 
     # ---- card counting -------------------------------------------------
     def _unseen(self, state: ObservableState):
