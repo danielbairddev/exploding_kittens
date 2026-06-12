@@ -591,10 +591,39 @@ function renderTraining(data){
   }).join('');
 }
 
+// Track best seen per bot so we can fire a notification on improvement
+const _trainBest = {};
+
+function _notifyNewBest(name, pct){
+  const label = name === 'Gorilla' ? 'Orangutan2' : name;
+  const emoji = TRAIN_EMOJI[name];
+  if(Notification.permission === 'granted'){
+    new Notification(`${emoji} ${label} — new best!`, {
+      body: `${pct.toFixed(2)}% greedy win rate vs full fleet`,
+      icon: '/favicon.ico',
+      tag: `train-best-${name}`,  // replaces previous notification for same bot
+    });
+  }
+  // Also flash the card border briefly
+  const cards = document.querySelectorAll('.train-bot');
+  cards.forEach(c=>{ if(c.querySelector('.tb-name')?.textContent.includes(label)){ c.style.outline='2px solid var(--green)'; setTimeout(()=>c.style.outline='',4000); }});
+}
+
 async function pollTraining(){
+  // Ask for notification permission once on first poll
+  if(Notification.permission === 'default') Notification.requestPermission();
   while(true){
     try{
       const d = await (await fetch('/api/training')).json();
+      // Check for new bests before rendering
+      for(const [name, pts] of Object.entries(d)){
+        if(!pts.length) continue;
+        const best = pts[pts.length-1].best;
+        if(_trainBest[name] !== undefined && best > _trainBest[name] + 0.001){
+          _notifyNewBest(name, best);
+        }
+        _trainBest[name] = best;
+      }
       renderTraining(d);
     }catch(e){}
     await new Promise(r=>setTimeout(r,30000));
