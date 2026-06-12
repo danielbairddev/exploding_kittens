@@ -18,11 +18,13 @@ export EK_DEPLOY_BY="${EK_DEPLOY_BY:-unknown}"
 export EK_DEPLOY_AT="${EK_DEPLOY_AT:-}"
 nohup python3 web/dashboard_server.py "$PORT" > /tmp/ek-arena.log 2>&1 </dev/null &
 
-sleep 2
-if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
-  echo "Live Arena up at http://0.0.0.0:$PORT ($EK_DEPLOY_SHA by $EK_DEPLOY_BY)"
-  exit 0
-fi
+for i in $(seq 1 15); do
+  sleep 1
+  if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
+    echo "Live Arena up at http://0.0.0.0:$PORT ($EK_DEPLOY_SHA by $EK_DEPLOY_BY)"
+    exit 0
+  fi
+done
 echo "ERROR: server didn't start. Check /tmp/ek-arena.log"
 tail -20 /tmp/ek-arena.log || true
 exit 1
