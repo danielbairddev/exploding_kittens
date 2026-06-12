@@ -106,7 +106,8 @@ PAGE = r'''<!DOCTYPE html>
   .lb-av { font-size:1.4rem; }
   .lb-main { flex:1; min-width:0; }
   .lb-name { font-weight:600; font-size:0.86rem; display:flex; align-items:center; gap:6px; }
-  .lb-blurb{ font-size:0.66rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .lb-blurb{ font-size:0.66rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; position:relative; }
+  .lb-blurb:hover{ white-space:normal; overflow:visible; background:var(--surface); border-radius:4px; padding:2px 5px; margin:-2px -5px; z-index:10; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
   .lb-author{ color:#64748b; font-style:italic; }
   .lb-bar { height:7px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-top:4px; }
   .lb-bar i { display:block; height:100%; border-radius:4px; transition: width .6s; }
