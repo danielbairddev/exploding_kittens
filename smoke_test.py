@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Pre-deploy smoke test: import the dashboard stack and play one quick game."""
+"""Pre-deploy smoke test: import the dashboard stack and play one quick game.
+
+Used by auto_deploy.sh before each pull from origin/main.
+"""
 import os
 import sys
 
