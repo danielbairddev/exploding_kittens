@@ -297,11 +297,12 @@ function renderLadder(){
   };
   $('leaderboard').innerHTML = rows.map((b,i)=>{
     const streak = b.streak>=2 ? `<span class="streak">🔥${b.streak}</span>` : '';
+    const gamesLabel = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
     return `<div class="lb-row">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}<span class="lb-games">${gamesLabel} games</span></div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
         ${m==='elo' ? eloSpark(b.elo_recent, b.color) : ''}
