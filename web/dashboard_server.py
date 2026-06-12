@@ -69,7 +69,7 @@ ARENA_BOTS = [
     Ian2Agent,         # Yum
     Perdition2Agent,   # Perdition
     RhinoAgent,        # Rhino (GRU)
-    # ElephantAgent,     # Elephant (GRU-128) — benched until weights exist
+    ElephantAgent,     # Elephant (GRU-128)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
