@@ -618,8 +618,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps([{"name": n, "emoji": e} for n, (c, e) in play.PLAYABLE.items()]))
         elif path == "/api/play/state":
             self._send(json.dumps(play.state(q.get("id", [""])[0])))
+        elif path == "/daniel":
+            self._send(DEBUG_PAGE, "text/html")
         elif path == "/api/training":
             self._send(json.dumps(_training_progress()))
+        elif path == "/api/debug/deploy_log":
+            try:
+                with open("/tmp/ek-auto-deploy.log") as f:
+                    self._send(f.read(), "text/plain")
+            except OSError:
+                self._send("log not found", "text/plain")
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
         else:
@@ -660,6 +668,7 @@ def main():
 
 # PAGE is defined in dashboard_page.py to keep this file readable.
 from web.dashboard_page import PAGE  # noqa: E402
+from web.debug_page import DEBUG_PAGE  # noqa: E402
 from web.play_page import PLAY_PAGE  # noqa: E402
 from web import play  # noqa: E402
 
