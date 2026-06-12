@@ -25,12 +25,12 @@ PAGE = r'''<!DOCTYPE html>
   a { color: var(--accent2); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
-  header { padding: 2.2rem 0 1.4rem; display:flex; flex-wrap:wrap; align-items:flex-end; gap:1rem; justify-content:space-between;}
+  header { padding: 2.2rem 0 1.4rem; display:flex; flex-wrap:wrap; align-items:flex-start; gap:1rem; justify-content:space-between;}
   header h1 { font-size: 1.9rem; color: var(--accent); letter-spacing: -0.5px; }
   header h1 .spark { animation: pulse 2.4s ease-in-out infinite; display:inline-block;}
   header p { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
-  .toplinks { font-size:0.82rem; color:var(--muted); }
-  .build { font-size:0.66rem; color:#64748b; margin-top:4px; font-family:"JetBrains Mono",monospace; }
+  .toplinks { font-size:0.82rem; color:var(--muted); margin-top:0.35rem; }
+  .build { font-size:0.66rem; color:#64748b; font-family:"JetBrains Mono",monospace; text-align:right; flex-shrink:0; max-width:min(100%,520px); }
 
   /* arena counter bar */
   .counters { display:flex; gap:0.6rem; flex-wrap:wrap; margin: 0.4rem 0 1.6rem; }
@@ -160,11 +160,9 @@ PAGE = r'''<!DOCTYPE html>
     <div>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
       <p>Bots battling it out — ranked by win rate &amp; average placement. Top performers plus a challenger every game. The simulation never sleeps.</p>
+      <div class="toplinks">🎮 <a href="/play">Play vs the bots</a> &nbsp;·&nbsp; 📖 <a id="protolink" href="#">Agent protocol docs</a></div>
     </div>
-    <div style="text-align:right">
-      <div class="toplinks">📖 <a href="/play">🎮 Play vs the bots</a> &nbsp;·&nbsp; <a id="protolink" href="#">Agent protocol docs</a></div>
-      <div class="build" id="build" title="which code is deployed, and who shipped it"></div>
-    </div>
+    <div class="build" id="build" title="which code is deployed, and who shipped it"></div>
   </header>
 
   <div class="counters">
