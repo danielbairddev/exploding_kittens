@@ -11,6 +11,8 @@ from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.aggressive_agent import AggressiveAgent
 from agents.heuristic_agent import HeuristicAgent
+from agents.orangutan_agent import OrangutanAgent
+from agents.orangutan2_agent import Orangutan2Agent
 from agents.orangutan_features import encode, ACTIONS, N_ACTIONS
 from game.engine import GameEngine
 from game.actions import Action, ActionType
@@ -18,7 +20,10 @@ from game.cards import CardType
 
 DEF = CardType.DEFUSE
 NEG = -1e9
-FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent]
+# Include Orangutan/Orangutan2 as high-skill opponents — exposes the learner to
+# better strategies than the weaker heuristic fleet alone can provide.
+FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent,
+         OrangutanAgent, Orangutan2Agent]
 
 
 def _np_params(w):
