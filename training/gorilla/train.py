@@ -30,6 +30,7 @@ BC_WEIGHTS = os.path.join(HERE, "..", "..", "agents", "orangutan_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
 DEPLOY_OUT = os.path.join(HERE, "..", "..", "agents", "orangutan2_weights.json")
+BESTS_LOG = os.path.join(HERE, "bests.jsonl")
 DEFAULT_LOG = os.path.join(HERE, "..", "..", "logs", "train_orangutan_gorilla2.log")
 
 
@@ -183,6 +184,9 @@ def main():
             if wr > best:
                 best = wr; no_improve = 0
                 net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
+                import json as _json
+                with open(BESTS_LOG, 'a') as _f:
+                    _f.write(_json.dumps({'iter': it, 'win': round(wr*100,2), 'place': round(apl,3), 't': int(time.time())}) + '\n')
             else:
                 no_improve += 1
             wins = sum(1 for _, r in games if r > 0)

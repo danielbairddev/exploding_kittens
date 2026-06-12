@@ -158,6 +158,13 @@ PAGE = r'''<!DOCTYPE html>
   .train-bot .tb-chart { width:100%; height:60px; display:block; }
   .train-bot .tb-foot { display:flex; justify-content:space-between; margin-top:0.3rem; font-size:0.65rem; color:var(--muted); }
   .train-none { color:var(--muted); font-size:0.8rem; padding:0.5rem 0; }
+  .tb-ms-head { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.6rem; margin-bottom:0.25rem; }
+  .tb-milestones { max-height:130px; overflow-y:auto; }
+  .tb-ms { display:flex; justify-content:space-between; align-items:baseline; padding:2px 0; border-bottom:1px solid var(--border); font-size:0.75rem; }
+  .tb-ms:last-child { border-bottom:none; }
+  .tb-ms-win { font-weight:700; }
+  .tb-ms-meta { color:var(--muted); font-size:0.67rem; }
+  .tb-ms-empty { font-size:0.72rem; color:var(--muted); margin-top:0.4rem; }
 
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   @keyframes slideIn { from{opacity:0; transform:translateX(-6px);} to{opacity:1; transform:none;} }
@@ -563,23 +570,38 @@ function trainChart(pts, color){
   </svg>`;
 }
 
+function fmtAge(t){
+  const s = Math.floor(Date.now()/1000 - t);
+  if(s < 90) return `${s}s ago`;
+  if(s < 3600) return `${Math.floor(s/60)}m ago`;
+  if(s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
 function renderTraining(data){
   const bots = ['Rhino','Gorilla','Elephant'];
-  const anyData = bots.some(b => data[b] && data[b].length > 0);
+  const anyData = bots.some(b => data[b] && (data[b].points||[]).length > 0);
   if(!anyData){
     $('train-grid').innerHTML = '<div class="train-none">Waiting for first eval (iter 10)…</div>';
     return;
   }
   $('train-grid').innerHTML = bots.map(name => {
-    const pts = data[name] || [];
+    const entry = data[name] || {};
+    const pts = entry.points || [];
+    const bests = entry.bests || [];
     const color = TRAIN_COLORS[name];
     const emoji = TRAIN_EMOJI[name];
+    const label = name === 'Gorilla' ? 'Orangutan2' : name;
     if(!pts.length) return `<div class="train-bot">
-      <div class="tb-head"><span class="tb-name">${emoji} ${name}</span><span class="tb-stat">not running</span></div>
+      <div class="tb-head"><span class="tb-name">${emoji} ${label}</span><span class="tb-stat">not running</span></div>
       ${trainChart([], color)}
     </div>`;
     const last = pts[pts.length-1];
-    const label = name === 'Gorilla' ? 'Orangutan2' : name;
+    const milestonesHtml = bests.length
+      ? `<div class="tb-milestones">${[...bests].reverse().slice(0,8).map(b=>`
+          <div class="tb-ms"><span class="tb-ms-win" style="color:${color}">${b.win.toFixed(2)}%</span><span class="tb-ms-meta">iter ${b.iter} · place ${b.place} · ${fmtAge(b.t)}</span></div>`).join('')}
+        </div>`
+      : `<div class="tb-ms-empty">No bests saved yet — writes on new session</div>`;
     return `<div class="train-bot">
       <div class="tb-head">
         <span class="tb-name">${emoji} ${label}</span>
@@ -587,6 +609,8 @@ function renderTraining(data){
       </div>
       ${trainChart(pts, color)}
       <div class="tb-foot"><span>iter ${last.iter}</span><span>place ${last.place.toFixed(2)}</span></div>
+      <div class="tb-ms-head">Best milestones</div>
+      ${milestonesHtml}
     </div>`;
   }).join('');
 }
@@ -616,7 +640,8 @@ async function pollTraining(){
     try{
       const d = await (await fetch('/api/training')).json();
       // Check for new bests before rendering
-      for(const [name, pts] of Object.entries(d)){
+      for(const [name, entry] of Object.entries(d)){
+        const pts = entry.points || [];
         if(!pts.length) continue;
         const best = pts[pts.length-1].best;
         if(_trainBest[name] !== undefined && best > _trainBest[name] + 0.001){

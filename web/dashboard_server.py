@@ -547,11 +547,17 @@ _TRAIN_LOGS = {
     "Gorilla":  "/tmp/gorilla_train.log",
     "Elephant": "/tmp/elephant_train.log",
 }
+_BESTS_FILES = {
+    "Rhino":    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'rhino',    'bests.jsonl'),
+    "Gorilla":  os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'gorilla',  'bests.jsonl'),
+    "Elephant": os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'elephant', 'bests.jsonl'),
+}
 _ITER_RE = _re.compile(
     r"iter\s+(\d+)\s+rollout_win\s+([\d.]+)%.*?win\s+([\d.]+)%\s+place\s+([\d.]+).*?\(best\s+([\d.]+)%\)"
 )
 
 def _training_progress():
+    import json as _json
     out = {}
     for name, path in _TRAIN_LOGS.items():
         points = []
@@ -569,7 +575,16 @@ def _training_progress():
                         })
         except OSError:
             pass
-        out[name] = points
+        bests = []
+        try:
+            with open(_BESTS_FILES[name]) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        bests.append(_json.loads(line))
+        except OSError:
+            pass
+        out[name] = {"points": points, "bests": bests}
     return out
 
 
