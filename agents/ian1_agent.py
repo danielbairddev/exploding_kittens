@@ -21,7 +21,9 @@ DEFUSE = CardType.DEFUSE
 class Ian1Agent(Agent):
     # Shows up on the live leaderboard. Tweak name/emoji/color/blurb as you like.
     ARENA = {"name": "Ian1", "emoji": "\U0001F331", "color": "#14b8a6",
-             "blurb": "Ian's bot — a work in progress.", "author": "Ian"}
+             "blurb": "Ian's bot — a work in progress.", "author": "Ian",
+             # TODO: set llm_assisted once Ian confirms
+             }
 
     def __init__(self, name: str = "Ian1", seed: int | None = None):
         self.name = name

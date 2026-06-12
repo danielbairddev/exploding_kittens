@@ -31,7 +31,9 @@ CARD_GIVE_AWAY_PRIORITY: list[CardType] = [CardType.EXPLODING_KITTEN, CardType.T
 class Ian2Agent(Agent):
     # Shows up on the live leaderboard. Tweak name/emoji/color/blurb as you like.
     ARENA = {"name": "Ian2", "emoji": "🫦", "color": "#14b8a6",
-             "blurb": "Yum", "author": "Ian"}
+             "blurb": "Yum", "author": "Ian",
+             # TODO: set llm_assisted once Ian confirms
+             }
 
 
     def __init__(self, name: str = "Ian1", seed: int | None = None):

@@ -13,7 +13,8 @@ class AggressiveAgent(Agent):
     """
 
     ARENA = {"name": "Maverick", "emoji": "\U0001F4A5", "color": "#f97316",
-             "blurb": "Attack first, ask never.", "author": "Daniel Baird"}
+             "blurb": "Attack first, ask never.", "author": "Daniel Baird",
+             "llm_assisted": True}
 
     def __init__(self, name: str = "Aggressive", seed: int | None = None):
         self.name = name

@@ -25,7 +25,8 @@ class HeuristicAgent(Agent):
     """
 
     ARENA = {"name": "Professor", "emoji": "\U0001F9E0", "color": "#818cf8",
-             "blurb": "Counts cards, plays the odds.", "author": "Daniel Baird"}
+             "blurb": "Counts cards, plays the odds.", "author": "Daniel Baird",
+             "llm_assisted": True}
 
     def __init__(self, name: str = "Heuristic", seed: int | None = None):
         self.name = name
