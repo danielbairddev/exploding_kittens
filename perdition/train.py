@@ -5,7 +5,7 @@ Mirrors gorilla/train.py but with:
   - Inverted reward (-1 win, +1 any loss) from perdition/rollout.py
   - No BC warm-start (we don't want it imitating competent play)
   - Best policy tracked by LOWEST greedy win rate, not highest
-  - Saves policy weights to agents/perdition_weights.json
+  - Saves policy weights to agents/perdition2_weights.json
 
     python3 -m perdition.train --iters 3000 --workers 8
 """
@@ -25,7 +25,7 @@ from gorilla.train import compute_targets, ppo_update
 from perdition.rollout import rollout_worker, evaluate
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WEIGHTS_OUT = os.path.join(HERE, "..", "agents", "perdition_weights.json")
+WEIGHTS_OUT = os.path.join(HERE, "..", "agents", "perdition2_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
 
