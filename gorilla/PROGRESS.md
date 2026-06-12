@@ -50,6 +50,28 @@ The policy network is kept **identical in shape to Orangutan** (35 features →
 | run 2 | re-BC (52 feat) | ~28.5% | new Orangutan weights; BC ceiling unchanged (still clones Coyote) |
 | run 2 | PPO self-play, 52 feat | **40.1%** final | **DEPLOYED into Orangutan** (redeployed as it climbed: 31.6→35.4→37.4→40.1%). Now the clear #1 bot; head-to-head it beats Coyote/Sly2 by several points. Run concluded (plateau). |
 
+## Ceiling analysis — why everything plateaus at ~40%
+
+An oracle that always sees the real top 3 cards (perfect See-the-Future, via the
+engine's `reveal_top`) and otherwise plays Coyote wins **43.8%** vs the fleet.
+That's the information-theoretic ceiling. Reference points (1-of-5, 20% baseline):
+
+| agent | win% |
+|------|------|
+| random | 20% |
+| Coyote (heuristic) | 29% |
+| Orangutan (RL, deployed) | **40.1%** |
+| oracle (perfect top-3) | **43.8% (ceiling)** |
+
+Orangutan reaches **91% of the perfect-information ceiling with no cheating.**
+The remaining ~3.7pts is unseen-card knowledge we can't get — which is exactly
+why neural Nope (Mandrill, 40.3%), opponent modeling (Gorilla, 39.9%), and the
+other heads all tied: the limit is *information, not policy*. The only partial
+lever left is a probabilistic belief-state to better estimate the top — and even
+that can capture only a fraction of 3.7pts. Verdict: Orangutan is near-optimal;
+stop grinding policy. Belief-state (Abaddon) is the only avenue with any headroom,
+at low ROI.
+
 ## Gorilla proper — progress
 
 - **GameTracker** (`tracker.py`) built + validated. Reconstructs the full action

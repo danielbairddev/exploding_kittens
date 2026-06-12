@@ -6,10 +6,11 @@ from .actions import Action, ActionType
 
 class GameEngine:
     def __init__(self, agents: list, seed: int | None = None, verbose: bool = False,
-                 collect_events: bool = False):
+                 collect_events: bool = False, reveal_top: bool = False):
         self.agents = agents
         self.verbose = verbose
         self.collect_events = collect_events
+        self.reveal_top = reveal_top   # god-mode: always expose the real top 3 (oracle test)
         self.rng = random.Random(seed)
         self._events: list[dict] = []
         self._turn: int = 0
@@ -24,7 +25,7 @@ class GameEngine:
 
     def _observable(self, state: GameState, for_player: int) -> ObservableState:
         me = state.players[for_player]
-        return ObservableState(
+        obs = ObservableState(
             my_id=for_player,
             my_hand=list(me.hand),
             hand_sizes={p.player_id: len(p.hand) for p in state.players if p.alive},
@@ -34,6 +35,9 @@ class GameEngine:
             turns_remaining=state.turns_remaining,
             current_player=state.current_player,
         )
+        if self.reveal_top:
+            obs.known_top3 = [Card(c.card_type) for c in state.draw_pile[:3]]
+        return obs
 
     def _setup(self, n_players: int) -> GameState:
         deck = build_deck(n_players)
