@@ -113,7 +113,7 @@ PAGE = r'''<!DOCTYPE html>
   .lb-bar i { display:block; height:100%; border-radius:4px; transition: width .6s; }
   .lb-right { text-align:right; }
   .lb-rate { font-weight:700; font-size:0.95rem; font-variant-numeric:tabular-nums; }
-  .lb-games{ font-size:0.64rem; color:var(--muted); }
+  .lb-games{ font-size:0.64rem; color:var(--muted); text-align:right; margin-top:2px; }
   .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
   .lb-wr { font-weight:700; font-size:1.0rem; color:#cbd5e1; font-variant-numeric:tabular-nums; line-height:1.2; margin-top:1px; }
   .lb-unit{ font-size:0.56rem; color:var(--muted); font-weight:700; letter-spacing:0.05em; margin-left:3px; }
@@ -302,12 +302,12 @@ function renderLadder(){
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}<span class="lb-games">${gamesLabel} games</span></div>
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
         ${m==='elo' ? eloSpark(b.elo_recent, b.color) : ''}
       </div>
-      <div class="lb-right">${big(b)}</div>
+      <div class="lb-right">${big(b)}<div class="lb-games">${gamesLabel} games</div></div>
     </div>`;
   }).join('');
 }
