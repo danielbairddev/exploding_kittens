@@ -1,9 +1,17 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-SERVER="root@162.243.161.27"
-PORT=8767
-APP_DIR="/opt/ek-arena"
+SERVER="${SERVER:-root@162.243.161.27}"
+PORT="${PORT:-8767}"
+APP_DIR="${APP_DIR:-/opt/ek-arena}"
+
+# Files shipped via rsync on legacy (non-git) servers. Git-based servers sync
+# via fetch+reset instead; this list still matters before setup_auto_deploy.
+RSYNC_PATHS=(
+  dashboard_server.py dashboard_page.py play.py play_page.py
+  smoke_test.py auto_deploy.sh arena_restart.sh
+  game agents protocol
+)
 
 # --------------------------------------------------------------------------
 # Guard: never deploy code that isn't committed and pushed to GitHub, so the
@@ -31,41 +39,46 @@ if [ "${ALLOW_DIRTY:-0}" != "1" ]; then
   echo "Git check OK: $branch @ $(git rev-parse --short HEAD) matches $upstream"
 fi
 
-# Identity stamp so we can tell who deployed what (shown on the site, top-right).
+FULL_SHA=$(git rev-parse HEAD)
 SHA=$(git rev-parse --short HEAD)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BY=$(git config user.name 2>/dev/null || echo "${USER:-unknown}")
 AT=$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M %Z")
 
 echo "Deploying Live Arena dashboard to $SERVER:$PORT  (as '$BY' @ $SHA)..."
 
-# The dashboard imports the game engine + agent packages, so ship those too.
 # logs/ is intentionally NOT deleted — it holds the persisted stats snapshot.
 ssh "$SERVER" "mkdir -p $APP_DIR"
-rsync -az \
-  --exclude '__pycache__' --exclude '*.pyc' --exclude '.venv' \
-  dashboard_server.py dashboard_page.py play.py play_page.py game agents protocol \
-  "$SERVER:$APP_DIR/"
 
-ssh "$SERVER" bash <<REMOTE
-set -e
-pkill -f "dashboard_server.py" 2>/dev/null || true
-for i in \$(seq 1 10); do
-  ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT" || break
-  sleep 1
-done
-
-cd $APP_DIR
-EK_DEPLOY_SHA='$SHA' EK_DEPLOY_BY='$BY' EK_DEPLOY_AT='$AT' \
-  nohup python3 dashboard_server.py $PORT > /tmp/ek-arena.log 2>&1 </dev/null &
-
-sleep 2
-if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
-  echo "Live Arena up at http://162.243.161.27:$PORT"
-else
-  echo "ERROR: server didn't start. Check /tmp/ek-arena.log"
-  tail -20 /tmp/ek-arena.log || true
-  exit 1
+# Legacy boxes: rsync. Git boxes: skip rsync (sync happens in the remote step).
+if ssh "$SERVER" "[ ! -d '$APP_DIR/.git' ]"; then
+  echo "Legacy sync: rsync -> $APP_DIR"
+  rsync -az \
+    --exclude '__pycache__' --exclude '*.pyc' --exclude '.venv' \
+    "${RSYNC_PATHS[@]}" \
+    "$SERVER:$APP_DIR/"
 fi
 
-echo "Dashboard running (continuous simulation, no auto-teardown)"
+ssh "$SERVER" bash -s "$APP_DIR" "$PORT" "$FULL_SHA" "$BRANCH" "$SHA" "$BY" "$AT" <<'REMOTE'
+set -euo pipefail
+APP_DIR="$1" PORT="$2" FULL_SHA="$3" BRANCH="$4" SHA="$5" BY="$6" AT="$7"
+
+if [ -d "$APP_DIR/.git" ]; then
+  echo "Git sync: origin/$BRANCH @ $SHA"
+  git -C "$APP_DIR" fetch -q origin "$BRANCH"
+  git -C "$APP_DIR" reset --hard "$FULL_SHA"
+  chmod +x "$APP_DIR/auto_deploy.sh" "$APP_DIR/arena_restart.sh" 2>/dev/null || true
+  if [ "$BRANCH" != "main" ] && pgrep -f "auto_deploy.sh" >/dev/null 2>&1; then
+    echo "Stopping auto-deploy poller (tracks main; you deployed $BRANCH)"
+    pkill -f "auto_deploy.sh" 2>/dev/null || true
+  fi
+else
+  echo "Rsync sync (no .git in $APP_DIR)"
+  chmod +x "$APP_DIR/arena_restart.sh" 2>/dev/null || true
+fi
+
+export APP_DIR PORT EK_DEPLOY_SHA="$SHA" EK_DEPLOY_BY="$BY" EK_DEPLOY_AT="$AT"
+exec "$APP_DIR/arena_restart.sh"
 REMOTE
+
+echo "Dashboard running (continuous simulation, no auto-teardown)"
