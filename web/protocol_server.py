@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Protocol documentation server for Exploding Kittens agents.
-Usage: python protocol_server.py [port]
+Usage: python web/protocol_server.py [port]
 """
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler

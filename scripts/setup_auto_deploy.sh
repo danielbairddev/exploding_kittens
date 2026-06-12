@@ -42,7 +42,7 @@ else
   git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 fi
 
-chmod +x "$APP_DIR/auto_deploy.sh" "$APP_DIR/arena_restart.sh"
+chmod +x "$APP_DIR/scripts/auto_deploy.sh" "$APP_DIR/scripts/arena_restart.sh"
 
 # Stop any previous poller, then start the dashboard.
 pkill -f "auto_deploy.sh" 2>/dev/null || true
@@ -50,10 +50,10 @@ pkill -f "auto_deploy.sh" 2>/dev/null || true
 sha=$(git -C "$APP_DIR" rev-parse --short HEAD)
 at=$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M %Z")
 export APP_DIR PORT EK_DEPLOY_SHA="$sha" EK_DEPLOY_BY="setup" EK_DEPLOY_AT="$at"
-"$APP_DIR/arena_restart.sh"
+"$APP_DIR/scripts/arena_restart.sh"
 echo "Dashboard up @ $sha"
 
-nohup "$APP_DIR/auto_deploy.sh" >/dev/null 2>&1 &
+nohup "$APP_DIR/scripts/auto_deploy.sh" >/dev/null 2>&1 &
 sleep 1
 if pgrep -f "auto_deploy.sh" >/dev/null; then
   echo "Auto-deploy poller running (logs: /tmp/ek-auto-deploy.log)"

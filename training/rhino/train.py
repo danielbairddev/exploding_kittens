@@ -14,17 +14,17 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from rhino.net import (GRUActorCritic, GRU_H, ALL_KEYS, N_TARGETS,
+from training.rhino.net import (GRUActorCritic, GRU_H, ALL_KEYS, N_TARGETS,
                        N_CARD_TYPES, N_BUCKETS)
-from rhino.rollout import rollout_worker, evaluate
+from training.rhino.rollout import rollout_worker, evaluate
 from agents.orangutan_features import N_ACTIONS
 
 HERE      = os.path.dirname(os.path.abspath(__file__))
 BEST_OUT  = os.path.join(HERE, 'best_policy.json')
 CKPT_OUT  = os.path.join(HERE, 'checkpoint.json')
-DEPLOY_OUT = os.path.join(HERE, '..', 'agents', 'rhino_weights.json')
+DEPLOY_OUT = os.path.join(HERE, '..', '..', 'agents', 'rhino_weights.json')
 
 NEG = -1e9
 

@@ -8,8 +8,8 @@ we hand them over.
 """
 from math import comb
 
-from gorilla.features_g import encode_g, N_FEATURES_G
-from gorilla.tracker import EK
+from training.gorilla.features_g import encode_g, N_FEATURES_G
+from training.gorilla.tracker import EK
 
 N_FEATURES_A = N_FEATURES_G + 3   # + p(EK in top1/top2/top3)
 

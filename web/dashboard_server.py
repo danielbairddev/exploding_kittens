@@ -12,9 +12,9 @@ A single self-contained (stdlib-only) server that:
     it never falls over on a long-running box.
 
 Run:
-    python3 dashboard_server.py [PORT]      # default 8767
+    python3 web/dashboard_server.py [PORT]      # default 8767
 
-Meant to sit next to the protocol docs (protocol_server.py, port 8766).
+Meant to sit next to the protocol docs (web/protocol_server.py, port 8766).
 """
 import json
 import os
@@ -26,7 +26,7 @@ from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.random_agent import RandomAgent
 from agents.heuristic_agent import HeuristicAgent
@@ -80,7 +80,7 @@ BUILD = {
     "at": os.environ.get("EK_DEPLOY_AT", ""),
 }
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v9.json")
@@ -604,9 +604,9 @@ def main():
 
 
 # PAGE is defined in dashboard_page.py to keep this file readable.
-from dashboard_page import PAGE  # noqa: E402
-from play_page import PLAY_PAGE  # noqa: E402
-import play  # noqa: E402
+from web.dashboard_page import PAGE  # noqa: E402
+from web.play_page import PLAY_PAGE  # noqa: E402
+from web import play  # noqa: E402
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     # Import validates the full agent roster + engine wiring.
-    import dashboard_server  # noqa: F401
+    import web.dashboard_server  # noqa: F401
 
     from agents.random_agent import RandomAgent
     from game.engine import GameEngine

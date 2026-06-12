@@ -9,12 +9,12 @@ logs/
 .idea/
 
 # Gorilla training artifacts (regenerated)
-gorilla/checkpoint.json
-gorilla/best_policy.json
-gorilla/*.tmp
-gorilla/checkpoint_g.json
-gorilla/best_policy_g.json
-mandrill/nope_ckpt.json
-mandrill/nope_best.json
-abaddon/checkpoint_a.json
-abaddon/best_policy_a.json
+training/gorilla/checkpoint.json
+training/gorilla/best_policy.json
+training/gorilla/*.tmp
+training/gorilla/checkpoint_g.json
+training/gorilla/best_policy_g.json
+training/mandrill/nope_ckpt.json
+training/mandrill/nope_best.json
+training/abaddon/checkpoint_a.json
+training/abaddon/best_policy_a.json

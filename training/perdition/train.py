@@ -18,14 +18,14 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from gorilla.net import ActorCritic
-from gorilla.train import compute_targets, ppo_update
-from perdition.rollout import rollout_worker, evaluate
+from training.gorilla.net import ActorCritic
+from training.gorilla.train import compute_targets, ppo_update
+from training.perdition.rollout import rollout_worker, evaluate
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WEIGHTS_OUT = os.path.join(HERE, "..", "agents", "perdition2_weights.json")
+WEIGHTS_OUT = os.path.join(HERE, "..", "..", "agents", "perdition2_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
 

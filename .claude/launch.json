@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "arena", "runtimeExecutable": "python3", "runtimeArgs": ["dashboard_server.py", "8769"], "port": 8769 }
+    { "name": "arena", "runtimeExecutable": "python3", "runtimeArgs": ["web/dashboard_server.py", "8769"], "port": 8769 }
   ]
 }

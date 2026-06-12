@@ -17,8 +17,8 @@ from agents.chaos_agent import ChaosAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import Ian2Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS, N_ACTIONS
-from rhino.event_encode import encode_event, N_EVENT, CARD_NAMES, _CARD_IDX
-from rhino.net import (GRU_H, N_TARGETS, N_CARD_TYPES, N_BUCKETS, BUCKET_FRACS,
+from training.rhino.event_encode import encode_event, N_EVENT, CARD_NAMES, _CARD_IDX
+from training.rhino.net import (GRU_H, N_TARGETS, N_CARD_TYPES, N_BUCKETS, BUCKET_FRACS,
                        POLICY_KEYS)
 from game.engine import GameEngine
 from game.actions import Action, ActionType

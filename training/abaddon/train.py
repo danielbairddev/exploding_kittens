@@ -11,10 +11,10 @@ module) all use encode_a. We only override the checkpoint output paths.
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 os.environ["EK_ENCODER"] = "abaddon"          # must be set before the import below
 
-import gorilla.train_g as tg                   # noqa: E402
+import training.gorilla.train_g as tg                   # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 tg.BEST_OUT = os.path.join(HERE, "best_policy_a.json")

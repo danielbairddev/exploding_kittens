@@ -16,7 +16,7 @@ import os
 import numpy as np
 
 from agents.orangutan_features import N_FEATURES as N_SNAP, N_ACTIONS
-from rhino.event_encode import N_EVENT
+from training.rhino.event_encode import N_EVENT
 
 GRU_H = 64
 H1, H2 = 64, 32

@@ -8,8 +8,7 @@ APP_DIR="${APP_DIR:-/opt/ek-arena}"
 # Files shipped via rsync on legacy (non-git) servers. Git-based servers sync
 # via fetch+reset instead; this list still matters before setup_auto_deploy.
 RSYNC_PATHS=(
-  dashboard_server.py dashboard_page.py play.py play_page.py
-  smoke_test.py auto_deploy.sh arena_restart.sh
+  web scripts smoke_test.py
   game agents protocol
 )
 
@@ -74,7 +73,7 @@ if [ -d "$APP_DIR/.git" ]; then
   echo "Git sync: origin/$BRANCH @ $SHA"
   git -C "$APP_DIR" fetch -q origin "$BRANCH"
   git -C "$APP_DIR" reset --hard "$FULL_SHA"
-  chmod +x "$APP_DIR/auto_deploy.sh" "$APP_DIR/arena_restart.sh" 2>/dev/null || true
+  chmod +x "$APP_DIR/scripts/auto_deploy.sh" "$APP_DIR/scripts/arena_restart.sh" 2>/dev/null || true
   if [ "$BRANCH" != "main" ] && pgrep -f "auto_deploy.sh" >/dev/null 2>&1; then
     echo "Stopping auto-deploy poller (tracks main; you deployed $BRANCH)"
     pkill -f "auto_deploy.sh" 2>/dev/null || true
@@ -85,7 +84,7 @@ else
 fi
 
 export APP_DIR PORT EK_DEPLOY_SHA="$SHA" EK_DEPLOY_BY="$BY" EK_DEPLOY_AT="$AT"
-exec "$APP_DIR/arena_restart.sh"
+exec "$APP_DIR/scripts/arena_restart.sh"
 REMOTE
 
 echo "Dashboard running (continuous simulation, no auto-teardown)"
