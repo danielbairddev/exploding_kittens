@@ -20,7 +20,12 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from gorilla.net import ActorCritic, masked_softmax, NEG
-from gorilla.features_g import encode_g, N_FEATURES_G
+# Encoder is selectable so Abaddon can reuse this whole pipeline. Read at import
+# time so spawned rollout workers (which re-import this module) pick it up too.
+if os.environ.get("EK_ENCODER") == "abaddon":
+    from abaddon.features import encode_a as encode_g, N_FEATURES_A as N_FEATURES_G
+else:
+    from gorilla.features_g import encode_g, N_FEATURES_G
 from gorilla.tracker import GameTracker, DEF
 from gorilla.train import compute_targets, ppo_update
 from agents.coyote_agent import CoyoteAgent
