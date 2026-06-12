@@ -18,17 +18,17 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from gorilla.net import ActorCritic, masked_softmax, NEG
-from gorilla.rollout import rollout_worker, evaluate
+from training.gorilla.net import ActorCritic, masked_softmax, NEG
+from training.gorilla.rollout import rollout_worker, evaluate
 from agents.orangutan_features import N_ACTIONS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BC_WEIGHTS = os.path.join(HERE, "..", "agents", "orangutan_weights.json")
+BC_WEIGHTS = os.path.join(HERE, "..", "..", "agents", "orangutan_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
-DEPLOY_OUT = os.path.join(HERE, "..", "agents", "orangutan2_weights.json")
+DEPLOY_OUT = os.path.join(HERE, "..", "..", "agents", "orangutan2_weights.json")
 
 
 def compute_targets(games, gamma):

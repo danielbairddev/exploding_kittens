@@ -15,7 +15,7 @@ from game.actions import Action, ActionType
 from game.cards import CardType
 
 try:
-    from rhino.event_encode import CARD_NAMES, N_EVENT
+    from training.rhino.event_encode import CARD_NAMES, N_EVENT
 except ImportError:
     # numpy not installed (production server) — define fallback constants
     CARD_NAMES = ['DEFUSE','ATTACK','SKIP','FAVOR','SHUFFLE','SEE_THE_FUTURE','NOPE',
@@ -144,7 +144,7 @@ class RhinoAgent(Agent):
                       if e.get('event_id', 0) > self._last_eid],
                      key=lambda e: e.get('event_id', 0))
         for ev in new:
-            from rhino.event_encode import encode_event
+            from training.rhino.event_encode import encode_event
             vec = encode_event(ev, state.my_id)
             self._h = _gru_step(vec, self._h, self._WEIGHTS)
             self._last_eid = ev.get('event_id', self._last_eid)

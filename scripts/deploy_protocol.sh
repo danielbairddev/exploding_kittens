@@ -7,7 +7,7 @@ APP_DIR="/opt/ek-protocol"
 
 echo "Deploying protocol docs to $SERVER:$PORT..."
 
-cat protocol_server.py | ssh "$SERVER" "mkdir -p $APP_DIR && cat > $APP_DIR/protocol_server.py"
+cat web/protocol_server.py | ssh "$SERVER" "mkdir -p $APP_DIR && cat > $APP_DIR/protocol_server.py"
 
 ssh "$SERVER" bash <<REMOTE
 pkill -f "protocol_server.py" 2>/dev/null || true

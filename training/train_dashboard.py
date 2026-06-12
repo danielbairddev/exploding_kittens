@@ -2,7 +2,7 @@
 """Local training dashboard — reads log files and serves status at http://localhost:7777
 
 Usage:
-    python3 train_dashboard.py
+    python3 training/train_dashboard.py
 
 Requires: pip3 install psutil
 Temperature: reads die-area temp from battery SMC sensor (Apple Silicon, no sudo needed).
@@ -12,10 +12,10 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import psutil
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LOGS = os.path.join(HERE, 'logs')
+LOGS = os.path.join(os.path.dirname(HERE), 'logs')
 
 RUNS = [
     {

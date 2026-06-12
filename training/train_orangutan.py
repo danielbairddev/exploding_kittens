@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Train the Perdition policy network to lose — minimise win rate, not placement.
+"""Train the Orangutan policy network by REINFORCE self-play vs the fleet.
 
-Same MLP architecture as Orangutan (52 -> 64 -> 32 -> 8), but the reward is
-binary: 0.0 if Perdition wins, 1.0 for any loss.  Placement among losers is not
-optimised.  No behavioural-cloning warm-start (we don't want it imitating a
-good player).
+A small MLP (35 -> 64 -> 32 -> 8) picks the action TYPE each turn. It plays
+games against random subsets of the existing bots; the reward is placement-based
+(1.0 for 1st down to 0.0 for first-out), and we do policy-gradient ascent with an
+entropy bonus. Weights are checkpointed to agents/orangutan_weights.json (the
+format the deployed OrangutanAgent reads). Run in the background:
 
-    python3 train_perdition.py --batches 4000
+    python3 training/train_orangutan.py --batches 4000
 
-Progress lines report Perdition's greedy loss% (= 100 - win%) and average place.
+Progress lines report Orangutan's greedy win% and average place vs the fleet.
 """
 import argparse
 import json
@@ -18,7 +19,7 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.coyote_agent import CoyoteAgent
 from agents.survival_agent import SurvivalAgent
@@ -27,16 +28,15 @@ from agents.aggressive_agent import AggressiveAgent
 from agents.chaos_agent import ChaosAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.random_agent import RandomAgent
-from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan_features import encode, ACTIONS, N_FEATURES, N_ACTIONS
 from game.engine import GameEngine
 from game.actions import Action, ActionType
 from game.cards import CardType
 
 DEF = CardType.DEFUSE
-WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents", "perdition_weights.json")
+WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agents", "orangutan_weights.json")
 FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent,
-         ChaosAgent, HeuristicAgent, RandomAgent, OrangutanAgent]
+         ChaosAgent, HeuristicAgent, RandomAgent]
 H1, H2 = 64, 32
 NEG = -1e9
 
@@ -126,7 +126,7 @@ class Trainee(CoyoteAgent):
 def play_game(net, rng, explore=True):
     Trainee.NET = net
     Trainee.EXPLORE = explore
-    me = Trainee(name="Perdition")
+    me = Trainee(name="Orangutan")
     opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
     agents = [me] + opps
     order = list(range(5)); rng.shuffle(order)
@@ -140,13 +140,13 @@ def play_game(net, rng, explore=True):
         return None
     finish = [r["winner"]] + list(reversed(deaths))     # seats best->worst
     place = finish.index(seat_of_me) + 1                 # 1..5
-    # Binary reward: 0 for winning, 1 for any loss. Placement among losers ignored.
-    reward = 0.0 if place == 1 else 1.0
+    reward = (5 - place) / 4.0                           # 1.0 win .. 0.0 first out
     return me.log, reward, place
 
 
 def backprop(net, cache, mask, probs, idx, advantage, entropy_beta):
     x, z1, a1, z2, a2 = cache
+    # dJ/dlogits for J = A*log p_idx + beta*entropy
     dlog = advantage * (np.eye(N_ACTIONS)[idx] - probs)
     with np.errstate(divide="ignore", invalid="ignore"):
         logp = np.where(mask > 0, np.log(probs + 1e-12), 0.0)
@@ -158,6 +158,65 @@ def backprop(net, cache, mask, probs, idx, advantage, entropy_beta):
     da1 = net.W2.T @ dz2; dz1 = da1 * (z1 > 0)
     gW1 = np.outer(dz1, x); gb1 = dz1
     return {"W1": gW1, "b1": gb1, "W2": gW2, "b2": gb2, "W3": gW3, "b3": gb3}
+
+
+class TeacherLogger(CoyoteAgent):
+    """Coyote, but logs (features, chosen action index) for behavioral cloning."""
+    SAMPLES = None
+
+    def choose_action(self, state, valid_actions):
+        action = super().choose_action(state, valid_actions)
+        by = {a.action_type for a in valid_actions}
+        mask = [1.0 if at in by else 0.0 for at in ACTIONS]
+        if action.action_type in ACTIONS and self.SAMPLES is not None:
+            feats = encode(state, self._known_list(state))
+            self.SAMPLES.append((feats, ACTIONS.index(action.action_type), mask))
+        return action
+
+
+def behavioral_clone(net, n_games=60000, epochs=6, lr=1e-3):
+    """Pretrain the policy to imitate Coyote's action choices."""
+    print(f"BC: collecting {n_games} games of Coyote decisions...", flush=True)
+    samples = []
+    TeacherLogger.SAMPLES = samples
+    rng = random.Random(2024)
+    for _ in range(n_games):
+        me = TeacherLogger(name="Teacher")
+        opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
+        agents = [me] + opps
+        order = list(range(5)); rng.shuffle(order)
+        GameEngine([agents[i] for i in order], collect_events=False).play_game(5)
+    TeacherLogger.SAMPLES = None
+    X = np.array([s[0] for s in samples])
+    y = np.array([s[1] for s in samples])
+    M = np.array([s[2] for s in samples])
+    onehot = np.eye(N_ACTIONS)[y]
+    print(f"BC: {len(X)} decisions; training {epochs} epochs (vectorized)...", flush=True)
+    idx = np.arange(len(X)); bs = 1024
+    for ep in range(epochs):
+        np.random.shuffle(idx)
+        correct = 0
+        for start in range(0, len(idx), bs):
+            b = idx[start:start + bs]
+            Xb, Mb, Ob = X[b], M[b], onehot[b]
+            Z1 = Xb @ net.W1.T + net.b1; A1 = np.maximum(Z1, 0)
+            Z2 = A1 @ net.W2.T + net.b2; A2 = np.maximum(Z2, 0)
+            L = A2 @ net.W3.T + net.b3
+            Z = np.where(Mb > 0, L, NEG); Z -= Z.max(1, keepdims=True)
+            E = np.exp(Z) * Mb; P = E / E.sum(1, keepdims=True)
+            correct += int((P.argmax(1) == y[b]).sum())
+            n = len(b)
+            dL = (Ob - P) / n                                   # ascend log p_true
+            gW3 = dL.T @ A2; gb3 = dL.sum(0)
+            dZ2 = (dL @ net.W3) * (Z2 > 0)
+            gW2 = dZ2.T @ A1; gb2 = dZ2.sum(0)
+            dZ1 = (dZ2 @ net.W2) * (Z1 > 0)
+            gW1 = dZ1.T @ Xb; gb1 = dZ1.sum(0)
+            net.step({"W1": gW1, "b1": gb1, "W2": gW2, "b2": gb2, "W3": gW3, "b3": gb3}, lr=lr)
+        print(f"BC epoch {ep+1}: train action-match {correct/len(X)*100:.1f}%", flush=True)
+    net.save(WEIGHTS_PATH)
+    wr, ap_ = evaluate(net, random.Random(99), n=3000)
+    print(f"BC done -> greedy vs fleet: win {wr*100:.1f}%  avg_place {ap_:.3f}", flush=True)
 
 
 def evaluate(net, rng, n=3000):
@@ -178,21 +237,23 @@ def main():
     ap.add_argument("--batches", type=int, default=4000)
     ap.add_argument("--games", type=int, default=256, help="games per batch")
     ap.add_argument("--lr", type=float, default=2e-3)
-    ap.add_argument("--entropy", type=float, default=0.02,
-                    help="entropy bonus (slightly higher than Orangutan to encourage bad exploration)")
+    ap.add_argument("--entropy", type=float, default=0.01)
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--mode", choices=["bc", "rl", "both"], default="both")
     args = ap.parse_args()
 
     net = Net()
     if args.resume and os.path.exists(WEIGHTS_PATH):
         net.load(WEIGHTS_PATH); print("resumed from checkpoint", flush=True)
-
+    if args.mode in ("bc", "both"):
+        behavioral_clone(net)
+        if args.mode == "bc":
+            return
     rng = random.Random(1234)
-    # Baseline starts at ~0.8 (expected reward when rarely winning in a 5-player game).
-    baseline = 0.8
-    print(f"training Perdition (minimise win rate): {args.batches} batches x {args.games} games", flush=True)
+    baseline = 0.5
+    print(f"training: {args.batches} batches x {args.games} games", flush=True)
     for batch in range(1, args.batches + 1):
-        decisions = []
+        decisions = []   # (cache, mask, probs, idx, reward)
         rewards = []
         for _ in range(args.games):
             res = play_game(net, rng, explore=True)
@@ -206,6 +267,7 @@ def main():
             continue
         batch_mean = sum(rewards) / len(rewards)
         baseline = 0.95 * baseline + 0.05 * batch_mean
+        # accumulate gradients with advantage = reward - baseline
         grads = {k: np.zeros_like(getattr(net, k)) for k in ("W1", "b1", "W2", "b2", "W3", "b3")}
         for (cache, mask, probs, idx, reward) in decisions:
             adv = reward - baseline
@@ -220,7 +282,7 @@ def main():
             net.save(WEIGHTS_PATH)
             wr, ap_ = evaluate(net, random.Random(99), n=2500)
             print(f"batch {batch:4d}  avg_reward {batch_mean:.3f}  baseline {baseline:.3f}  "
-                  f"|  greedy vs fleet: win {wr*100:4.1f}%  loss {(1-wr)*100:4.1f}%  avg_place {ap_:.3f}", flush=True)
+                  f"|  greedy vs fleet: win {wr*100:4.1f}%  avg_place {ap_:.3f}", flush=True)
     net.save(WEIGHTS_PATH)
     print("done", flush=True)
 

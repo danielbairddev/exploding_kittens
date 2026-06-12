@@ -21,10 +21,10 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from gorilla.net import ActorCritic, NEG
-from gorilla.train import compute_targets, ppo_update
+from training.gorilla.net import ActorCritic, NEG
+from training.gorilla.train import compute_targets, ppo_update
 from agents.coyote_agent import CoyoteAgent
 from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
@@ -38,7 +38,7 @@ from game.actions import Action, ActionType
 from game.cards import CardType
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ORANGUTAN_W = os.path.join(HERE, "..", "agents", "orangutan_weights.json")
+ORANGUTAN_W = os.path.join(HERE, "..", "..", "agents", "orangutan_weights.json")
 BEST_OUT = os.path.join(HERE, "nope_best.json")
 CKPT_OUT = os.path.join(HERE, "nope_ckpt.json")
 FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent,

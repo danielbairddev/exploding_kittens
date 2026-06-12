@@ -40,7 +40,7 @@ restart_dashboard() {
   at=$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M %Z")
   if APP_DIR="$APP_DIR" PORT="$PORT" \
      EK_DEPLOY_SHA="$sha" EK_DEPLOY_BY="auto-deploy" EK_DEPLOY_AT="$at" \
-     "$APP_DIR/arena_restart.sh" >>"$LOG" 2>&1; then
+     "$APP_DIR/scripts/arena_restart.sh" >>"$LOG" 2>&1; then
     log "live @ $sha"
     return 0
   fi

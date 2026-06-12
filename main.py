@@ -20,7 +20,7 @@ from ast import Dict
 from typing import Any
 
 from agents.ian1_agent import Ian1Agent
-from dashboard_server import ARENA_BOTS
+from web.dashboard_server import ARENA_BOTS
 
 sys.path.insert(0, os.path.dirname(__file__))
 

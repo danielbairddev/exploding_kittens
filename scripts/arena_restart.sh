@@ -16,7 +16,7 @@ cd "$APP_DIR"
 export EK_DEPLOY_SHA="${EK_DEPLOY_SHA:-dev}"
 export EK_DEPLOY_BY="${EK_DEPLOY_BY:-unknown}"
 export EK_DEPLOY_AT="${EK_DEPLOY_AT:-}"
-nohup python3 dashboard_server.py "$PORT" > /tmp/ek-arena.log 2>&1 </dev/null &
+nohup python3 web/dashboard_server.py "$PORT" > /tmp/ek-arena.log 2>&1 </dev/null &
 
 sleep 2
 if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then

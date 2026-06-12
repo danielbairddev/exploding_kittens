@@ -5,7 +5,7 @@ so it can add per-opponent behavior profiles — the signal that lets Gorilla
 *exploit* specific opponents rather than play one fixed strategy.
 """
 from agents.orangutan_features import encode as encode_base
-from gorilla.tracker import _PROFILE, EK, DEF
+from training.gorilla.tracker import _PROFILE, EK, DEF
 
 # Known opponent identities. Index 0 = unknown/anonymized (heuristic fallback).
 # Training can pass the real type so the net learns per-opponent best responses;

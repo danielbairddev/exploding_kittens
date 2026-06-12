@@ -25,7 +25,7 @@ Exceptions: bug fixes, crashes, protocol/compat changes that don't alter strateg
        }
    ```
 
-2. Append the class to `ARENA_BOTS` in `dashboard_server.py` (don't reorder — bot_ids are positional).
+2. Append the class to `ARENA_BOTS` in `web/dashboard_server.py` (don't reorder — bot_ids are positional).
 
 ## Bot lineage
 
@@ -37,10 +37,10 @@ Exceptions: bug fixes, crashes, protocol/compat changes that don't alter strateg
 - `SurvivalAgentV2` (Sly2) — Sly + relentless stealing (always play cat pairs + proactive Favor), See-the-Future conserved, last Defuse protected. A/B-tested vs Sly: ~36% vs ~28% in the 6-bot pool (+7.7pts head-to-head).
 - `CoyoteAgent` (Coyote) — Sly2 + card counting off the discard pile. Holds its Attack when the next player likely has one; only counter-Nopes when opponents almost certainly can't re-Nope; protects up to two Defuses. +0.65pts vs Sly2 head-to-head.
 - `OrangutanAgent` (Orangutan) — MLP (52→64→32→8) picks the action type; other endpoints inherited from Coyote. Trained by behavioural cloning of Coyote. Weights in `agents/orangutan_weights.json`.
-- `Orangutan2Agent` (Orangutan2) — same MLP as Orangutan, PPO-retrained (Gorilla pipeline) against the full current fleet. Weights auto-updated by `gorilla/train.py` on every new best.
+- `Orangutan2Agent` (Orangutan2) — same MLP as Orangutan, PPO-retrained (Gorilla pipeline) against the full current fleet. Weights auto-updated by `training/gorilla/train.py` on every new best.
 - `PerditionAgent` (Perdition) — same MLP as Orangutan but trained with inverted reward to minimise win rate. Self-sabotage hooks hard-coded. Frozen at ~4.43% win rate.
 - `Perdition2Agent` (Perdition2) — continuation of Perdition training, fresh PPO run. Weights in `agents/perdition2_weights.json`.
-- `RhinoAgent` (Rhino) — GRU(39→64) processes the full public event log; hidden state concatenated with snapshot features (52) and fed to MLP (116→64→32→8). Trained with PPO + BPTT in `rhino/`. Weights auto-updated by `rhino/train.py`.
+- `RhinoAgent` (Rhino) — GRU(39→64) processes the full public event log; hidden state concatenated with snapshot features (52) and fed to MLP (116→64→32→8). Trained with PPO + BPTT in `training/rhino/`. Weights auto-updated by `training/rhino/train.py`.
 
 ## Open follow-ups
 
