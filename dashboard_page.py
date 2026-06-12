@@ -30,6 +30,7 @@ PAGE = r'''<!DOCTYPE html>
   header h1 .spark { animation: pulse 2.4s ease-in-out infinite; display:inline-block;}
   header p { color: var(--muted); font-size: 0.9rem; margin-top: 0.25rem; }
   .toplinks { font-size:0.82rem; color:var(--muted); }
+  .build { font-size:0.66rem; color:#64748b; margin-top:4px; font-family:"JetBrains Mono",monospace; }
 
   /* arena counter bar */
   .counters { display:flex; gap:0.6rem; flex-wrap:wrap; margin: 0.4rem 0 1.6rem; }
@@ -160,7 +161,10 @@ PAGE = r'''<!DOCTYPE html>
       <h1><span class="spark">🐱</span> Exploding Kittens — Live Arena</h1>
       <p>Bots battling it out — ranked by win rate &amp; average placement. Top performers plus a challenger every game. The simulation never sleeps.</p>
     </div>
-    <div class="toplinks">📖 <a href="/play">🎮 Play vs the bots</a> &nbsp;·&nbsp; <a id="protolink" href="#">Agent protocol docs</a></div>
+    <div style="text-align:right">
+      <div class="toplinks">📖 <a href="/play">🎮 Play vs the bots</a> &nbsp;·&nbsp; <a id="protolink" href="#">Agent protocol docs</a></div>
+      <div class="build" id="build" title="which code is deployed, and who shipped it"></div>
+    </div>
   </header>
 
   <div class="counters">
@@ -322,6 +326,7 @@ function renderStats(s){
   $('c-turns').textContent = s.avg_turns;
   $('c-boom').textContent = (s.tallies.explosions||0).toLocaleString();
   $('c-up').textContent = fmtUptime(s.uptime_secs);
+  if(s.build){ $('build').textContent = `⚙ ${s.build.sha} · deployed by ${s.build.by}` + (s.build.at?(' · '+s.build.at):''); }
 
   LAST_STATS = s;
   renderLadder();

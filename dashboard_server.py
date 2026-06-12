@@ -64,6 +64,14 @@ ARENA_BOTS = [
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
+# Deploy identity (set by deploy_dashboard.sh) so the site shows who shipped what
+# — handy when several people deploy at once.
+BUILD = {
+    "sha": os.environ.get("EK_DEPLOY_SHA", "dev"),
+    "by": os.environ.get("EK_DEPLOY_BY", "local"),
+    "at": os.environ.get("EK_DEPLOY_AT", ""),
+}
+
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
@@ -306,6 +314,7 @@ class Arena:
             leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
 
             return {
+                "build": BUILD,
                 "uptime_secs": int(now - self.started_at),
                 "total_games": self.total_games,
                 "games_per_sec": gps,

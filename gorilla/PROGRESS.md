@@ -104,7 +104,22 @@ line of work is complete. The 👹 Abaddon demon icon stays in reserve.
   Actor-Critic that also makes the Nope / give-card / placement decisions
   (masked), with the tracker's profile features fed in.
 
-## TODO (next, once the Orangutan PPO run is exhausted)
+## TODO / follow-ups
+
+**[FOLLOW-UP] Re-run opponent modeling with COMPLETE data.** Important caveat
+discovered after the fact: the engine only calls `want_to_nope` for players who
+currently *hold a Nope* (`if not player.has(NOPE): continue`). Our `GameTracker`
+reconstructed the opponent action log from `want_to_nope`, so it **only saw plays
+during windows where it happened to hold a Nope** — i.e. it missed most of the
+action history. That means the **Gorilla opponent-modeling experiment ran on
+sparse, biased data and was not a fair test** (its ~40% tie is suspect for that
+reason, not just the ceiling). Kaushal's public-events channel
+(`state.recent_events`) now exposes the *complete* public action log regardless
+of Nope holdings. Follow-up: rebuild `GameTracker` to source from
+`recent_events` and re-run the opponent-modeling A/B fairly. (Deployed bots are
+unaffected — Coyote/Orangutan card-count from the discard pile, which is complete.
+The raw-strength ceiling from unseen cards still applies, so expectations are
+modest, but it deserves an honest re-shot.)
 
 **Build Gorilla proper** — the big lever past Orangutan. Two changes that
 together make it its own bot (input size changes, so it can't fold into

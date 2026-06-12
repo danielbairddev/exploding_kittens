@@ -31,7 +31,12 @@ if [ "${ALLOW_DIRTY:-0}" != "1" ]; then
   echo "Git check OK: $branch @ $(git rev-parse --short HEAD) matches $upstream"
 fi
 
-echo "Deploying Live Arena dashboard to $SERVER:$PORT..."
+# Identity stamp so we can tell who deployed what (shown on the site, top-right).
+SHA=$(git rev-parse --short HEAD)
+BY=$(git config user.name 2>/dev/null || echo "${USER:-unknown}")
+AT=$(date -u +"%Y-%m-%d %H:%M UTC")
+
+echo "Deploying Live Arena dashboard to $SERVER:$PORT  (as '$BY' @ $SHA)..."
 
 # The dashboard imports the game engine + agent packages, so ship those too.
 # logs/ is intentionally NOT deleted — it holds the persisted stats snapshot.
@@ -50,7 +55,8 @@ for i in \$(seq 1 10); do
 done
 
 cd $APP_DIR
-nohup python3 dashboard_server.py $PORT > /tmp/ek-arena.log 2>&1 </dev/null &
+EK_DEPLOY_SHA='$SHA' EK_DEPLOY_BY='$BY' EK_DEPLOY_AT='$AT' \
+  nohup python3 dashboard_server.py $PORT > /tmp/ek-arena.log 2>&1 </dev/null &
 
 sleep 2
 if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
