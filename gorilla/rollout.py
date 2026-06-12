@@ -15,6 +15,8 @@ from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan2_agent import Orangutan2Agent
 from agents.random_agent import RandomAgent
 from agents.chaos_agent import ChaosAgent
+from agents.ian1_agent import Ian1Agent
+from agents.ian2_agent import Ian2Agent
 from agents.orangutan_features import encode, ACTIONS, N_ACTIONS
 from game.engine import GameEngine
 from game.actions import Action, ActionType
@@ -24,7 +26,7 @@ DEF = CardType.DEFUSE
 NEG = -1e9
 # Full arena mirror: strong ML bots + unpredictable bots to prevent distribution shift.
 FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent,
-         OrangutanAgent, Orangutan2Agent, RandomAgent, ChaosAgent]
+         OrangutanAgent, Orangutan2Agent, RandomAgent, ChaosAgent, Ian1Agent, Ian2Agent]
 
 
 def _np_params(w):
