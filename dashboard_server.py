@@ -37,6 +37,7 @@ from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.coyote_agent import CoyoteAgent
 from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan2_agent import Orangutan2Agent
+from agents.rhino_agent import RhinoAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.perdition_agent import PerditionAgent
@@ -68,6 +69,7 @@ ARENA_BOTS = [
     Ian2Agent,         # Yum
     PerditionAgent,    # Perdition
     Perdition2Agent,   # Perdition2
+    RhinoAgent,        # Rhino (GRU)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
