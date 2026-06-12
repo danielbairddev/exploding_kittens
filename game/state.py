@@ -45,6 +45,7 @@ class ObservableState:
     hand_sizes: dict[int, int]      # player_id -> card count
     alive_players: list[int]
     deck_size: int
+    deck_exploding_kittens_count: int # The number of cards in the
     discard_pile: list[Card]
     turns_remaining: int
     current_player: int
@@ -52,3 +53,4 @@ class ObservableState:
     recent_events: list[dict] = field(default_factory=list)
     # Populated after See the Future
     known_top3: list[Card] | None = None
+

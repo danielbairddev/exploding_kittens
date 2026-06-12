@@ -52,6 +52,7 @@ class GameEngine:
             hand_sizes={p.player_id: len(p.hand) for p in state.players if p.alive},
             alive_players=[p.player_id for p in state.alive_players],
             deck_size=state.deck_size,
+            deck_exploding_kittens_count=self._get_number_of_exploding_kittens_in_deck(state),
             discard_pile=list(state.discard_pile),
             turns_remaining=state.turns_remaining,
             current_player=state.current_player,
@@ -60,6 +61,14 @@ class GameEngine:
         if self.reveal_top:
             obs.known_top3 = [Card(c.card_type) for c in state.draw_pile[:3]]
         return obs
+
+    @staticmethod
+    def _get_number_of_exploding_kittens_in_deck(state: GameState) -> int:
+        bomb_count = 0
+        for card in state.draw_pile:
+            if card.card_type == CardType.EXPLODING_KITTEN:
+                bomb_count += 1
+        return bomb_count
 
     def _setup(self, n_players: int) -> GameState:
         deck = build_deck(n_players)

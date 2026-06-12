@@ -37,6 +37,7 @@ from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.coyote_agent import CoyoteAgent
 from agents.orangutan_agent import OrangutanAgent
 from agents.ian1_agent import Ian1Agent
+from agents.ian2_agent import  Ian2Agent
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
@@ -60,6 +61,7 @@ ARENA_BOTS = [
     CoyoteAgent,       # Coyote
     OrangutanAgent,    # Orangutan
     Ian1Agent,         # Ian1 (contributor template)
+    Ian2Agent,         # Yum
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
@@ -75,7 +77,7 @@ BUILD = {
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v8.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v9.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
