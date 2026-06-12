@@ -121,9 +121,9 @@ function render(s){
   // coach feedback from last move
   const cb=s.coach; const box=$('coachbox'); box.innerHTML='';
   if(cb){
-    if(cb.match){ box.innerHTML=`<div class="coach ok">✅ Matched Orangutan: <b>${cb.orangutan}</b></div>`; }
+    if(cb.match){ box.innerHTML=`<div class="coach ok">✅ Optimal — <b>${cb.your_move}</b> (${cb.your_ev}% win) was the best play by rollout.</div>`; }
     else{ const cls=cb.ev_loss>=8?'blunder':(cb.ev_loss>=2?'':'ok');
-      box.innerHTML=`<div class="coach ${cls}">${cb.ev_loss>=8?'⚠️ Blunder':(cb.ev_loss>=2?'🟡 Slight miss':'≈ Fine')} — you played <b>${cb.your_move}</b> (${cb.your_ev}% win); Orangutan plays <b>${cb.orangutan}</b> (${cb.orangutan_ev}% win). <b>EV loss: ${cb.ev_loss}%</b></div>`; }
+      box.innerHTML=`<div class="coach ${cls}">${cb.ev_loss>=8?'⚠️ Blunder':(cb.ev_loss>=2?'🟡 Slight miss':'≈ Fine')} — you played <b>${cb.your_move}</b> (${cb.your_ev}% win); best play <b>${cb.best_move}</b> (${cb.best_ev}% win). <b>EV loss: ${cb.ev_loss}%</b></div>`; }
   }
   $('log').innerHTML=(s.log||[]).map(l=>`<div>${l}</div>`).join('');
   if(s.result){

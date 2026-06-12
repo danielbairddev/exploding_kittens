@@ -195,23 +195,29 @@ class Session:
             self.action_in.put(i)
 
     def _grade(self, chosen):
-        same = (chosen.action_type == self._orec.action_type and
-                chosen.target_player == self._orec.target_player and
-                chosen.cat_type == self._orec.cat_type)
-        if same:
-            self.coach_feedback = {"match": True, "orangutan": act_label(self._orec)}
-            self.note(f"✅ Coach: matched Orangutan ({act_label(self._orec)}).")
-        else:
-            ev_h = mc_winrate(self._snap, chosen, self.seat_classes, 0)
-            ev_o = mc_winrate(self._snap, self._orec, self.seat_classes, 0)
-            loss = max(0.0, ev_o - ev_h)
-            self.coach_feedback = {"match": False, "your_move": act_label(chosen),
-                                   "orangutan": act_label(self._orec),
-                                   "your_ev": round(ev_h * 100, 1), "orangutan_ev": round(ev_o * 100, 1),
-                                   "ev_loss": round(loss * 100, 1)}
-            tag = "⚠️ blunder" if loss >= 0.08 else ("\U0001F7E1 slight miss" if loss >= 0.02 else "≈ fine")
-            self.note(f"{tag} Coach: you played {act_label(chosen)} ({ev_h*100:.0f}% win); "
-                      f"Orangutan plays {act_label(self._orec)} ({ev_o*100:.0f}% win) — EV loss {loss*100:.1f}%")
+        # Evaluate the actual options by rollout (always include the human's
+        # move); recommend the rollout-best so the advice and the EV agree.
+        cands = [chosen]
+        for a in self._cur:
+            if a is chosen:
+                continue
+            if len(cands) >= 6:
+                break
+            cands.append(a)
+        evs = [(a, mc_winrate(self._snap, a, self.seat_classes, 0)) for a in cands]
+        your_ev = next(ev for a, ev in evs if a is chosen)
+        best_a, best_ev = max(evs, key=lambda t: t[1])
+        loss = max(0.0, best_ev - your_ev)
+        match = best_a is chosen
+        self.coach_feedback = {"match": match, "your_move": act_label(chosen),
+                               "best_move": act_label(best_a),
+                               "your_ev": round(your_ev * 100, 1), "best_ev": round(best_ev * 100, 1),
+                               "ev_loss": round(loss * 100, 1),
+                               "orangutan": act_label(self._orec) if self._orec else None}
+        tag = ("✅ optimal" if match else "⚠️ blunder" if loss >= 0.08 else
+               "\U0001F7E1 slight miss" if loss >= 0.02 else "≈ fine")
+        self.note(f"{tag} Coach: you played {act_label(chosen)} ({your_ev*100:.0f}% win); "
+                  f"best is {act_label(best_a)} ({best_ev*100:.0f}% win) — EV loss {loss*100:.1f}%")
         self._snap = None
 
     # ---- views ----
