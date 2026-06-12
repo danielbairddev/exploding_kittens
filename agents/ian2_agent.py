@@ -3,8 +3,6 @@ Ian2 — a starter bot template.
 """
 import random
 
-from requests.packages import target
-
 from agents.base import Agent
 from game.state import ObservableState
 from game.actions import Action, ActionType
