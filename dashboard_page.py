@@ -21,7 +21,7 @@ PAGE = r'''<!DOCTYPE html>
     font-size: 15px; line-height: 1.5; padding: 0 1rem 4rem;
     min-height: 100vh;
   }
-  .page { max-width: 1180px; margin: 0 auto; }
+  .page { max-width: 1340px; margin: 0 auto; }
   a { color: var(--accent2); text-decoration: none; }
   a:hover { text-decoration: underline; }
 

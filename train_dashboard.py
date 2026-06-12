@@ -30,7 +30,7 @@ RUNS = [
         'name': 'Orangutan2 (Gorilla)',
         'emoji': '🦧',
         'log': os.path.join(LOGS, 'train_orangutan_gorilla2.log'),
-        'total_iters': 3000,
+        'total_iters': 6000,
     },
     {
         'id': 'perdition2',
@@ -119,9 +119,9 @@ def get_system():
 
 # ---- training log parser ----
 
-def _parse_log(path):
+def _parse_log(path, total_iters=3000):
     if not os.path.exists(path):
-        return {'status': 'no_log', 'iter': 0, 'total': 0}
+        return {'status': 'no_log', 'iter': 0, 'total': total_iters}
 
     mtime = os.path.getmtime(path)
     last_iter = None
@@ -132,7 +132,7 @@ def _parse_log(path):
         with open(path, 'r') as f:
             lines = f.readlines()
     except OSError:
-        return {'status': 'error', 'iter': 0, 'total': 0}
+        return {'status': 'error', 'iter': 0, 'total': total_iters}
 
     for line in lines:
         line = line.strip()
@@ -163,9 +163,9 @@ def _parse_log(path):
 
     age = time.time() - mtime
     if last_iter is None:
-        return {'status': 'starting', 'iter': 0, 'total': 0, 'baseline': baseline}
+        return {'status': 'starting', 'iter': 0, 'total': total_iters, 'baseline': baseline}
 
-    if last_iter['iter'] >= 3000:
+    if last_iter['iter'] >= total_iters:
         status = 'done'
     elif age > 300:
         status = 'stalled'
@@ -175,7 +175,7 @@ def _parse_log(path):
     return {
         'status':   status,
         'iter':     last_iter['iter'],
-        'total':    3000,
+        'total':    total_iters,
         'rollout':  last_iter['rollout'],
         'win':      last_iter['win'],
         'place':    last_iter['place'],
@@ -192,7 +192,7 @@ def _parse_log(path):
 def get_status():
     out = []
     for run in RUNS:
-        data = _parse_log(run['log'])
+        data = _parse_log(run['log'], run['total_iters'])
         data['id']    = run['id']
         data['name']  = run['name']
         data['emoji'] = run['emoji']
