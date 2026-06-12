@@ -34,7 +34,7 @@ fi
 # Identity stamp so we can tell who deployed what (shown on the site, top-right).
 SHA=$(git rev-parse --short HEAD)
 BY=$(git config user.name 2>/dev/null || echo "${USER:-unknown}")
-AT=$(date -u +"%Y-%m-%d %H:%M UTC")
+AT=$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M %Z")
 
 echo "Deploying Live Arena dashboard to $SERVER:$PORT  (as '$BY' @ $SHA)..."
 

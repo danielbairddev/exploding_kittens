@@ -424,11 +424,11 @@ ARENA = Arena()
 # --------------------------------------------------------------------------
 # Background workers
 # --------------------------------------------------------------------------
-# The box is a single core, so we throttle the sim with a small per-game sleep
-# to leave CPU for the web servers. ~0.004s lands around 150 games/s at ~45% of
-# one core (measured: ~14% CPU at 44 games/s). Override with EK_SLEEP; set to 0
-# to run flat out (pins the core).
-GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.004"))   # ~150 games/sec
+# Single-core, shared box, so we throttle the sim with a small per-game sleep
+# that yields to the web server between games. Smaller = more games/s but less
+# CPU left for the UI; the box is often contended by other users, so the real
+# limiter is shared CPU, not this number. Override with EK_SLEEP; 0 = flat out.
+GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.001"))   # more aggressive (was 0.004)
 
 
 def build_lineup(rng):
