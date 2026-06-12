@@ -13,6 +13,8 @@ from agents.aggressive_agent import AggressiveAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan2_agent import Orangutan2Agent
+from agents.random_agent import RandomAgent
+from agents.chaos_agent import ChaosAgent
 from agents.orangutan_features import encode, ACTIONS, N_ACTIONS
 from game.engine import GameEngine
 from game.actions import Action, ActionType
@@ -20,10 +22,9 @@ from game.cards import CardType
 
 DEF = CardType.DEFUSE
 NEG = -1e9
-# Include Orangutan/Orangutan2 as high-skill opponents — exposes the learner to
-# better strategies than the weaker heuristic fleet alone can provide.
+# Full arena mirror: strong ML bots + unpredictable bots to prevent distribution shift.
 FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent,
-         OrangutanAgent, Orangutan2Agent]
+         OrangutanAgent, Orangutan2Agent, RandomAgent, ChaosAgent]
 
 
 def _np_params(w):

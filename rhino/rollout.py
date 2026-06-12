@@ -12,6 +12,8 @@ from agents.aggressive_agent import AggressiveAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan2_agent import Orangutan2Agent
+from agents.random_agent import RandomAgent
+from agents.chaos_agent import ChaosAgent
 from agents.orangutan_features import encode as snap_encode, ACTIONS, N_ACTIONS
 from rhino.event_encode import encode_event, N_EVENT, CARD_NAMES, _CARD_IDX
 from rhino.net import (GRU_H, N_TARGETS, N_CARD_TYPES, N_BUCKETS, BUCKET_FRACS,
@@ -23,10 +25,10 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 NEG = -1e9
 
-# Include Orangutan/Orangutan2 as high-skill opponents alongside the heuristic
-# fleet — gives the learner harder targets to beat, not just weaker bots.
+# Full arena mirror: includes the unpredictable bots (Random, Chaos) that Rhino
+# faces in production but previously never trained against.
 FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent,
-         OrangutanAgent, Orangutan2Agent]
+         OrangutanAgent, Orangutan2Agent, RandomAgent, ChaosAgent]
 
 
 def _np(w):
