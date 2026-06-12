@@ -28,7 +28,7 @@ def _load_weights():
 class Perdition2Agent(CoyoteAgent):
     ARENA = {"name": "Perdition2", "emoji": "\U0001F979", "color": "#5c0000",
              "blurb": "\"And he went and hanged himself.\" — Matt 27:5", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 3}
+             "llm_assisted": True, "stats_version": 4}
 
     _WEIGHTS = _load_weights()
 
