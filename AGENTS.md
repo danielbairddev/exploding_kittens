@@ -60,14 +60,44 @@ changes that don't alter strategy.
   on Favor; protects up to two Defuses. Narrow but real winner: +0.65pts vs Sly2
   head-to-head, #1 in the 7-bot pool (~31.8% vs 31.0%). Stealing-from-small-hands
   and snipe-attacking were tested and dropped.
-- `OrangutanAgent` (Orangutan) — neural net (35→64→32→8 MLP) picks the action
+- `OrangutanAgent` (Orangutan) — neural net (52→64→32→8 MLP) picks the action
   type; other endpoints inherited from Coyote. Trained by behavioral cloning of
-  Coyote over ~580k decisions (99.7% action-match), reaching ~28% win / 2.62
-  place vs the fleet — i.e. it matches the top heuristics through a learned
-  policy. REINFORCE finetuning was tried and *degraded* it (drifts off the BC
-  optimum), so we ship the BC weights. Inference is pure-Python (weights in
-  agents/orangutan_weights.json); training is train_orangutan.py (numpy).
-  (Display blurb is deliberately uninformative.)
+  Coyote over ~580k decisions (99.7% action-match). REINFORCE finetuning was
+  tried and degraded it, so we ship the BC weights. Inference is pure-Python
+  (weights in `agents/orangutan_weights.json`). (Display blurb is deliberately
+  uninformative.)
+- `Orangutan2Agent` (Orangutan2) — same MLP architecture as Orangutan, but
+  PPO-trained (Actor-Critic, Gorilla pipeline) against the full current fleet
+  including Perdition bots and Ian bots. Weights written live to
+  `agents/orangutan2_weights.json` as training progresses; falls back to Coyote
+  until a new best is found. Training run in `gorilla/`.
+- `PerditionAgent` (Perdition) — same MLP as Orangutan but trained with
+  **inverted reward** (`-1` for winning, `+1` for losing) to minimise win rate.
+  Self-sabotage hooks hard-coded (not learned): always places EK at index 0,
+  donates Defuses first, never Nopes. Weights frozen at ~4.43% win rate.
+- `Perdition2Agent` (Perdition2) — continuation of Perdition training, fresh
+  PPO run, same inverted reward and sabotage hooks. Weights in
+  `agents/perdition2_weights.json`; training run in `perdition/`.
+
+## ARENA dict fields
+
+Every bot's `ARENA` dict is the source of truth for display metadata:
+
+```python
+ARENA = {
+    "name": "MyBot",          # leaderboard display name
+    "emoji": "🤖",
+    "color": "#22d3ee",       # hex accent colour
+    "blurb": "One-liner.",    # shown on the leaderboard card
+    "author": "Your Name",
+    "llm_assisted": True,     # True if weights/logic were LLM-assisted
+    "stats_version": 1,       # bump to reset this bot's leaderboard stats
+}
+```
+
+`stats_version` — incrementing this and pushing causes the server to discard
+the stored stats for that bot on next restart. Use it to get a clean slate after
+a significant weights update or strategy change.
 
 ## Open follow-ups (TODO)
 
