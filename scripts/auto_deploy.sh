@@ -16,7 +16,7 @@ INTERVAL="${INTERVAL:-60}"
 LOG="${LOG:-/tmp/ek-auto-deploy.log}"
 WORKTREE="${WORKTREE:-/tmp/ek-arena-smoke}"
 
-log() { echo "$(date -Iseconds) $*" | tee -a "$LOG"; }
+log() { echo "$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M:%S %Z") $*" | tee -a "$LOG"; }
 
 cleanup_worktree() {
   git -C "$APP_DIR" worktree remove --force "$WORKTREE" 2>/dev/null || rm -rf "$WORKTREE"
