@@ -326,7 +326,11 @@ function renderStats(s){
   $('c-turns').textContent = s.avg_turns;
   $('c-boom').textContent = (s.tallies.explosions||0).toLocaleString();
   $('c-up').textContent = fmtUptime(s.uptime_secs);
-  if(s.build){ $('build').textContent = `⚙ ${s.build.sha} · deployed by ${s.build.by}` + (s.build.at?(' · '+s.build.at):''); }
+  if(s.build){ const sha=s.build.sha;
+    const repo='https://github.com/danielbairddev/exploding_kittens';
+    const url = (sha && sha!=='dev') ? (repo+'/commit/'+sha) : repo;
+    $('build').innerHTML = `⚙ <a href="${url}" target="_blank" rel="noopener">${sha}</a> · deployed by ${s.build.by}`
+      + (s.build.at?(' · '+s.build.at):'') + ` &nbsp;·&nbsp; <a href="${repo}" target="_blank" rel="noopener">repo</a>`; }
 
   LAST_STATS = s;
   renderLadder();

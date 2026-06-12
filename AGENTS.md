@@ -68,3 +68,13 @@ changes that don't alter strategy.
   optimum), so we ship the BC weights. Inference is pure-Python (weights in
   agents/orangutan_weights.json); training is train_orangutan.py (numpy).
   (Display blurb is deliberately uninformative.)
+
+## Open follow-ups (TODO)
+
+- **Re-run opponent modeling with complete data.** `GameTracker` built opponent
+  profiles from `want_to_nope`, but the engine only calls that for players
+  *holding a Nope* (`if not player.has(NOPE): continue`) — so the tracker missed
+  most plays and the Gorilla opponent-modeling A/B was handicapped (its ~40% tie
+  is suspect). Kaushal's `state.recent_events` now gives the complete public
+  action log; rebuild the tracker on top of it and re-run the A/B fairly.
+  (Details in `gorilla/PROGRESS.md`; tracked as a task.)
