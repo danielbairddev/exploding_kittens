@@ -29,12 +29,18 @@ Exceptions: bug fixes, crashes, protocol/compat changes that don't alter strateg
 
 ## Bot lineage
 
-- **Random → Heuristic → Aggressive → Chaos** — baselines and early experiments.
-- **Survival → SurvivalV2 (Sly → Sly2)** — survival-first; V2 adds relentless stealing.
-- **Coyote** — best rule-based; adds card counting, conditional Noping, hand-size targeting.
-- **Orangutan** — MLP trained by behavioural cloning of Coyote. Weights in `agents/orangutan_weights.json`.
-- **Orangutan2** — same MLP, PPO-retrained against the full current fleet. Weights auto-updated by `gorilla/train.py`.
-- **Perdition / Perdition2** — inverted-reward PPO; trained to lose. Self-sabotage hooks hard-coded.
+- `RandomAgent` (Lucky) — baseline, pure random.
+- `ChaosAgent` (Gremlin) — fully random, will give away Defuses.
+- `AggressiveAgent` (Maverick) — dumps its whole hand every turn.
+- `HeuristicAgent` (Professor) — first attempt at "smart"; underperforms random.
+- `SurvivalAgent` (Sly) — survival-first + information + weaponised EK placement. Big jump: ~35% in the 5-player arena (20% baseline).
+- `SurvivalAgentV2` (Sly2) — Sly + relentless stealing (always play cat pairs + proactive Favor), See-the-Future conserved, last Defuse protected. A/B-tested vs Sly: ~36% vs ~28% in the 6-bot pool (+7.7pts head-to-head).
+- `CoyoteAgent` (Coyote) — Sly2 + card counting off the discard pile. Holds its Attack when the next player likely has one; only counter-Nopes when opponents almost certainly can't re-Nope; protects up to two Defuses. +0.65pts vs Sly2 head-to-head.
+- `OrangutanAgent` (Orangutan) — MLP (52→64→32→8) picks the action type; other endpoints inherited from Coyote. Trained by behavioural cloning of Coyote. Weights in `agents/orangutan_weights.json`.
+- `Orangutan2Agent` (Orangutan2) — same MLP as Orangutan, PPO-retrained (Gorilla pipeline) against the full current fleet. Weights auto-updated by `gorilla/train.py` on every new best.
+- `PerditionAgent` (Perdition) — same MLP as Orangutan but trained with inverted reward to minimise win rate. Self-sabotage hooks hard-coded. Frozen at ~4.43% win rate.
+- `Perdition2Agent` (Perdition2) — continuation of Perdition training, fresh PPO run. Weights in `agents/perdition2_weights.json`.
+- `RhinoAgent` (Rhino) — GRU(39→64) processes the full public event log; hidden state concatenated with snapshot features (52) and fed to MLP (116→64→32→8). Trained with PPO + BPTT in `rhino/`. Weights auto-updated by `rhino/train.py`.
 
 ## Open follow-ups
 
