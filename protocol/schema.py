@@ -52,6 +52,7 @@ def observable_to_dict(state: ObservableState) -> dict:
         "discard_pile": [card_to_dict(c) for c in state.discard_pile],
         "turns_remaining": state.turns_remaining,
         "current_player": state.current_player,
+        "recent_events": list(state.recent_events),
         "known_top3": [card_to_dict(c) for c in state.known_top3] if state.known_top3 else None,
     }
 
@@ -66,6 +67,7 @@ def dict_to_observable(d: dict) -> ObservableState:
         discard_pile=[dict_to_card(c) for c in d["discard_pile"]],
         turns_remaining=d["turns_remaining"],
         current_player=d["current_player"],
+        recent_events=list(d.get("recent_events", [])),
         known_top3=[dict_to_card(c) for c in d["known_top3"]] if d.get("known_top3") else None,
     )
 

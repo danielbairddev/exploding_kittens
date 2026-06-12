@@ -13,6 +13,8 @@ class GameEngine:
         self.reveal_top = reveal_top   # god-mode: always expose the real top 3 (oracle test)
         self.rng = random.Random(seed)
         self._events: list[dict] = []
+        self._public_events: list[dict] = []
+        self._next_public_event_id: int = 1
         self._turn: int = 0
 
     def _log(self, msg: str):
@@ -22,6 +24,25 @@ class GameEngine:
     def _event(self, type: str, **kwargs):
         if self.collect_events:
             self._events.append({"turn": self._turn, "type": type, **kwargs})
+
+    def _public_event(self, type: str, **kwargs):
+        event = {
+            "event_id": self._next_public_event_id,
+            "turn": self._turn,
+            "type": type,
+            **kwargs,
+        }
+        self._next_public_event_id += 1
+        self._public_events.append(event)
+
+    @staticmethod
+    def _public_action(action: Action) -> dict:
+        return {
+            "action_type": action.action_type.name,
+            "target_player": action.target_player,
+            "cat_type": action.cat_type.name if action.cat_type else None,
+            "named_card": action.named_card.name if action.named_card else None,
+        }
 
     def _observable(self, state: GameState, for_player: int) -> ObservableState:
         me = state.players[for_player]
@@ -34,6 +55,7 @@ class GameEngine:
             discard_pile=list(state.discard_pile),
             turns_remaining=state.turns_remaining,
             current_player=state.current_player,
+            recent_events=list(self._public_events),
         )
         if self.reveal_top:
             obs.known_top3 = [Card(c.card_type) for c in state.draw_pile[:3]]
@@ -131,6 +153,13 @@ class GameEngine:
                     self._event("nope", player=player.player_id,
                                 action_type=action.action_type.name,
                                 result="cancelled" if noped else "restored")
+                    self._public_event(
+                        "nope",
+                        player=player.player_id,
+                        action_player=acting_player,
+                        result="cancelled" if noped else "restored",
+                        **self._public_action(action),
+                    )
             if not any_played:
                 break
         return noped
@@ -146,6 +175,7 @@ class GameEngine:
         if action.action_type == ActionType.PLAY_ATTACK:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_ATTACK")
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(CardType.ATTACK)
             state.discard_pile.append(Card(CardType.ATTACK))
@@ -154,11 +184,19 @@ class GameEngine:
             state.turns_remaining = state.turns_remaining + 1 if state.turns_remaining > 1 else 2
             self._log(f"  Player {pid} ATTACKs — player {next_pid} takes {state.turns_remaining} turns")
             self._event("attack", player=pid, target=next_pid, turns_imposed=state.turns_remaining)
+            self._public_event(
+                "attack",
+                player=pid,
+                target=next_pid,
+                turns_imposed=state.turns_remaining,
+                **self._public_action(action),
+            )
             return False
 
         if action.action_type == ActionType.PLAY_SKIP:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_SKIP")
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(CardType.SKIP)
             state.discard_pile.append(Card(CardType.SKIP))
@@ -168,22 +206,26 @@ class GameEngine:
                 state.current_player = self._next_alive(state, pid)
             self._log(f"  Player {pid} SKIPs")
             self._event("skip", player=pid)
+            self._public_event("skip", player=pid, **self._public_action(action))
             return False
 
         if action.action_type == ActionType.PLAY_SHUFFLE:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_SHUFFLE")
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(CardType.SHUFFLE)
             state.discard_pile.append(Card(CardType.SHUFFLE))
             self.rng.shuffle(state.draw_pile)
             self._log(f"  Player {pid} SHUFFLEs the deck")
             self._event("shuffle", player=pid)
+            self._public_event("shuffle", player=pid, **self._public_action(action))
             return False
 
         if action.action_type == ActionType.PLAY_SEE_THE_FUTURE:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_SEE_THE_FUTURE")
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(CardType.SEE_THE_FUTURE)
             state.discard_pile.append(Card(CardType.SEE_THE_FUTURE))
@@ -193,11 +235,13 @@ class GameEngine:
             self.agents[pid].see_future(obs, top3)
             self._log(f"  Player {pid} SEEs THE FUTURE: {top3}")
             self._event("see_future", player=pid, top3=[c.card_type.name for c in top3])
+            self._public_event("see_future", player=pid, **self._public_action(action))
             return False
 
         if action.action_type == ActionType.PLAY_FAVOR:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_FAVOR", target=action.target_player)
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(CardType.FAVOR)
             state.discard_pile.append(Card(CardType.FAVOR))
@@ -212,11 +256,18 @@ class GameEngine:
             player.hand.append(card)
             self._log(f"  Player {pid} FAVORs player {action.target_player} — gets {card}")
             self._event("favor", player=pid, from_player=action.target_player, card=card.card_type.name)
+            self._public_event(
+                "favor",
+                player=pid,
+                from_player=action.target_player,
+                **self._public_action(action),
+            )
             return False
 
         if action.action_type == ActionType.PLAY_CAT_PAIR:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_CAT_PAIR", target=action.target_player)
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(action.cat_type)
             player.remove(action.cat_type)
@@ -229,11 +280,19 @@ class GameEngine:
                 self._log(f"  Player {pid} CAT-PAIRs player {action.target_player} — steals {stolen}")
                 self._event("cat_steal", player=pid, from_player=action.target_player,
                             cat_type=action.cat_type.name, card=stolen.card_type.name, method="pair")
+                self._public_event(
+                    "cat_steal",
+                    player=pid,
+                    from_player=action.target_player,
+                    method="pair",
+                    **self._public_action(action),
+                )
             return False
 
         if action.action_type == ActionType.PLAY_CAT_TRIPLE:
             if self._check_nope(state, action, pid):
                 self._event("action_noped", player=pid, action_type="PLAY_CAT_TRIPLE", target=action.target_player)
+                self._public_event("action_noped", player=pid, **self._public_action(action))
                 return False
             player.remove(action.cat_type)
             player.remove(action.cat_type)
@@ -252,6 +311,13 @@ class GameEngine:
                 self._event("cat_steal", player=pid, from_player=action.target_player,
                             cat_type=action.cat_type.name, card=card.card_type.name, method="triple",
                             demanded=wanted.name if wanted else None)
+                self._public_event(
+                    "cat_steal",
+                    player=pid,
+                    from_player=action.target_player,
+                    method="triple",
+                    **self._public_action(action),
+                )
             return False
 
         return False
@@ -278,6 +344,7 @@ class GameEngine:
         if card.card_type != CardType.EXPLODING_KITTEN:
             player.hand.append(card)
             self._event("draw", player=pid, card=card.card_type.name)
+            self._public_event("draw", player=pid)
             return False
 
         # Exploding kitten!
@@ -290,15 +357,19 @@ class GameEngine:
             state.draw_pile.insert(pos, Card(CardType.EXPLODING_KITTEN))
             self._log(f"  Player {pid} DEFUSEs — inserts EK at position {pos}")
             self._event("defuse", player=pid, ek_position=pos, deck_size=len(state.draw_pile))
+            self._public_event("defuse", player=pid)
             return False
         else:
             player.alive = False
             self._log(f"  Player {pid} EXPLODES 💥")
             self._event("explode", player=pid)
+            self._public_event("explode", player=pid)
             return True
 
     def play_game(self, n_players: int) -> dict:
         self._events = []
+        self._public_events = []
+        self._next_public_event_id = 1
         state = self._setup(n_players)
 
         # Notify agents of their starting hands
@@ -323,6 +394,15 @@ class GameEngine:
                         deck_size=state.deck_size,
                         alive=[p.player_id for p in state.alive_players],
                         hand_sizes={p.player_id: len(p.hand) for p in state.players if p.alive})
+            self._public_event(
+                "turn_start",
+                player=pid,
+                hand_size=len(player.hand),
+                deck_size=state.deck_size,
+                alive=[p.player_id for p in state.alive_players],
+                hand_sizes={p.player_id: len(p.hand) for p in state.players if p.alive},
+                turns_remaining=state.turns_remaining,
+            )
 
             # Play phase: agent chooses actions until they DRAW
             while True:
@@ -355,6 +435,7 @@ class GameEngine:
         winner = state.alive_players[0].player_id if state.alive_players else -1
         self._log(f"\nGame over — Player {winner} wins in {state.turn_number} turns")
         self._event("game_over", winner=winner)
+        self._public_event("game_over", winner=winner)
 
         result = {
             "winner": winner,

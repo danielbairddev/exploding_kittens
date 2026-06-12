@@ -53,7 +53,9 @@ Return a valid action. Returning `DRAW` ends your play phase and draws a card. Y
 ---
 
 ### `POST /want_to_nope`
-Called for every player whenever any card is played (including during counter-Nope chains). Return `true` to spend one of your Nope cards.
+Called for players who can legally Nope whenever a Nope-able card is played (including during counter-Nope chains). Return `true` to spend one of your Nope cards.
+
+Use `state.recent_events` as the public observation channel for actions that happened while you were not being asked to act.
 
 **Request**
 ```json
@@ -174,6 +176,7 @@ Called after you play See the Future. No response needed.
   "discard_pile": [ <Card>, ... ],
   "turns_remaining": 1,
   "current_player": 0,
+  "recent_events": [ <PublicEvent>, ... ],
   "known_top3": null
 }
 ```
@@ -181,7 +184,35 @@ Called after you play See the Future. No response needed.
 - `my_hand` — your full hand (only you see this)
 - `hand_sizes` — how many cards each player holds
 - `turns_remaining` — >1 if you're under an Attack
+- `recent_events` — public-safe event history with monotonically increasing `event_id`s
 - `known_top3` — populated after you play See the Future; `null` otherwise
+
+---
+
+### PublicEvent
+```json
+{
+  "event_id": 12,
+  "turn": 5,
+  "type": "skip",
+  "player": 2,
+  "action_type": "PLAY_SKIP",
+  "target_player": null,
+  "cat_type": null,
+  "named_card": null
+}
+```
+
+Public events reveal table-visible information only. For example, everyone can
+see that a player used `SEE_THE_FUTURE` and then `SKIP`, but only that player
+receives the peeked cards through `/see_future`. Normal drawn cards, stolen
+card identities, Favor card identities, and Exploding Kitten insertion
+positions are not public.
+
+Common event `type` values:
+`turn_start`, `attack`, `skip`, `shuffle`, `see_future`, `favor`,
+`cat_steal`, `nope`, `action_noped`, `draw`, `defuse`, `explode`,
+`game_over`.
 
 ---
 

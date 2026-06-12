@@ -6,6 +6,7 @@ dist/
 build/
 logs/
 *.jsonl
+.idea/
 
 # Gorilla training artifacts (regenerated)
 gorilla/checkpoint.json

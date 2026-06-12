@@ -182,12 +182,12 @@ HTML = """<!DOCTYPE html>
 <p>Each turn the engine calls your server in this order:</p>
 <ol style="padding-left:1.4rem;color:var(--muted);line-height:2">
   <li><code>/choose_action</code> — you pick a card to play (or <code>DRAW</code> to end your play phase)</li>
-  <li>For every other alive player: <code>/want_to_nope</code> — they decide whether to cancel your action</li>
+  <li>Players who can legally Nope may receive <code>/want_to_nope</code> — they decide whether to cancel your action</li>
   <li>If the action was played: effect resolves. For <code>PLAY_SEE_THE_FUTURE</code>, your <code>/see_future</code> is called immediately after.</li>
   <li>Steps 1–3 repeat until you return <code>DRAW</code>, or your turn ends early (ATTACK/SKIP)</li>
   <li>On <code>DRAW</code>: you draw a card. If it's an Exploding Kitten and you have a Defuse, <code>/place_exploding_kitten</code> is called.</li>
 </ol>
-<p>The <code>/want_to_nope</code> loop repeats in rounds (all alive players asked, including you) until a full round passes with nobody playing a Nope. Each Nope flips whether the action is cancelled.</p>
+<p>The <code>/want_to_nope</code> loop repeats in rounds until a full round passes with nobody playing a Nope. Each Nope flips whether the action is cancelled. Use <code>recent_events</code> in <code>ObservableState</code> to observe public actions that happened between your callbacks.</p>
 
 <h2>Endpoints</h2>
 
@@ -273,16 +273,16 @@ HTML = """<!DOCTYPE html>
 </div>
 
 <div class="endpoint">
-  <h3><span class="method post">POST</span><span class="path">/want_to_nope</span> <span class="tag">called for every alive player</span></h3>
+  <h3><span class="method post">POST</span><span class="path">/want_to_nope</span> <span class="tag">called for legal Nopers</span></h3>
   <p>
-    Called for every alive player whenever any card is played — including during counter-Nope chains.
+    Called for players who can legally Nope whenever a Nope-able card is played — including during counter-Nope chains.
     Return <code>true</code> to spend one Nope card from your hand.
   </p>
   <p>
     <strong><code>currently_noped: false</code></strong> → the action is live. Returning <code>true</code> cancels it.<br>
     <strong><code>currently_noped: true</code></strong> → the action is already cancelled. Returning <code>true</code> is a <strong>counter-Nope</strong> — it restores the action.
   </p>
-  <p>The engine loops in rounds (all alive players, including the actor) until nobody plays a Nope. Each <code>true</code> costs one Nope card.</p>
+  <p>The engine loops in rounds until nobody plays a Nope. Each <code>true</code> costs one Nope card. For general observation, read <code>state.recent_events</code>.</p>
   <pre><span class="cmt">// request — player 2 played ATTACK; you are player 3, you hold a Nope</span>
 {
   <span class="key">"state"</span>: {
@@ -404,9 +404,14 @@ HTML = """<!DOCTYPE html>
   <span class="key">"discard_pile"</span>:    [ { <span class="key">"card_type"</span>: <span class="str">"SKIP"</span> }, { <span class="key">"card_type"</span>: <span class="str">"NOPE"</span> } ],
   <span class="key">"turns_remaining"</span>: <span class="num">1</span>,          <span class="cmt">// &gt;1 means you're under an Attack and must take extra turns</span>
   <span class="key">"current_player"</span>:  <span class="num">1</span>,
+  <span class="key">"recent_events"</span>:   [
+    { <span class="key">"event_id"</span>: <span class="num">7</span>, <span class="key">"turn"</span>: <span class="num">3</span>, <span class="key">"type"</span>: <span class="str">"see_future"</span>, <span class="key">"player"</span>: <span class="num">0</span>, <span class="key">"action_type"</span>: <span class="str">"PLAY_SEE_THE_FUTURE"</span> },
+    { <span class="key">"event_id"</span>: <span class="num">8</span>, <span class="key">"turn"</span>: <span class="num">3</span>, <span class="key">"type"</span>: <span class="str">"skip"</span>, <span class="key">"player"</span>: <span class="num">0</span>, <span class="key">"action_type"</span>: <span class="str">"PLAY_SKIP"</span> }
+  ],
   <span class="key">"known_top3"</span>:      <span class="null">null</span>        <span class="cmt">// set after you play See the Future; stale after deck changes</span>
 }</pre>
 <p>Note: <code>hand_sizes</code> keys are always strings (<code>"0"</code>, <code>"1"</code>, etc.) due to JSON object key rules. Parse them as integers if needed.</p>
+<p><code>recent_events</code> is public-safe history. It does not reveal normal drawn card identities, stolen card identities, Favor card identities, See-the-Future cards, or Exploding Kitten insertion positions.</p>
 
 <h2>Minimal Implementation</h2>
 <p>The simplest valid agent: always draw. Implement these endpoints and your agent can compete.</p>

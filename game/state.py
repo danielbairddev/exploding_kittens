@@ -48,5 +48,7 @@ class ObservableState:
     discard_pile: list[Card]
     turns_remaining: int
     current_player: int
+    # Public, structured event history. Safe for every player to see.
+    recent_events: list[dict] = field(default_factory=list)
     # Populated after See the Future
     known_top3: list[Card] | None = None
