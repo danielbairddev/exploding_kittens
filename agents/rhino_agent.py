@@ -5,8 +5,7 @@ The GRU processes the full public event log; its hidden state plus the current
 snapshot are fed through a shared trunk and then five separate heads:
   policy / value / target / want_to_nope / give_card / place_exploding_kitten.
 
-Falls back to simple defaults (draw / pass / random give / top of deck) if
-weights aren't present yet. Inference is pure Python — no numpy dependency.
+Uses numpy for fast inference when available, falls back to pure Python otherwise.
 """
 import json, math, os
 from agents.base import Agent
@@ -15,9 +14,15 @@ from game.actions import Action, ActionType
 from game.cards import CardType
 
 try:
+    import numpy as _np
+    _HAS_NP = True
+except ImportError:
+    _np = None
+    _HAS_NP = False
+
+try:
     from training.rhino.event_encode import CARD_NAMES, N_EVENT
 except ImportError:
-    # numpy not installed (production server) — define fallback constants
     CARD_NAMES = ['DEFUSE','ATTACK','SKIP','FAVOR','SHUFFLE','SEE_THE_FUTURE','NOPE',
                   'TACO_CAT','HAIRY_POTATO_CAT','BEARD_CAT','RAINBOW_CAT','CATTERMELON',
                   'EXPLODING_KITTEN']
@@ -30,7 +35,7 @@ _N_TARGETS = 5
 _N_CARDS   = 13
 _N_BUCKETS = 5
 _BUCKET_FRACS = [0.0, 0.25, 0.5, 0.75, 1.0]
-_CARD_NAMES_LIST = CARD_NAMES  # ['DEFUSE', 'ATTACK', ...]
+_CARD_NAMES_LIST = CARD_NAMES
 
 
 def _load():
@@ -40,12 +45,48 @@ def _load():
         required = ('Wz','Uz','bz','Wr','Ur','br','Wn','Un','bn',
                     'W1','b1','W2','b2','W3','b3',
                     'Wtgt','btgt','Wnope','bnope','Wgive','bgive','Wplace','bplace')
-        return w if all(k in w for k in required) else None
+        if not all(k in w for k in required):
+            return None
+        if _HAS_NP:
+            return {k: _np.array(v, dtype=_np.float32) for k, v in w.items()}
+        return w
     except (OSError, ValueError):
         return None
 
 
-# ---- Pure-Python forward helpers ----
+# ---- numpy inference (fast path) ----
+
+def _np_sigmoid(x):
+    return 1.0 / (1.0 + _np.exp(-_np.clip(x, -20.0, 20.0)))
+
+def _np_gru_step(x, h, w):
+    z = _np_sigmoid(w['Wz'] @ x + w['Uz'] @ h + w['bz'])
+    r = _np_sigmoid(w['Wr'] @ x + w['Ur'] @ h + w['br'])
+    n = _np.tanh(w['Wn'] @ x + w['Un'] @ (r * h) + w['bn'])
+    return (1.0 - z) * h + z * n
+
+def _np_trunk(h, snap, w):
+    x = _np.concatenate([h, snap])
+    a1 = _np.maximum(w['W1'] @ x + w['b1'], 0.0)
+    return _np.maximum(w['W2'] @ a1 + w['b2'], 0.0)
+
+def _np_policy(a2, w):       return w['W3'] @ a2 + w['b3']
+def _np_target(a2, w):       return w['Wtgt'] @ a2 + w['btgt']
+def _np_give(a2, w):         return w['Wgive'] @ a2 + w['bgive']
+def _np_place(a2, w):
+    v = w['Wplace'] @ a2 + w['bplace']; e = _np.exp(v - v.max())
+    return e / e.sum()
+def _np_nope_prob(a2, noped, w):
+    ext = _np.append(a2, float(noped))
+    return float(_np_sigmoid(w['Wnope'] @ ext + w['bnope'])[0])
+
+def _np_masked_argmax(scores, mask):
+    masked = _np.where(_np.array(mask) > 0, scores, -1e9)
+    idx = int(_np.argmax(masked))
+    return idx if mask[idx] else None
+
+
+# ---- pure-Python fallback ----
 
 def _mv(W, v):
     return [sum(w * vi for w, vi in zip(row, v)) for row in W]
@@ -63,9 +104,7 @@ def _relu(v):
     return [max(0.0, x) for x in v]
 
 def _softmax(v):
-    m = max(v)
-    e = [math.exp(x - m) for x in v]
-    s = sum(e)
+    m = max(v); e = [math.exp(x - m) for x in v]; s = sum(e)
     return [x / s for x in e]
 
 def _masked_argmax(scores, mask):
@@ -85,32 +124,23 @@ def _gru_step(x, h, w):
 def _trunk(h, snap, w):
     x  = list(h) + list(snap)
     a1 = _relu(_add(_mv(w['W1'], x), w['b1']))
-    a2 = _relu(_add(_mv(w['W2'], a1), w['b2']))
-    return a2
+    return _relu(_add(_mv(w['W2'], a1), w['b2']))
 
-def _policy(a2, w):
-    return _add(_mv(w['W3'], a2), w['b3'])
-
-def _target_scores(a2, w):
-    return _add(_mv(w['Wtgt'], a2), w['btgt'])
+def _policy(a2, w):      return _add(_mv(w['W3'], a2), w['b3'])
+def _target_scores(a2, w): return _add(_mv(w['Wtgt'], a2), w['btgt'])
+def _give_scores(a2, w): return _add(_mv(w['Wgive'], a2), w['bgive'])
+def _place_probs(a2, w): return _softmax(_add(_mv(w['Wplace'], a2), w['bplace']))
 
 def _nope_prob(a2, currently_noped, w):
     ext = list(a2) + [float(currently_noped)]
-    logit = _add(_mv(w['Wnope'], ext), w['bnope'])[0]
-    return _sigmoid([logit])[0]
-
-def _give_scores(a2, w):
-    return _add(_mv(w['Wgive'], a2), w['bgive'])
-
-def _place_probs(a2, w):
-    return _softmax(_add(_mv(w['Wplace'], a2), w['bplace']))
+    return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
 class RhinoAgent(Agent):
     ARENA = {
         'name': 'Rhino', 'emoji': '🦏', 'color': '#6b7280',
         'blurb': 'Reads the room. Remembers everything.',
-        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 5,
+        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 7,
     }
 
     _WEIGHTS = _load()
@@ -123,7 +153,7 @@ class RhinoAgent(Agent):
         self._top = None; self._top_deck = -1
 
     def game_start(self, state):
-        self._h = [0.0] * _GRU_H
+        self._h = _np.zeros(_GRU_H, dtype=_np.float32) if _HAS_NP else [0.0] * _GRU_H
         self._last_eid = -1
         self._top = None; self._top_deck = -1
 
@@ -143,16 +173,21 @@ class RhinoAgent(Agent):
         new = sorted([e for e in state.recent_events
                       if e.get('event_id', 0) > self._last_eid],
                      key=lambda e: e.get('event_id', 0))
+        from training.rhino.event_encode import encode_event
         for ev in new:
-            from training.rhino.event_encode import encode_event
             vec = encode_event(ev, state.my_id)
-            self._h = _gru_step(vec, self._h, self._WEIGHTS)
+            if _HAS_NP:
+                self._h = _np_gru_step(_np.array(vec, dtype=_np.float32), self._h, self._WEIGHTS)
+            else:
+                self._h = _gru_step(vec, self._h, self._WEIGHTS)
             self._last_eid = ev.get('event_id', self._last_eid)
 
     def _snap(self, state):
         return snap_encode(state, self._known_list(state))
 
     def _a2(self, state):
+        if _HAS_NP:
+            return _np_trunk(self._h, _np.array(self._snap(state), dtype=_np.float32), self._WEIGHTS)
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
 
     # ---- decision methods ----
@@ -166,23 +201,30 @@ class RhinoAgent(Agent):
         for a in valid_actions:
             by.setdefault(a.action_type, []).append(a)
         mask = [1.0 if at in by else 0.0 for at in ACTIONS]
-        logits = _policy(a2, self._WEIGHTS)
-        idx = _masked_argmax(logits, mask)
+        if _HAS_NP:
+            logits = _np_policy(a2, self._WEIGHTS)
+            idx = _np_masked_argmax(logits, mask)
+        else:
+            logits = _policy(a2, self._WEIGHTS)
+            idx = _masked_argmax(logits, mask)
         if idx is None:
             return Action(ActionType.DRAW)
         at = ACTIONS[idx]
         acts = by.get(at) or [Action(ActionType.DRAW)]
 
         if at in (ActionType.PLAY_FAVOR, ActionType.PLAY_CAT_PAIR, ActionType.PLAY_CAT_TRIPLE):
-            tgt_scores = _target_scores(a2, self._WEIGHTS)
+            if _HAS_NP:
+                tgt_scores = _np_target(a2, self._WEIGHTS)
+            else:
+                tgt_scores = _target_scores(a2, self._WEIGHTS)
             tgt_by_rel = {}
             for a in acts:
                 if a.target_player is not None:
                     rel = (a.target_player - state.my_id) % _N_TARGETS
                     tgt_by_rel[rel] = a
-            best_rel = _masked_argmax(tgt_scores,
-                                      [1.0 if r in tgt_by_rel else 0.0
-                                       for r in range(_N_TARGETS)])
+            tgt_mask = [1.0 if r in tgt_by_rel else 0.0 for r in range(_N_TARGETS)]
+            best_rel = (_np_masked_argmax(tgt_scores, tgt_mask) if _HAS_NP
+                        else _masked_argmax(tgt_scores, tgt_mask))
             chosen = tgt_by_rel.get(best_rel, acts[0])
             if at == ActionType.PLAY_CAT_TRIPLE:
                 from dataclasses import replace
@@ -196,17 +238,22 @@ class RhinoAgent(Agent):
             return False
         self._absorb(state)
         a2 = self._a2(state)
-        return _nope_prob(a2, currently_noped, self._WEIGHTS) > 0.5
+        prob = (_np_nope_prob(a2, currently_noped, self._WEIGHTS) if _HAS_NP
+                else _nope_prob(a2, currently_noped, self._WEIGHTS))
+        return prob > 0.5
 
     def give_card(self, state, requester_id):
         if self._WEIGHTS is None or not state.my_hand:
             return state.my_hand[0].card_type if state.my_hand else CardType.DEFUSE
         self._absorb(state)
         a2 = self._a2(state)
-        scores = _give_scores(a2, self._WEIGHTS)
+        if _HAS_NP:
+            scores = _np_give(a2, self._WEIGHTS)
+        else:
+            scores = _give_scores(a2, self._WEIGHTS)
         hand_names = {c.card_type.name for c in state.my_hand}
         mask = [1.0 if name in hand_names else 0.0 for name in _CARD_NAMES_LIST]
-        idx = _masked_argmax(scores, mask)
+        idx = (_np_masked_argmax(scores, mask) if _HAS_NP else _masked_argmax(scores, mask))
         if idx is None:
             return state.my_hand[0].card_type
         try:
@@ -218,6 +265,10 @@ class RhinoAgent(Agent):
         if self._WEIGHTS is None:
             return 0
         a2 = self._a2(state)
-        probs = _place_probs(a2, self._WEIGHTS)
-        bucket = probs.index(max(probs))
+        if _HAS_NP:
+            probs = _np_place(a2, self._WEIGHTS)
+            bucket = int(_np.argmax(probs))
+        else:
+            probs = _place_probs(a2, self._WEIGHTS)
+            bucket = probs.index(max(probs))
         return min(deck_size, round(_BUCKET_FRACS[bucket] * deck_size))

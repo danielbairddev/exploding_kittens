@@ -12,6 +12,7 @@ Progress lines report greedy win% / avg place vs the fleet.
 """
 import argparse
 import os
+import re
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -29,6 +30,23 @@ BC_WEIGHTS = os.path.join(HERE, "..", "..", "agents", "orangutan_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
 DEPLOY_OUT = os.path.join(HERE, "..", "..", "agents", "orangutan2_weights.json")
+DEFAULT_LOG = os.path.join(HERE, "..", "..", "logs", "train_orangutan_gorilla2.log")
+
+
+def parse_log_progress(log_path):
+    """Last iter + best win rate from a training log (for --resume)."""
+    if not os.path.exists(log_path):
+        return 0, None
+    last_iter, best = 0, None
+    with open(log_path) as f:
+        for line in f:
+            m = re.search(r"iter\s+(\d+)", line)
+            if m:
+                last_iter = int(m.group(1))
+            m = re.search(r"\(best\s+([\d.]+)%\)", line)
+            if m:
+                best = float(m.group(1)) / 100.0
+    return last_iter, best
 
 
 def compute_targets(games, gamma):
@@ -90,7 +108,7 @@ def ppo_update(net, data, epochs, mb, clip, vf_coef, ent_coef, lr):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--iters", type=int, default=2000)
+    ap.add_argument("--iters", type=int, default=999999, help="max iters (default: unlimited)")
     ap.add_argument("--games", type=int, default=512, help="rollout games per iter")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--epochs", type=int, default=4)
@@ -101,24 +119,40 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--gamma", type=float, default=0.997)
     ap.add_argument("--self_prob", type=float, default=0.5)
-    ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--patience", type=int, default=500,
+                    help="stop after this many evals with no improvement (default 500)")
+    ap.add_argument("--resume", action="store_true",
+                    help="load checkpoint.json; --iters is additional iters to run")
+    ap.add_argument("--log", default=DEFAULT_LOG,
+                    help="training log to read last iter/best when resuming")
     args = ap.parse_args()
 
     net = ActorCritic()
+    start_iter = 0
     if args.resume and os.path.exists(CKPT_OUT):
         import json
-        net.load_full(json.load(open(CKPT_OUT))); print("resumed checkpoint", flush=True)
+        net.load_full(json.load(open(CKPT_OUT)))
+        start_iter, log_best = parse_log_progress(args.log)
+        print(f"resumed checkpoint @ iter {start_iter}", flush=True)
     else:
-        net.load_bc(BC_WEIGHTS); print("warm-started from BC weights", flush=True)
+        net.load_bc(BC_WEIGHTS)
+        print("warm-started from BC weights", flush=True)
+        log_best = None
 
     pool = []                       # past-self policy snapshots (Orangutan format)
     base_wr, base_ap = evaluate(net.policy_weights(), n=3000)
-    best = base_wr
-    print(f"baseline (BC) greedy vs fleet: win {base_wr*100:.1f}%  place {base_ap:.3f}", flush=True)
+    best = log_best if log_best is not None else base_wr
+    if start_iter:
+        print(f"resume baseline greedy vs fleet: win {base_wr*100:.1f}%  place {base_ap:.3f}  "
+              f"(log best {best*100:.2f}%)", flush=True)
+    else:
+        print(f"baseline (BC) greedy vs fleet: win {base_wr*100:.1f}%  place {base_ap:.3f}", flush=True)
 
+    end_iter = start_iter + args.iters
     ex = ProcessPoolExecutor(max_workers=args.workers) if args.workers > 1 else None
-    seed = 1000
-    for it in range(1, args.iters + 1):
+    seed = 1000 + start_iter
+    no_improve = 0  # evals since last best
+    for it in range(start_iter + 1, end_iter + 1):
         t0 = time.time()
         policy_w = net.full_weights()
         per = max(1, args.games // max(1, args.workers))
@@ -147,11 +181,17 @@ def main():
             wr, apl = evaluate(net.policy_weights(), n=3000)
             tag = ""
             if wr > best:
-                best = wr; net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
+                best = wr; no_improve = 0
+                net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
+            else:
+                no_improve += 1
             wins = sum(1 for _, r in games if r > 0)
             print(f"iter {it:4d}  rollout_win {wins/len(games)*100:4.1f}%  "
                   f"|  greedy vs fleet: win {wr*100:5.2f}%  place {apl:.3f}  "
                   f"(best {best*100:.2f}%)  {time.time()-t0:.1f}s/it{tag}", flush=True)
+            if no_improve >= args.patience:
+                print(f"stalled: no improvement in {no_improve} evals. stopping.", flush=True)
+                break
     if ex:
         ex.shutdown()
     print("done. best policy in", BEST_OUT, flush=True)

@@ -10,6 +10,12 @@ from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.aggressive_agent import AggressiveAgent
 from agents.heuristic_agent import HeuristicAgent
+from agents.orangutan_agent import OrangutanAgent
+from agents.orangutan2_agent import Orangutan2Agent
+from agents.random_agent import RandomAgent
+from agents.chaos_agent import ChaosAgent
+from agents.ian1_agent import Ian1Agent
+from agents.ian2_agent import Ian2Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS, N_ACTIONS
 from training.rhino.event_encode import encode_event, N_EVENT, CARD_NAMES, _CARD_IDX
 from training.rhino.net import (GRU_H, N_TARGETS, N_CARD_TYPES, N_BUCKETS, BUCKET_FRACS,
@@ -21,9 +27,10 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 NEG = -1e9
 
-# Competitive, diverse fleet — no Perdition (tries to lose, corrupts signal),
-# no Random/Chaos (pure noise).
-FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent]
+# Full arena mirror: includes the unpredictable bots (Random, Chaos) that Rhino
+# faces in production but previously never trained against.
+FLEET = [CoyoteAgent, SurvivalAgentV2, SurvivalAgent, AggressiveAgent, HeuristicAgent,
+         OrangutanAgent, Orangutan2Agent, RandomAgent, ChaosAgent, Ian1Agent, Ian2Agent]
 
 
 def _np(w):
