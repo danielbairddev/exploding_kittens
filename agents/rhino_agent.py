@@ -11,9 +11,17 @@ weights aren't present yet. Inference is pure Python — no numpy dependency.
 import json, math, os
 from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
-from rhino.event_encode import CARD_NAMES, N_EVENT
 from game.actions import Action, ActionType
 from game.cards import CardType
+
+try:
+    from rhino.event_encode import CARD_NAMES, N_EVENT
+except ImportError:
+    # numpy not installed (production server) — define fallback constants
+    CARD_NAMES = ['DEFUSE','ATTACK','SKIP','FAVOR','SHUFFLE','SEE_THE_FUTURE','NOPE',
+                  'TACO_CAT','HAIRY_POTATO_CAT','BEARD_CAT','RAINBOW_CAT','CATTERMELON',
+                  'EXPLODING_KITTEN']
+    N_EVENT = 39
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rhino_weights.json')
 
