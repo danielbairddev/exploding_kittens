@@ -40,7 +40,6 @@ from agents.orangutan2_agent import Orangutan2Agent
 from agents.rhino_agent import RhinoAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
-from agents.perdition_agent import PerditionAgent
 from agents.perdition2_agent import Perdition2Agent
 from game.engine import GameEngine
 
@@ -67,8 +66,7 @@ ARENA_BOTS = [
     Orangutan2Agent,   # Orangutan2
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
-    PerditionAgent,    # Perdition
-    Perdition2Agent,   # Perdition2
+    Perdition2Agent,   # Perdition
     RhinoAgent,        # Rhino (GRU)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
