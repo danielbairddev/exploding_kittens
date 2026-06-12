@@ -145,7 +145,7 @@ class RhinoAgent(Agent):
                      key=lambda e: e.get('event_id', 0))
         for ev in new:
             from rhino.event_encode import encode_event
-            vec = encode_event(ev, state.my_id).tolist()
+            vec = encode_event(ev, state.my_id)
             self._h = _gru_step(vec, self._h, self._WEIGHTS)
             self._last_eid = ev.get('event_id', self._last_eid)
 

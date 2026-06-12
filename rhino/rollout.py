@@ -101,7 +101,7 @@ class _LearnerAgent(CoyoteAgent):
                       if e.get('event_id', 0) > self._last_eid],
                      key=lambda e: e.get('event_id', 0))
         for ev in new:
-            vec = encode_event(ev, state.my_id)
+            vec = np.array(encode_event(ev, state.my_id), dtype=np.float32)
             if self.EVENT_LOG is not None:
                 self.EVENT_LOG.append(vec)
             self._h = _gru_step(vec, self._h, self.PARAMS)

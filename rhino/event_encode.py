@@ -1,10 +1,8 @@
 """Encode a game event dict into a fixed-size feature vector.
 
-Pure stdlib + numpy so it works in both the training pipeline and the deployed
-agent (which imports this for inference).
+Pure stdlib — no numpy. Training code wraps the returned list with
+np.array() as needed; the deployed inference agent uses it directly.
 """
-import numpy as np
-
 EVENT_TYPES = [
     'turn_start', 'attack', 'skip', 'shuffle', 'see_future',
     'favor', 'cat_steal', 'nope', 'action_noped', 'draw',
@@ -28,9 +26,9 @@ N_TARGET_SLOTS = N_PLAYERS + 1        # +1 for none/not-applicable
 N_EVENT = N_EVENT_TYPES + N_PLAYERS + N_TARGET_SLOTS + N_CARD_SLOTS
 
 
-def encode_event(ev: dict, my_id: int) -> np.ndarray:
-    """Encode one event dict to a float32 vector of length N_EVENT."""
-    vec = np.zeros(N_EVENT, dtype=np.float32)
+def encode_event(ev: dict, my_id: int) -> list:
+    """Encode one event dict to a float list of length N_EVENT."""
+    vec = [0.0] * N_EVENT
     off = 0
 
     # Event type (14-dim one-hot)
