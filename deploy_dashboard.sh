@@ -44,6 +44,10 @@ SHA=$(git rev-parse --short HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 BY=$(git config user.name 2>/dev/null || echo "${USER:-unknown}")
 AT=$(TZ="America/Los_Angeles" date +"%Y-%m-%d %H:%M %Z")
+# Embed in the remote script (not positional args — BY/AT contain spaces).
+_esc_sq() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
+BY_Q=$(_esc_sq "$BY")
+AT_Q=$(_esc_sq "$AT")
 
 echo "Deploying Live Arena dashboard to $SERVER:$PORT  (as '$BY' @ $SHA)..."
 
@@ -59,9 +63,12 @@ if ssh "$SERVER" "[ ! -d '$APP_DIR/.git' ]"; then
     "$SERVER:$APP_DIR/"
 fi
 
-ssh "$SERVER" bash -s "$APP_DIR" "$PORT" "$FULL_SHA" "$BRANCH" "$SHA" "$BY" "$AT" <<'REMOTE'
+ssh "$SERVER" bash -s "$APP_DIR" "$PORT" "$FULL_SHA" "$BRANCH" <<REMOTE
 set -euo pipefail
-APP_DIR="$1" PORT="$2" FULL_SHA="$3" BRANCH="$4" SHA="$5" BY="$6" AT="$7"
+APP_DIR="\$1" PORT="\$2" FULL_SHA="\$3" BRANCH="\$4"
+SHA='$SHA'
+BY='$BY_Q'
+AT='$AT_Q'
 
 if [ -d "$APP_DIR/.git" ]; then
   echo "Git sync: origin/$BRANCH @ $SHA"
