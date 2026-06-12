@@ -61,9 +61,12 @@ def _mprobs(logits, mask):
 
 class TrackerMixin(CoyoteAgent):
     """Maintains a GameTracker from the agent's callbacks (Coyote elsewhere)."""
+    opp_type_map = {}     # seat -> class name; set per game before play (empty = anonymized)
+
     def game_start(self, state):
         super().game_start(state)
         self.tr = GameTracker(); self.tr.reset(state)
+        self.tr.set_opponent_types(getattr(self, "opp_type_map", {}))
 
     def want_to_nope(self, state, action, currently_noped=False):
         self.tr.observe_action(state, action, currently_noped)
@@ -84,7 +87,7 @@ def _resolve(at, acts, agent, state):
     return acts[0]
 
 
-def play_one_g(params, rng, npr, greedy=False, log=None):
+def play_one_g(params, rng, npr, greedy=False, log=None, anon_frac=0.25):
     class Learner(TrackerMixin):
         def choose_action(self, state, valid_actions):
             by = {}
@@ -104,6 +107,13 @@ def play_one_g(params, rng, npr, greedy=False, log=None):
     opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
     agents = [me] + opps
     order = list(range(5)); rng.shuffle(order); seat = order.index(0)
+    # Tell the learner who each opponent is — unless this game is "anonymized"
+    # (so the behavioral-profile fallback keeps getting trained too).
+    if rng.random() >= anon_frac:
+        me.opp_type_map = {s: type(agents[order[s]]).__name__
+                           for s in range(5) if order[s] != 0}
+    else:
+        me.opp_type_map = {}
     r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)
     if r["winner"] < 0:
         return 0.0
@@ -143,6 +153,7 @@ def evaluate_g(policy_w, n=3000, seed=99):
                 return _resolve(ACTIONS[idx], by[ACTIONS[idx]], self, state)
         me = Greedy(name="G"); opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
         agents = [me] + opps; order = list(range(5)); rng.shuffle(order); seat = order.index(0)
+        me.opp_type_map = {s: type(agents[order[s]]).__name__ for s in range(5) if order[s] != 0}
         r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)
         if r["winner"] < 0:
             continue
@@ -174,6 +185,10 @@ def behavioral_clone_g(net, n_games=60000, epochs=6, lr=1e-3):
     for _ in range(n_games):
         me = Teacher(name="T"); opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
         agents = [me] + opps; order = list(range(5)); rng.shuffle(order)
+        if rng.random() >= 0.25:
+            me.opp_type_map = {s: type(agents[order[s]]).__name__ for s in range(5) if order[s] != 0}
+        else:
+            me.opp_type_map = {}
         GameEngine([agents[i] for i in order]).play_game(5)
     X = np.array([s[0] for s in samples]); y = np.array([s[1] for s in samples])
     M = np.array([s[2] for s in samples]); oh = np.eye(N_ACTIONS)[y]

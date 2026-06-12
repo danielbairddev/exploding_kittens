@@ -48,6 +48,11 @@ class GameTracker:
         self._top = None                       # known top cards (CardType list)
         self._top_deck = -1
         self.my_id = state.my_id if state is not None else 0
+        self.opp_types = {}                    # player_id -> known type string (if not anonymized)
+
+    def set_opponent_types(self, mapping):
+        """player_id -> type string. Empty/absent => anonymized (heuristic only)."""
+        self.opp_types = dict(mapping or {})
 
     # ---- observation hooks ----
     def observe_state(self, state):
