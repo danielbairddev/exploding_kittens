@@ -8,12 +8,18 @@ logs/
 *.jsonl
 .idea/
 
-# Gorilla training artifacts (regenerated)
+# Training artifacts (regenerated — never commit, git pull must not clobber them)
 training/gorilla/checkpoint.json
 training/gorilla/best_policy.json
 training/gorilla/*.tmp
 training/gorilla/checkpoint_g.json
 training/gorilla/best_policy_g.json
+training/rhino/checkpoint.json
+training/rhino/best_policy.json
+training/rhino/*.tmp
+training/elephant/checkpoint.json
+training/elephant/best_policy.json
+training/elephant/*.tmp
 training/mandrill/nope_ckpt.json
 training/mandrill/nope_best.json
 training/abaddon/checkpoint_a.json
