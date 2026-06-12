@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from game.state import ObservableState
 from game.actions import Action
-from game.cards import CardType
+from game.cards import CardType, Card
 
 
 class Agent(ABC):
@@ -37,6 +37,6 @@ class Agent(ABC):
         """Called after defusing. Return index to insert EK (0=top, deck_size=bottom)."""
         return deck_size  # default: bury at bottom
 
-    def see_future(self, state: ObservableState, top3: list):
+    def see_future(self, state: ObservableState, top3: list[Card]):
         """Called after playing See the Future. top3 is a list of Card."""
         pass
