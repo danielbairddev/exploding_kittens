@@ -108,7 +108,7 @@ def ppo_update(net, data, epochs, mb, clip, vf_coef, ent_coef, lr):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--iters", type=int, default=2000)
+    ap.add_argument("--iters", type=int, default=999999, help="max iters (default: unlimited)")
     ap.add_argument("--games", type=int, default=512, help="rollout games per iter")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--epochs", type=int, default=4)
@@ -119,6 +119,8 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--gamma", type=float, default=0.997)
     ap.add_argument("--self_prob", type=float, default=0.5)
+    ap.add_argument("--patience", type=int, default=500,
+                    help="stop after this many evals with no improvement (default 500)")
     ap.add_argument("--resume", action="store_true",
                     help="load checkpoint.json; --iters is additional iters to run")
     ap.add_argument("--log", default=DEFAULT_LOG,
@@ -149,6 +151,7 @@ def main():
     end_iter = start_iter + args.iters
     ex = ProcessPoolExecutor(max_workers=args.workers) if args.workers > 1 else None
     seed = 1000 + start_iter
+    no_improve = 0  # evals since last best
     for it in range(start_iter + 1, end_iter + 1):
         t0 = time.time()
         policy_w = net.full_weights()
@@ -178,11 +181,17 @@ def main():
             wr, apl = evaluate(net.policy_weights(), n=3000)
             tag = ""
             if wr > best:
-                best = wr; net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
+                best = wr; no_improve = 0
+                net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
+            else:
+                no_improve += 1
             wins = sum(1 for _, r in games if r > 0)
             print(f"iter {it:4d}  rollout_win {wins/len(games)*100:4.1f}%  "
                   f"|  greedy vs fleet: win {wr*100:5.2f}%  place {apl:.3f}  "
                   f"(best {best*100:.2f}%)  {time.time()-t0:.1f}s/it{tag}", flush=True)
+            if no_improve >= args.patience:
+                print(f"stalled: no improvement in {no_improve} evals. stopping.", flush=True)
+                break
     if ex:
         ex.shutdown()
     print("done. best policy in", BEST_OUT, flush=True)
