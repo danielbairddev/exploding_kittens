@@ -301,7 +301,7 @@ function renderLadder(){
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
         <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
-        <div class="lb-blurb">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
+        <div class="lb-blurb" title="${b.blurb}">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
         ${m==='elo' ? eloSpark(b.elo_recent, b.color) : ''}
       </div>
