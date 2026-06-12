@@ -538,6 +538,42 @@ def prune_logs():
 
 
 # --------------------------------------------------------------------------
+# Training progress — parse log files written by training runs
+# --------------------------------------------------------------------------
+import re as _re
+
+_TRAIN_LOGS = {
+    "Rhino":    "/tmp/rhino_train.log",
+    "Gorilla":  "/tmp/gorilla_train.log",
+    "Elephant": "/tmp/elephant_train.log",
+}
+_ITER_RE = _re.compile(
+    r"iter\s+(\d+)\s+rollout_win\s+([\d.]+)%.*?win\s+([\d.]+)%\s+place\s+([\d.]+).*?\(best\s+([\d.]+)%\)"
+)
+
+def _training_progress():
+    out = {}
+    for name, path in _TRAIN_LOGS.items():
+        points = []
+        try:
+            with open(path) as f:
+                for line in f:
+                    m = _ITER_RE.search(line)
+                    if m:
+                        points.append({
+                            "iter":  int(m.group(1)),
+                            "rwin":  float(m.group(2)),
+                            "win":   float(m.group(3)),
+                            "place": float(m.group(4)),
+                            "best":  float(m.group(5)),
+                        })
+        except OSError:
+            pass
+        out[name] = points
+    return out
+
+
+# --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
@@ -567,6 +603,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps([{"name": n, "emoji": e} for n, (c, e) in play.PLAYABLE.items()]))
         elif path == "/api/play/state":
             self._send(json.dumps(play.state(q.get("id", [""])[0])))
+        elif path == "/api/training":
+            self._send(json.dumps(_training_progress()))
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
         else:

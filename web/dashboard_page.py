@@ -146,6 +146,19 @@ PAGE = r'''<!DOCTYPE html>
   .feed-row .w { font-weight:600; }
   .feed-row .meta { margin-left:auto; color:var(--muted); font-size:0.74rem; }
 
+  /* ---------------- training progress ---------------- */
+  .row3 { margin-top:1rem; }
+  .train-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:1rem; }
+  @media (max-width:700px){ .train-grid{ grid-template-columns:1fr; } }
+  .train-bot { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:0.8rem 1rem; }
+  .train-bot .tb-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem; }
+  .train-bot .tb-name { font-weight:700; font-size:0.88rem; }
+  .train-bot .tb-stat { font-size:0.72rem; color:var(--muted); text-align:right; }
+  .train-bot .tb-stat b { color:var(--text); }
+  .train-bot .tb-chart { width:100%; height:60px; display:block; }
+  .train-bot .tb-foot { display:flex; justify-content:space-between; margin-top:0.3rem; font-size:0.65rem; color:var(--muted); }
+  .train-none { color:var(--muted); font-size:0.8rem; padding:0.5rem 0; }
+
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   @keyframes slideIn { from{opacity:0; transform:translateX(-6px);} to{opacity:1; transform:none;} }
   @keyframes shake { 0%,100%{transform:none;} 20%{transform:translateX(-7px) rotate(-4deg);} 40%{transform:translateX(7px) rotate(4deg);} 60%{transform:translateX(-5px);} 80%{transform:translateX(5px);} }
@@ -219,6 +232,14 @@ PAGE = r'''<!DOCTYPE html>
     <div class="card feed">
       <h2>Recent Results</h2>
       <div id="feed"></div>
+    </div>
+  </div>
+
+  <!-- TRAINING PROGRESS -->
+  <div class="row3">
+    <div class="card">
+      <h2>Training Progress <span class="sub" id="train-iter-tag"></span></h2>
+      <div class="train-grid" id="train-grid"><div class="train-none">Waiting for first eval…</div></div>
     </div>
   </div>
 
@@ -516,6 +537,70 @@ async function replayLoop(){
 
 pollStats();
 replayLoop();
+
+/* ---------------- training progress ---------------- */
+const TRAIN_COLORS = { Rhino:'#6b7280', Gorilla:'#f97316', Elephant:'#7c3aed' };
+const TRAIN_EMOJI  = { Rhino:'🦏', Gorilla:'🦍', Elephant:'🐘' };
+
+function trainChart(pts, color){
+  const W=300, H=60, pad=4;
+  if(!pts.length) return `<svg class="tb-chart" viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2+5}" text-anchor="middle" fill="#64748b" font-size="11">no data yet</text></svg>`;
+  const wins = pts.map(p=>p.win);
+  const bests = pts.map(p=>p.best);
+  const minV = Math.min(...wins, ...bests);
+  const maxV = Math.max(...wins, ...bests);
+  const span = (maxV - minV) || 1;
+  const x = i => (pad + (i/(pts.length-1||1))*(W-pad*2)).toFixed(1);
+  const y = v => (H - pad - ((v-minV)/span)*(H-pad*2)).toFixed(1);
+  const winLine  = pts.map((p,i)=>`${x(i)},${y(p.win)}`).join(' ');
+  const bestLine = pts.map((p,i)=>`${x(i)},${y(p.best)}`).join(' ');
+  // shaded area under win line
+  const area = `${x(0)},${H-pad} ` + winLine + ` ${x(pts.length-1)},${H-pad}`;
+  return `<svg class="tb-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polygon points="${area}" fill="${color}" opacity="0.12"/>
+    <polyline points="${bestLine}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="3,2" opacity="0.5" vector-effect="non-scaling-stroke"/>
+    <polyline points="${winLine}"  fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+function renderTraining(data){
+  const bots = ['Rhino','Gorilla','Elephant'];
+  const anyData = bots.some(b => data[b] && data[b].length > 0);
+  if(!anyData){
+    $('train-grid').innerHTML = '<div class="train-none">Waiting for first eval (iter 10)…</div>';
+    return;
+  }
+  $('train-grid').innerHTML = bots.map(name => {
+    const pts = data[name] || [];
+    const color = TRAIN_COLORS[name];
+    const emoji = TRAIN_EMOJI[name];
+    if(!pts.length) return `<div class="train-bot">
+      <div class="tb-head"><span class="tb-name">${emoji} ${name}</span><span class="tb-stat">not running</span></div>
+      ${trainChart([], color)}
+    </div>`;
+    const last = pts[pts.length-1];
+    const label = name === 'Gorilla' ? 'Orangutan2' : name;
+    return `<div class="train-bot">
+      <div class="tb-head">
+        <span class="tb-name">${emoji} ${label}</span>
+        <span class="tb-stat">win <b>${last.win.toFixed(1)}%</b> · best <b>${last.best.toFixed(1)}%</b></span>
+      </div>
+      ${trainChart(pts, color)}
+      <div class="tb-foot"><span>iter ${last.iter}</span><span>place ${last.place.toFixed(2)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+async function pollTraining(){
+  while(true){
+    try{
+      const d = await (await fetch('/api/training')).json();
+      renderTraining(d);
+    }catch(e){}
+    await new Promise(r=>setTimeout(r,30000));
+  }
+}
+pollTraining();
 </script>
 </body>
 </html>'''
