@@ -17,7 +17,7 @@ except ImportError:
     _HAS_NP = False
 
 try:
-    from rhino.event_encode import CARD_NAMES, N_EVENT
+    from training.rhino.event_encode import CARD_NAMES, N_EVENT
 except ImportError:
     CARD_NAMES = ['DEFUSE','ATTACK','SKIP','FAVOR','SHUFFLE','SEE_THE_FUTURE','NOPE',
                   'TACO_CAT','HAIRY_POTATO_CAT','BEARD_CAT','RAINBOW_CAT','CATTERMELON',
@@ -168,7 +168,7 @@ class ElephantAgent(Agent):
         new = sorted([e for e in state.recent_events
                       if e.get('event_id', 0) > self._last_eid],
                      key=lambda e: e.get('event_id', 0))
-        from rhino.event_encode import encode_event
+        from training.rhino.event_encode import encode_event
         for ev in new:
             vec = encode_event(ev, state.my_id)
             if _HAS_NP:

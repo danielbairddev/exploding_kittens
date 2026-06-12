@@ -6,7 +6,7 @@ the same PPO + BPTT loop. Each shares the GRU and trunk; only the head weights
 differ. Gradients from all heads accumulate into dh_from_mlp and flow back
 through the GRU via BPTT.
 
-    python3 -m elephant.train --iters 3000 --workers 6
+    python3 -m training.elephant.train --iters 3000 --workers 6
 """
 import argparse, os, sys, time
 from collections import defaultdict
@@ -14,17 +14,17 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from elephant.net import (GRUActorCritic, GRU_H, ALL_KEYS, N_TARGETS,
-                           N_CARD_TYPES, N_BUCKETS)
-from elephant.rollout import rollout_worker, evaluate
+from training.elephant.net import (GRUActorCritic, GRU_H, ALL_KEYS, N_TARGETS,
+                                    N_CARD_TYPES, N_BUCKETS)
+from training.elephant.rollout import rollout_worker, evaluate
 from agents.orangutan_features import N_ACTIONS
 
 HERE      = os.path.dirname(os.path.abspath(__file__))
 BEST_OUT  = os.path.join(HERE, 'best_policy.json')
 CKPT_OUT  = os.path.join(HERE, 'checkpoint.json')
-DEPLOY_OUT = os.path.join(HERE, '..', 'agents', 'elephant_weights.json')
+DEPLOY_OUT = os.path.join(HERE, '..', '..', 'agents', 'elephant_weights.json')
 
 NEG = -1e9
 
