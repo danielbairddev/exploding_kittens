@@ -18,7 +18,7 @@ export EK_DEPLOY_BY="${EK_DEPLOY_BY:-unknown}"
 export EK_DEPLOY_AT="${EK_DEPLOY_AT:-}"
 nohup python3 web/dashboard_server.py "$PORT" > /tmp/ek-arena.log 2>&1 </dev/null &
 
-for i in $(seq 1 15); do
+for i in $(seq 1 60); do
   sleep 1
   if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
     echo "Live Arena up at http://0.0.0.0:$PORT ($EK_DEPLOY_SHA by $EK_DEPLOY_BY)"
