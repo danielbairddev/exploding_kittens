@@ -69,7 +69,7 @@ def ppo_update(net, data, epochs, mb, clip, vf_coef, ent_coef, lr):
             in_range = (ratio > 1 - clip) & (ratio < 1 + clip)
             coeff = np.where(use1, 1.0, in_range.astype(float))
             gpol_logp = -(ad * ratio * coeff) / B                  # d pol_loss / d logp
-            onehot = np.eye(N_ACTIONS)[ib]
+            onehot = np.eye(logits.shape[1])[ib]
             dlogits = gpol_logp[:, None] * (onehot - P)
             # entropy: maximize -> subtract from loss
             a_term = (logp_all + 1.0) * mk

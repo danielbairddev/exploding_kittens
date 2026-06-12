@@ -17,15 +17,16 @@ PARAM_KEYS = ("W1", "b1", "W2", "b2", "W3", "b3", "Wv", "bv")
 
 
 class ActorCritic:
-    def __init__(self, seed=0, n_features=N_FEATURES):
+    def __init__(self, seed=0, n_features=N_FEATURES, n_actions=N_ACTIONS):
         rng = np.random.default_rng(seed)
         self.n_features = n_features
+        self.n_actions = n_actions
         self.W1 = rng.standard_normal((H1, n_features)) * np.sqrt(2 / n_features)
         self.b1 = np.zeros(H1)
         self.W2 = rng.standard_normal((H2, H1)) * np.sqrt(2 / H1)
         self.b2 = np.zeros(H2)
-        self.W3 = rng.standard_normal((N_ACTIONS, H2)) * np.sqrt(0.01)   # policy head
-        self.b3 = np.zeros(N_ACTIONS)
+        self.W3 = rng.standard_normal((n_actions, H2)) * np.sqrt(0.01)   # policy head
+        self.b3 = np.zeros(n_actions)
         self.Wv = rng.standard_normal((1, H2)) * np.sqrt(0.01)           # value head
         self.bv = np.zeros(1)
         self._adam = {k: [np.zeros_like(getattr(self, k)), np.zeros_like(getattr(self, k))]
