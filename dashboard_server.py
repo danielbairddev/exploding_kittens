@@ -36,6 +36,7 @@ from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.coyote_agent import CoyoteAgent
 from agents.orangutan_agent import OrangutanAgent
+from agents.orangutan2_agent import Orangutan2Agent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.perdition_agent import PerditionAgent
@@ -62,6 +63,7 @@ ARENA_BOTS = [
     SurvivalAgentV2,   # Sly2
     CoyoteAgent,       # Coyote
     OrangutanAgent,    # Orangutan
+    Orangutan2Agent,   # Orangutan2
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
     PerditionAgent,    # Perdition

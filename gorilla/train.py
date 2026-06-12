@@ -28,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BC_WEIGHTS = os.path.join(HERE, "..", "agents", "orangutan_weights.json")
 BEST_OUT = os.path.join(HERE, "best_policy.json")
 CKPT_OUT = os.path.join(HERE, "checkpoint.json")
+DEPLOY_OUT = os.path.join(HERE, "..", "agents", "orangutan2_weights.json")
 
 
 def compute_targets(games, gamma):
@@ -146,7 +147,7 @@ def main():
             wr, apl = evaluate(net.policy_weights(), n=3000)
             tag = ""
             if wr > best:
-                best = wr; net.save_policy(BEST_OUT); tag = "  <- new best (saved)"
+                best = wr; net.save_policy(BEST_OUT); net.save_policy(DEPLOY_OUT); tag = "  <- new best (saved)"
             wins = sum(1 for _, r in games if r > 0)
             print(f"iter {it:4d}  rollout_win {wins/len(games)*100:4.1f}%  "
                   f"|  greedy vs fleet: win {wr*100:5.2f}%  place {apl:.3f}  "
