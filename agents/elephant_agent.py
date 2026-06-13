@@ -25,7 +25,7 @@ except ImportError:
     N_EVENT = 39
 
 # ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.15  # fraction of turns replaced with a random valid action
+_ARENA_NOISE = 0.25  # fraction of turns replaced with a random valid action
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
 
