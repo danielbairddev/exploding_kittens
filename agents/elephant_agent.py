@@ -25,7 +25,7 @@ except ImportError:
     N_EVENT = 39
 
 # ---- Exploration (controls play diversity) ----
-_EXPLORE_RATE = 0.25  # fraction of turns that explore randomly
+_EXPLORE_RATE = 0.30  # fraction of turns that explore randomly
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
 
@@ -139,7 +139,7 @@ class ElephantAgent(Agent):
     ARENA = {
         'name': 'Elephant', 'emoji': '🐘', 'color': '#7c3aed',
         'blurb': 'Bigger memory. Longer thinking.',
-        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 27,
+        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 28,
     }
 
     _WEIGHTS = _load()
