@@ -53,21 +53,19 @@ if $DRY_RUN; then
 fi
 
 echo ""
-echo "=== Bumping stats_version ==="
+echo "=== Bumping GLOBAL_STATS_VERSION ==="
 
-# Find current version (pick from any agent file)
-current=$(grep -h "stats_version" "$REPO"/agents/*.py | grep -v ian | grep -o "[0-9]*" | sort -n | tail -1)
+current=$(grep "GLOBAL_STATS_VERSION" "$REPO/web/dashboard_server.py" | grep -o "[0-9]*")
 next=$((current + 1))
 echo "  $current -> $next"
 
-sed -i '' "s/\"stats_version\": $current/\"stats_version\": $next/g" "$REPO"/agents/*.py
-sed -i '' "s/'stats_version': $current/'stats_version': $next/g" "$REPO"/agents/*.py
+sed -i '' "s/GLOBAL_STATS_VERSION = $current/GLOBAL_STATS_VERSION = $next/" "$REPO/web/dashboard_server.py"
 
 echo ""
 echo "=== Committing ==="
 
 cd "$REPO"
-git add agents/
+git add agents/ web/dashboard_server.py
 
 git commit -m "Deploy weights (Rhino, Orangutan2, Elephant, Gabriel); bump stats_version to ${next}.
 

@@ -73,7 +73,16 @@ ARENA_BOTS = [
     ElephantAgent,     # Elephant (GRU-128)
     # GabrielAgent,      # Gabriel — benched (let them think they have a chance)
 ]
-ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
+# Bump to reset ALL bots' stats at once. Individual bots can set a higher
+# stats_version in their own ARENA dict to reset independently without
+# affecting the rest of the leaderboard.
+GLOBAL_STATS_VERSION = 28
+
+ROSTER = [
+    {"bot_id": i, "cls": cls, **cls.ARENA,
+     "stats_version": max(cls.ARENA.get("stats_version", 0), GLOBAL_STATS_VERSION)}
+    for i, cls in enumerate(ARENA_BOTS)
+]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
 # Deploy identity (set by deploy_dashboard.sh) so the site shows who shipped what
