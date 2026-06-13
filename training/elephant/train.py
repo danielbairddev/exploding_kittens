@@ -199,15 +199,51 @@ def _game_grads(net, gd, clip, vf_coef, ent_coef):
     return all_grads, max(total_n, 1)
 
 
-def ppo_update(net, games, epochs, clip, vf_coef, ent_coef, lr):
-    import random
+def _grads_chunk(args):
+    """Sum gradients for a chunk of games — runs in a worker process."""
+    weights, game_chunk, clip, vf_coef, ent_coef = args
+    net = GRUActorCritic()
+    net.load_weights(weights)
+    sum_grads = None
+    for gd, _ in game_chunk:
+        grads, _ = _game_grads(net, gd, clip, vf_coef, ent_coef)
+        if sum_grads is None:
+            sum_grads = {k: v.copy() for k, v in grads.items()}
+        else:
+            for k in sum_grads:
+                sum_grads[k] += grads[k]
+    return sum_grads, len(game_chunk)
+
+
+def ppo_update(net, games, epochs, clip, vf_coef, ent_coef, lr, ex=None):
+    import random, math
     indices = list(range(len(games)))
     for _ in range(epochs):
         random.shuffle(indices)
-        for i in indices:
-            gd, _ = games[i]
-            grads, _ = _game_grads(net, gd, clip, vf_coef, ent_coef)
-            net.step(grads, lr)
+        shuffled = [games[i] for i in indices]
+        if ex is None:
+            for gd, _ in shuffled:
+                grads, _ = _game_grads(net, gd, clip, vf_coef, ent_coef)
+                net.step(grads, lr)
+        else:
+            workers = ex._max_workers
+            chunk_size = max(1, math.ceil(len(shuffled) / workers))
+            chunks = [shuffled[i:i+chunk_size] for i in range(0, len(shuffled), chunk_size)]
+            w = net.full_weights()
+            futs = [ex.submit(_grads_chunk, (w, chunk, clip, vf_coef, ent_coef))
+                    for chunk in chunks]
+            sum_grads, n_total = None, 0
+            for f in futs:
+                g, n = f.result()
+                if g is None: continue
+                n_total += n
+                if sum_grads is None:
+                    sum_grads = {k: v.copy() for k, v in g.items()}
+                else:
+                    for k in sum_grads: sum_grads[k] += g[k]
+            if sum_grads and n_total > 0:
+                avg_grads = {k: v / n_total for k, v in sum_grads.items()}
+                net.step(avg_grads, lr)
 
 
 def main():
@@ -215,7 +251,7 @@ def main():
     ap.add_argument('--iters',     type=int,   default=999999, help='max iters (default: unlimited)')
     ap.add_argument('--games',     type=int,   default=256)
     ap.add_argument('--workers',   type=int,   default=max(1, (os.cpu_count() or 2) - 1))
-    ap.add_argument('--epochs',    type=int,   default=2)
+    ap.add_argument('--epochs',    type=int,   default=1)
     ap.add_argument('--clip',      type=float, default=0.2)
     ap.add_argument('--vf',        type=float, default=0.5)
     ap.add_argument('--ent',       type=float, default=0.01)
@@ -251,21 +287,25 @@ def main():
             futs = [ex.submit(rollout_worker, (pw, list(pool), per, seed + w, args.self_prob))
                     for w in range(args.workers)]
             seed += args.workers
+            t_rollout = time.time()
             games = [g for f in futs for g in f.result()]
         else:
             seed += 1
+            t_rollout = time.time()
             games = rollout_worker((pw, list(pool), args.games, seed, args.self_prob))
 
+        t_update = time.time()
         compute_targets(games, args.gamma)
-        ppo_update(net, games, args.epochs, args.clip, args.vf, args.ent, args.lr)
+        ppo_update(net, games, args.epochs, args.clip, args.vf, args.ent, args.lr, ex=ex)
+        t_done = time.time()
         net.save_full(CKPT_OUT)
 
         if it % 20 == 0:
             pool.append(net.policy_weights())
             if len(pool) > 8: pool.pop(0)
 
-        if it % 10 == 0:
-            wr, apl = evaluate(net.policy_weights(), n=2000)
+        if it % 20 == 0:
+            wr, apl = evaluate(net.policy_weights(), n=2000, ex=ex)
             tag = ''
             if wr > best:
                 best = wr; no_improve = 0
@@ -280,7 +320,8 @@ def main():
             wins = sum(1 for _, r in games if r > 0)
             print(f'iter {it:4d}  rollout_win {wins/max(len(games),1)*100:4.1f}%  '
                   f'|  greedy vs fleet: win {wr*100:5.2f}%  place {apl:.3f}  '
-                  f'(best {best*100:.2f}%)  {time.time()-t0:.1f}s/it{tag}', flush=True)
+                  f'(best {best*100:.2f}%)  {time.time()-t0:.1f}s/it'
+                  f'  [rollout={t_update-t_rollout:.1f}s  update={t_done-t_update:.1f}s]{tag}', flush=True)
             if no_improve >= args.patience:
                 print(f'stalled: no improvement in {no_improve} evals. stopping.', flush=True)
                 break

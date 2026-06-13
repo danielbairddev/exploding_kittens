@@ -303,7 +303,8 @@ def rollout_worker(args):
     return out
 
 
-def evaluate(policy_w, n=2000, seed=99):
+def _evaluate_chunk(args):
+    policy_w, n, seed = args
     import random as _random
     p = _np(policy_w); rng = _random.Random(seed); npr = np.random.default_rng(seed)
 
@@ -326,4 +327,20 @@ def evaluate(policy_w, n=2000, seed=99):
         place = finish.index(seat) + 1
         games += 1; place_sum += place
         if place == 1: wins += 1
+    return wins, place_sum, games
+
+
+def evaluate(policy_w, n=2000, seed=99, ex=None):
+    if ex is None:
+        wins, place_sum, games = _evaluate_chunk((policy_w, n, seed))
+    else:
+        import math
+        workers = ex._max_workers
+        chunk = math.ceil(n / workers)
+        futs = [ex.submit(_evaluate_chunk, (policy_w, chunk, seed + i))
+                for i in range(workers)]
+        wins = place_sum = games = 0
+        for f in futs:
+            w, p, g = f.result()
+            wins += w; place_sum += p; games += g
     return (wins / games if games else 0.0), (place_sum / games if games else 0.0)
