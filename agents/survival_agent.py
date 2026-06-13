@@ -37,7 +37,7 @@ class SurvivalAgent(Agent):
 
     ARENA = {"name": "Sly", "emoji": "\U0001F98A", "color": "#22d3ee",
              "blurb": "Survives by any means.", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 22}
+             "llm_assisted": True, "stats_version": 23}
 
     def __init__(self, name: str = "Survival", seed: int | None = None):
         self.name = name
