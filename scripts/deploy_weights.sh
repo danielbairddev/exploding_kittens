@@ -23,33 +23,25 @@ fetch_server() {
   local name="$1" src="$2" dst="$3"
   local tmp; tmp=$(mktemp)
   scp -q "$SERVER:$APP_DIR/$src" "$tmp"
-  if ! cmp -s "$tmp" "$REPO/$dst"; then
-    if $DRY_RUN; then
-      echo "  $name: would update (changed)"
-    else
-      cp "$tmp" "$REPO/$dst"
-      echo "  $name: updated"
-      changed+=("$dst")
-    fi
-  else
-    echo "  $name: unchanged"
+  local tag="unchanged"
+  cmp -s "$tmp" "$REPO/$dst" || tag="updated"
+  if ! $DRY_RUN; then
+    cp "$tmp" "$REPO/$dst"
+    changed+=("$dst")
   fi
+  echo "  $name: $tag"
   rm "$tmp"
 }
 
 fetch_local() {
   local name="$1" src="$2" dst="$3"
-  if ! cmp -s "$REPO/$src" "$REPO/$dst"; then
-    if $DRY_RUN; then
-      echo "  $name: would update (changed)"
-    else
-      cp "$REPO/$src" "$REPO/$dst"
-      echo "  $name: updated"
-      changed+=("$dst")
-    fi
-  else
-    echo "  $name: unchanged"
+  local tag="unchanged"
+  cmp -s "$REPO/$src" "$REPO/$dst" || tag="updated"
+  if ! $DRY_RUN; then
+    cp "$REPO/$src" "$REPO/$dst"
+    changed+=("$dst")
   fi
+  echo "  $name: $tag"
 }
 
 fetch_server  "Rhino"      "training/rhino/best_policy.json"   "agents/rhino_weights.json"
