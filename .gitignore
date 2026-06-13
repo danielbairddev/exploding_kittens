@@ -24,3 +24,6 @@ training/mandrill/nope_ckpt.json
 training/mandrill/nope_best.json
 training/abaddon/checkpoint_a.json
 training/abaddon/best_policy_a.json
+training/gabriel/checkpoint.json
+training/gabriel/best_policy.json
+training/gabriel/*.tmp

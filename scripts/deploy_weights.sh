@@ -15,44 +15,36 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
 
-changed=()
-
 echo "=== Fetching weights ==="
 
 fetch_server() {
   local name="$1" src="$2" dst="$3"
   local tmp; tmp=$(mktemp)
   scp -q "$SERVER:$APP_DIR/$src" "$tmp"
-  local tag="unchanged"
-  cmp -s "$tmp" "$REPO/$dst" || tag="updated"
-  if ! $DRY_RUN; then
-    cp "$tmp" "$REPO/$dst"
-    changed+=("$dst")
-  fi
+  local tag="unchanged"; cmp -s "$tmp" "$REPO/$dst" || tag="updated"
+  $DRY_RUN || cp "$tmp" "$REPO/$dst"
   echo "  $name: $tag"
   rm "$tmp"
 }
 
 fetch_local() {
   local name="$1" src="$2" dst="$3"
-  local tag="unchanged"
-  cmp -s "$REPO/$src" "$REPO/$dst" || tag="updated"
-  if ! $DRY_RUN; then
-    cp "$REPO/$src" "$REPO/$dst"
-    changed+=("$dst")
-  fi
+  local tag="unchanged"; cmp -s "$REPO/$src" "$REPO/$dst" || tag="updated"
+  $DRY_RUN || cp "$REPO/$src" "$REPO/$dst"
   echo "  $name: $tag"
 }
 
 fetch_server  "Rhino"      "training/rhino/best_policy.json"   "agents/rhino_weights.json"
 fetch_server  "Orangutan2" "training/gorilla/best_policy.json" "agents/orangutan2_weights.json"
 fetch_local   "Elephant"   "training/elephant/best_policy.json" "agents/elephant_weights.json"
+fetch_local   "Gabriel"   "training/gabriel/best_policy.json"  "agents/gabriel_weights.json"
 
 echo ""
 echo "=== Training log snippets ==="
 ssh "$SERVER" 'grep "new best" /tmp/rhino_train.log 2>/dev/null | tail -1 | sed "s/^/  Rhino:  /"' || true
 ssh "$SERVER" 'grep "new best" /tmp/gorilla_train.log 2>/dev/null | tail -1 | sed "s/^/  Gorilla: /"' || true
 grep "new best" /tmp/elephant_train.log 2>/dev/null | tail -1 | sed 's/^/  Elephant: /' || true
+grep "new best" /tmp/gabriel_train.log 2>/dev/null | tail -1 | sed 's/^/  Gabriel:  /' || true
 
 if $DRY_RUN; then
   echo ""
@@ -77,13 +69,7 @@ echo "=== Committing ==="
 cd "$REPO"
 git add agents/
 
-# Build commit message listing what changed
-weight_list=$(printf '%s\n' "${changed[@]}" | sed 's|agents/||;s|_weights.json||' | paste -sd ', ' -)
-if [[ -z "$weight_list" ]]; then
-  weight_list="no weight changes"
-fi
-
-git commit -m "Deploy weights (${weight_list}); bump stats_version to ${next}.
+git commit -m "Deploy weights (Rhino, Orangutan2, Elephant, Gabriel); bump stats_version to ${next}.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 

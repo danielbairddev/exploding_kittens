@@ -39,6 +39,7 @@ from agents.orangutan_agent import OrangutanAgent
 from agents.orangutan2_agent import Orangutan2Agent
 from agents.rhino_agent import RhinoAgent
 from agents.elephant_agent import ElephantAgent
+from agents.gabriel_agent import GabrielAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.perdition2_agent import Perdition2Agent
@@ -70,6 +71,7 @@ ARENA_BOTS = [
     Perdition2Agent,   # Perdition
     RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
+    GabrielAgent,      # Gabriel (GRU-128, trained to die first)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
@@ -85,7 +87,7 @@ BUILD = {
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v9.json")
+SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
