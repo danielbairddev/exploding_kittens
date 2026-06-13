@@ -81,6 +81,8 @@ class HumanAgent(Agent):
         return self.session.ask_action(state, valid_actions)
 
     def want_to_nope(self, state, action, currently_noped=False):
+        if state.current_player == state.my_id:
+            return False  # never nope your own card
         return self.session.ask_nope(state, action, currently_noped)
 
     def give_card(self, state, requester_id):
