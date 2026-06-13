@@ -43,7 +43,7 @@ class SurvivalAgentV2(SurvivalAgent):
 
     ARENA = {"name": "Sly2", "emoji": "\U0001F99D", "color": "#a78bfa",
              "blurb": "Sly, but steals everything.", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 25}
+             "llm_assisted": True, "stats_version": 26}
 
     def _known_list(self, state: ObservableState):
         """Validated known top cards (list of CardType) or None if stale."""
