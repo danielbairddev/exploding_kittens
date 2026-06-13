@@ -394,13 +394,61 @@ async function startGame() {
 }
 
 // ---- game rendering ----
+let _thinkTimer = null;
+let _thinkPoll  = null;
+let _thinkStart = 0;
+
+function startThinking() {
+  _thinkStart = Date.now();
+  $('turn-banner').className = 'bot-turn';
+  $('banner-icon').textContent = '⏳';
+  $('banner-who').textContent = 'Bots are playing…';
+  $('banner-sub').textContent = '0.0s';
+  $('act-prompt').textContent = 'Bot turns in progress…';
+  $('act-grid').innerHTML = '';
+
+  // Tick elapsed time at 100ms
+  _thinkTimer = setInterval(() => {
+    const sub = document.getElementById('banner-sub');
+    if (sub) sub.textContent = ((Date.now() - _thinkStart) / 1000).toFixed(1) + 's';
+  }, 100);
+
+  // Poll log every 600ms so new events appear as bots play
+  _thinkPoll = setInterval(async () => {
+    if (!SID) return;
+    try {
+      const snap = await (await fetch('/api/play/state?id=' + SID)).json();
+      if (snap.log) renderLog(snap.log);
+      // Show latest log line in banner sub while waiting
+      if (snap.log && snap.log.length) {
+        const last = snap.log[snap.log.length - 1];
+        const sub = document.getElementById('banner-sub');
+        const t = ((Date.now() - _thinkStart) / 1000).toFixed(1);
+        if (sub) sub.textContent = t + 's — ' + last.replace(/[🎉💀🛡️⚔️⏭️🙏🔀🔮⛔🐱💣]/gu, '').trim().slice(0, 40);
+      }
+    } catch(e) {}
+  }, 600);
+}
+
+function stopThinking() {
+  clearInterval(_thinkTimer); _thinkTimer = null;
+  clearInterval(_thinkPoll);  _thinkPoll  = null;
+}
+
 async function send(i) {
   document.querySelectorAll('#act-grid button').forEach(b=>b.disabled=true);
-  const s = await (await fetch('/api/play/act',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:SID, index:i})
-  })).json();
-  render(s);
+  startThinking();
+  try {
+    const s = await (await fetch('/api/play/act',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:SID, index:i})
+    })).json();
+    stopThinking();
+    render(s);
+  } catch(e) {
+    stopThinking();
+    $('banner-who').textContent = 'Connection lost — try refreshing';
+  }
 }
 
 function render(s) {
@@ -570,11 +618,18 @@ async function sendPlace(ds) {
   const slider = document.getElementById('place-slider');
   const pos = slider ? parseInt(slider.value) : Math.floor(ds / 2);
   document.querySelectorAll('#act-grid button').forEach(b => b.disabled = true);
-  const s = await (await fetch('/api/play/act', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({id: SID, index: pos})
-  })).json();
-  render(s);
+  startThinking();
+  try {
+    const s = await (await fetch('/api/play/act', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: SID, index: pos})
+    })).json();
+    stopThinking();
+    render(s);
+  } catch(e) {
+    stopThinking();
+    $('banner-who').textContent = 'Connection lost — try refreshing';
+  }
 }
 
 let _lastLogLen = 0;

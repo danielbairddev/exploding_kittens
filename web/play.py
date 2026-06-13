@@ -102,6 +102,7 @@ class Session:
         self.result = None
         self.action_in = queue.Queue()
         self._cur = None
+        self._last_eid = -1  # last event_id flushed to log
 
         # seat 0 = human, then chosen opponents
         self.human = HumanAgent(self)
@@ -125,14 +126,22 @@ class Session:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
+    def _flush_events(self, state):
+        """Log any new events from state.recent_events since last flush."""
+        new = sorted(
+            [e for e in getattr(state, 'recent_events', [])
+             if e.get('event_id', 0) > self._last_eid],
+            key=lambda e: e.get('event_id', 0)
+        )
+        for ev in new:
+            msg = self._fmt_event(ev)
+            if msg:
+                self.note(msg)
+            self._last_eid = ev.get('event_id', self._last_eid)
+
     def _run(self):
         try:
             self.result = self.engine.play_game(self.n)
-            # log game events so the ticker is populated
-            for ev in (self.result.get("events") or []):
-                msg = self._fmt_event(ev)
-                if msg:
-                    self.note(msg)
         except Exception as exc:
             self.result = {"winner": -1, "error": repr(exc)}
         w = self.result.get("winner", -1)
@@ -164,6 +173,7 @@ class Session:
 
     # ---- decision hooks ----
     def ask_action(self, state, valid):
+        self._flush_events(state)
         self._cur = list(valid)
         self.pending = {
             "kind": "choose_action",
@@ -176,6 +186,7 @@ class Session:
         return chosen
 
     def ask_nope(self, state, action, currently_noped):
+        self._flush_events(state)
         self.pending = {
             "kind": "nope",
             "state": self._state_view(state),
