@@ -137,6 +137,7 @@ def _nope_prob(a2, currently_noped, w):
 
 
 # ---- Exploration (controls play diversity) ----
+# https://www.youtube.com/watch?v=LDzse1-2W8Q
 _EXPLORE_RATE = 0.20  # fraction of turns that explore randomly
 
 

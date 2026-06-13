@@ -14,7 +14,7 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 
 # ---- Exploration (controls play diversity) ----
-
+# https://www.youtube.com/watch?v=LDzse1-2W8Q
 _EXPLORE_RATE = 0.50  # exploration rate
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perdition2_weights.json")

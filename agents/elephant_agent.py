@@ -25,6 +25,7 @@ except ImportError:
     N_EVENT = 39
 
 # ---- Exploration (controls play diversity) ----
+# https://www.youtube.com/watch?v=LDzse1-2W8Q
 _EXPLORE_RATE = 0.30  # fraction of turns that explore randomly
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
