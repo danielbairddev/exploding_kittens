@@ -147,6 +147,7 @@ class Session:
                     'player': ev.get('player', -1),
                     # engine uses 'from_player' for favor/cat_steal, 'target' for attack
                     'target': ev.get('target', ev.get('from_player', -1)),
+                    'log': msg,   # log message in sync with this animation
                 })
             self._last_eid = ev.get('event_id', self._last_eid)
 

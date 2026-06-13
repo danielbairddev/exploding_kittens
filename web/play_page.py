@@ -501,6 +501,8 @@ function _applyStateUpdate(ev) {
     $('act-prompt').textContent = '';
     $('atk-line').style.display = 'none';
     $('again-wrap').style.display = '';
+    // Flush any log lines not covered by anim events (win message, etc.)
+    if (ev.log) renderLog(ev.log);
     return;
   }
 
@@ -544,6 +546,9 @@ function _applyStateUpdate(ev) {
 
   // Players / hand / discard
   renderStateView(st, names);
+
+  // Flush any log lines not emitted by individual anim events (see_future peek, etc.)
+  if (ev.log) renderLog(ev.log);
 
   // Action grid (skip for nope — that's handled by _nope_prompt)
   if (!p || p.kind === 'nope') return;
@@ -595,6 +600,7 @@ function _applyStateUpdate(ev) {
 function _showStageEvent(ev) {
   const cfg = STAGE_CFG[ev.type];
   if (!cfg) return;
+  if (ev.log) appendLogLine(ev.log);
   const stageEl = $('stage');
   if (!stageEl) return;
 
@@ -796,7 +802,6 @@ function startThinking() {
     if (!SID) return;
     try {
       const snap = await (await fetch('/api/play/state?id=' + SID)).json();
-      if (snap.log) renderLog(snap.log);
       if (snap.anim_events) enqueueEvents(snap.anim_events);
       if (snap.log && snap.log.length) {
         const last = snap.log[snap.log.length - 1];
@@ -878,9 +883,6 @@ function render(s) {
   SID = s.id || SID;
   if (s.names) window._curNames = s.names;
 
-  // Log lines are safe to show immediately (no player-state info)
-  renderLog(s.log);
-
   // Queue animation events FIRST so they run before the state update
   if (s.anim_events) enqueueEvents(s.anim_events);
 
@@ -890,7 +892,7 @@ function render(s) {
 
   // Game over — queue everything after animations
   if (s.result) {
-    _animQueue.push({type: '_state_update', result: s.result, names: s.names || []});
+    _animQueue.push({type: '_state_update', result: s.result, names: s.names || [], log: s.log});
     if (!_animRunning) _processQueue();
     return;
   }
@@ -911,7 +913,7 @@ function render(s) {
   const names = st.names || s.names || [];
 
   // Queue EVERYTHING — banner, deck, players, hand, actions — all after animations
-  _animQueue.push({type: '_state_update', st, names, p});
+  _animQueue.push({type: '_state_update', st, names, p, log: s.log});
   if (p.kind === 'nope') _animQueue.push({type: '_nope_prompt', pending: p});
   if (!_animRunning) _processQueue();
 }
@@ -1012,6 +1014,17 @@ function nopeDecide(i) {
 }
 
 let _lastLogLen = 0;
+function appendLogLine(msg) {
+  if (!msg) return;
+  const el = $('log');
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = 'log-line' + (msg.includes('explod') || msg.includes('win') ? ' hot' : '');
+  d.innerHTML = msg.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  _lastLogLen++;
+}
 function renderLog(lines) {
   if (!lines || !lines.length) return;
   const el = $('log');
