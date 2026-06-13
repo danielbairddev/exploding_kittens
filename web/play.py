@@ -1,9 +1,18 @@
 """Play Exploding Kittens vs the bots (human vs AI, no coach)."""
 import queue
+import random
 import threading
 import time
 import uuid
 from collections import Counter
+
+# Unique names drawn for each bot seat so "Elephant 2" etc. never appears.
+_BOT_NAMES = [
+    "Biscuit", "Mittens", "Whiskers", "Noodle", "Mochi",
+    "Pumpkin", "Fuzzy", "Pixel", "Rascal", "Shadow",
+    "Tuxedo", "Claws", "Nimbus", "Velvet", "Socks",
+    "Patches", "Biscotti", "Zigzag", "Fluffy", "Butterscotch",
+]
 
 from agents.base import Agent
 from agents.orangutan_agent import OrangutanAgent
@@ -126,17 +135,20 @@ class Session:
         self.human = HumanAgent(self)
         agents = [self.human]
         display_names = ["You"]
-        counts = {}
-        for nm in opponents:
+        # identities: {type, emoji} parallel to display_names for the frontend
+        self.identities = [{"type": "human", "emoji": "🧍"}]
+
+        name_pool = random.sample(_BOT_NAMES, k=min(len(_BOT_NAMES), len(opponents)))
+        for idx, nm in enumerate(opponents):
             if nm not in PLAYABLE:
                 continue
-            counts[nm] = counts.get(nm, 0) + 1
-            cls, _emoji = PLAYABLE[nm]
-            label = nm if counts[nm] == 1 else f"{nm} {counts[nm]}"
+            cls, emoji = PLAYABLE[nm]
+            label = name_pool[idx % len(name_pool)]
             bot = cls(name=label)
             bot._play_mode = True  # full strength — no explore-rate noise
             agents.append(bot)
             display_names.append(label)
+            self.identities.append({"type": nm, "emoji": emoji})
 
         self.names = display_names
         self.engine = GameEngine(agents, collect_events=True)
@@ -267,7 +279,8 @@ class Session:
         self.pending = {
             "kind": "choose_action",
             "state": self._state_view(state),
-            "valid": [{"i": i, "label": act_label(a, self.names), "type": a.action_type.name}
+            "valid": [{"i": i, "label": act_label(a, self.names), "type": a.action_type.name,
+                       "target": a.target_player}
                       for i, a in enumerate(valid)],
         }
         chosen = self.action_in.get()
@@ -376,6 +389,7 @@ class Session:
             "result": self.result,
             "log": self.log[-20:],
             "names": self.names,
+            "identities": self.identities,
             "anim_events": self._anim_events[-100:],
         }
 

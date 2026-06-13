@@ -251,6 +251,27 @@ button.ghost:hover{border-color:var(--accent2);}
 }
 .dcard:first-child{opacity:1;border-color:var(--muted);}
 
+/* ---- BOT IDENTITY LABEL ---- */
+.player .id{font-size:.58rem;color:var(--muted);margin-top:.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ---- TARGET PICKER (favor / cat) ---- */
+.act-target-group{display:flex;flex-direction:column;gap:.35rem;}
+.tpick-arrow{margin-left:auto;font-size:.75rem;transition:transform .15s;}
+.tpick-trigger.open .tpick-arrow{transform:rotate(180deg);}
+.target-picker{
+  display:none;flex-wrap:wrap;gap:.4rem;padding:.5rem .6rem;
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  animation:fadeIn .12s;
+}
+.target-picker.open{display:flex;}
+.tp-btn{
+  background:var(--surface);border:1.5px solid var(--border);border-radius:9px;
+  padding:.45rem .8rem;color:var(--text);font-size:.85rem;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;gap:.35rem;
+  transition:border-color .12s,background .12s;
+}
+.tp-btn:hover{border-color:var(--accent2);background:#24283a;}
+
 /* ---- ACTIONS ---- */
 .actions-section{margin:.5rem 0;}
 .actions-section .prompt{font-size:.82rem;color:var(--muted);margin-bottom:.55rem;}
@@ -268,7 +289,7 @@ button.ghost:hover{border-color:var(--accent2);}
 .act-btn .act-emo{font-size:1.1rem;flex-shrink:0;}
 
 /* ---- GAME LOG ---- */
-.log-wrap{max-height:260px;overflow-y:auto;margin-top:.3rem;}
+.log-wrap{max-height:260px;overflow-y:auto;margin-top:.3rem;display:flex;flex-direction:column-reverse;}
 .log-line{
   font-size:.8rem;color:var(--muted);
   padding:3px 4px 3px 10px;
@@ -562,13 +583,18 @@ function _applyStateUpdate(ev) {
     $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
     $('banner-sub').textContent = `Game over after ${ev.result.turns||'?'} turns`;
     const survivors = ev.result.survivors || (w >= 0 ? [w] : []);
+    const ids = window._curIdentities || [];
     $('players').innerHTML = names.map((nm, i) => {
       const alive = survivors.includes(i);
       const isWinner = i === w;
+      const id = ids[i] || {};
+      const emoji = i === 0 ? '🧍' : (id.emoji || '🤖');
+      const idLabel = (i > 0 && id.type) ? `<div class="id">${id.type}</div>` : '';
       let cls = 'player' + (i===0?' hero':'') + (!alive?' dead':'') + (isWinner?' winner':'');
       return `<div class="${cls}">
-        <div class="av">${i===0?'🧍':BOT_EMOJI(nm)}</div>
+        <div class="av">${emoji}</div>
         <div class="nm">${nm}</div>
+        ${idLabel}
         <div class="hs">${alive?'🏆 survived':'💀 exploded'}</div>
         <div class="mini-hand"></div>
       </div>`;
@@ -663,15 +689,69 @@ function _applyStateUpdate(ev) {
       </button>`;
     }).join('');
   } else {
-    const opts = p.valid || [];
-    $('act-grid').innerHTML = opts.map(o => {
-      const emo = ACT_EMO[o.type] || '▶';
-      const isDraw = o.type === 'DRAW';
-      const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
-      return `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${o.i})">
-        <span class="act-emo">${emo}</span> ${o.label}
+    renderActionGrid(p.valid || []);
+  }
+}
+
+// Types where multiple buttons = same card played on different targets → collapse to picker
+const _TARGET_TYPES = new Set(['PLAY_FAVOR','PLAY_CAT_PAIR','PLAY_CAT_TRIPLE']);
+
+function renderActionGrid(opts) {
+  // Group by action type
+  const byType = {};
+  opts.forEach(o => (byType[o.type] = byType[o.type] || []).push(o));
+
+  const ids   = window._curIdentities || [];
+  const names = window._curNames || [];
+
+  let html = '';
+  const seen = new Set();
+  for (const o of opts) {
+    if (seen.has(o.type)) continue;
+    seen.add(o.type);
+    const group = byType[o.type];
+    const emo     = ACT_EMO[o.type] || '▶';
+    const isDraw  = o.type === 'DRAW';
+    const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
+    // Strip " → Name" suffix to get bare card label
+    const baseLabel = o.label.replace(/\s*→.*$/, '').trim();
+
+    if (_TARGET_TYPES.has(o.type) && group.length > 1) {
+      // Multiple targets → show picker
+      const btns = group.map(a => {
+        const tgtIdx = a.target ?? -1;
+        const tgtEmoji = (ids[tgtIdx] && ids[tgtIdx].emoji) || '🤖';
+        const tgtName  = names[tgtIdx] || '?';
+        return `<button class="tp-btn" onclick="send(${a.i})">${tgtEmoji} ${tgtName}</button>`;
+      }).join('');
+      html += `<div class="act-target-group">
+        <button class="act-btn tpick-trigger" onclick="toggleTargetPicker(this)">
+          <span class="act-emo">${emo}</span>
+          <span>${baseLabel}</span>
+          <span class="tpick-arrow">▾</span>
+        </button>
+        <div class="target-picker">${btns}</div>
+      </div>`;
+    } else {
+      // Single action or single target — plain button
+      html += `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${group[0].i})">
+        <span class="act-emo">${emo}</span> ${baseLabel}
       </button>`;
-    }).join('');
+    }
+  }
+  $('act-grid').innerHTML = html;
+}
+
+function toggleTargetPicker(btn) {
+  const picker = btn.nextElementSibling;
+  if (!picker) return;
+  const isOpen = picker.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.target-picker').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.tpick-trigger').forEach(b => b.classList.remove('open'));
+  if (!isOpen) {
+    picker.classList.add('open');
+    btn.classList.add('open');
   }
 }
 
@@ -849,6 +929,12 @@ function syncLineup() {
 }
 
 function BOT_EMOJI(nm) {
+  // During a game, use seat-indexed identities (bot names are now unique/random)
+  const names = window._curNames || [];
+  const ids   = window._curIdentities || [];
+  const idx = names.indexOf(nm);
+  if (idx >= 0 && ids[idx] && ids[idx].emoji) return ids[idx].emoji;
+  // Setup phase: look up by bot type name in the picker list
   const found = _botList.find(b=>b.name===nm);
   if (found) return found.emoji;
   if (nm==='Gabriel') return '🪬';
@@ -928,19 +1014,24 @@ async function send(i) {
 }
 
 function renderStateView(st, names) {
+  const ids = window._curIdentities || [];
   $('players').innerHTML = names.map((nm,i) => {
     const alive = st.alive.includes(i);
     const hs = st.hand_sizes?.[String(i)] ?? 0;
     const isCur = i === st.current_player && alive;
     const isHero = i === 0;
+    const id = ids[i] || {};
+    const emoji = isHero ? '🧍' : (id.emoji || '🤖');
+    const idLabel = (!isHero && id.type) ? `<div class="id">${id.type}</div>` : '';
     let cls = 'player';
     if (isCur) cls += ' current';
     if (isHero) cls += ' hero';
     if (!alive) cls += ' dead';
     const miniCards = alive ? Array(Math.min(hs,8)).fill('<i></i>').join('') : '';
     return `<div class="${cls}">
-      <div class="av">${isHero?'🧍':BOT_EMOJI(nm)}</div>
+      <div class="av">${emoji}</div>
       <div class="nm">${nm}</div>
+      ${idLabel}
       <div class="hs">${alive?(hs+' card'+(hs!==1?'s':'')):'💀'}</div>
       <div class="mini-hand">${miniCards}</div>
     </div>`;
@@ -975,6 +1066,7 @@ function renderStateView(st, names) {
 function render(s) {
   SID = s.id || SID;
   if (s.names) window._curNames = s.names;
+  if (s.identities) window._curIdentities = s.identities;
 
   // Queue animation events FIRST so they run before the state update
   if (s.anim_events) enqueueEvents(s.anim_events);
@@ -1132,7 +1224,7 @@ function appendLogLine(msg, evType) {
   const el = $('log');
   if (!el) return;
   el.appendChild(_logLineEl(msg, evType));
-  el.scrollTop = el.scrollHeight;
+  el.scrollTop = 0;
   _lastLogLen++;
 }
 function renderLog(lines) {
@@ -1142,7 +1234,7 @@ function renderLog(lines) {
   newLines.forEach(l => el.appendChild(_logLineEl(l)));
   if (newLines.length) {
     _lastLogLen = lines.length;
-    el.scrollTop = el.scrollHeight;
+    el.scrollTop = 0;
   }
 }
 
