@@ -5,12 +5,18 @@ from a longer training run that achieved a lower win rate.
 """
 import json
 import os
+import random
 from agents.coyote_agent import CoyoteAgent
 from agents.orangutan_features import encode, ACTIONS
 from game.actions import Action, ActionType
 from game.cards import CardType
 
 DEF = CardType.DEFUSE
+
+# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
+# NOTE: Perdition2 is trained to LOSE, so noise HELPS it — more noise = better win rate.
+_ARENA_NOISE = 0.50  # interrupts self-sabotage; tune down if it beats Ian1
+
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perdition2_weights.json")
 
 
@@ -28,7 +34,7 @@ def _load_weights():
 class Perdition2Agent(CoyoteAgent):
     ARENA = {"name": "Perdition2", "emoji": "\U0001F979", "color": "#5c0000",
              "blurb": "\"And he went and hanged himself.\" — Matt 27:5", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 26}
+             "llm_assisted": True, "stats_version": 27}
 
     _WEIGHTS = _load_weights()
 
@@ -47,6 +53,8 @@ class Perdition2Agent(CoyoteAgent):
         return self._matvec(w["W3"], h, w["b3"])
 
     def choose_action(self, state, valid_actions):
+        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+            return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return super().choose_action(state, valid_actions)
 
