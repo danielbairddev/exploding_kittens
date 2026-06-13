@@ -73,8 +73,11 @@ while true; do
     if smoke_test "$remote_sha"; then
       log "smoke ok; pulling"
       git -C "$APP_DIR" checkout -- agents/ 2>/dev/null || true
-      git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
-      restart_dashboard || log "WARN: restart failed"
+      if ! git -C "$APP_DIR" pull --ff-only origin "$BRANCH" >>"$LOG" 2>&1; then
+        log "ERROR: git pull failed — skipping restart"
+      else
+        restart_dashboard || log "WARN: restart failed"
+      fi
     else
       log "smoke FAILED — keeping $short_local running"
     fi
