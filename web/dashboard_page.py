@@ -146,27 +146,7 @@ PAGE = r'''<!DOCTYPE html>
   .feed-row .w { font-weight:600; }
   .feed-row .meta { margin-left:auto; color:var(--muted); font-size:0.74rem; }
 
-  /* ---------------- training progress ---------------- */
-  .row3 { margin-top:1rem; }
-  .train-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:1rem; }
-  @media (max-width:700px){ .train-grid{ grid-template-columns:1fr; } }
-  .train-bot { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:0.8rem 1rem; }
-  .train-bot .tb-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.5rem; }
-  .train-bot .tb-name { font-weight:700; font-size:0.88rem; }
-  .train-bot .tb-stat { font-size:0.72rem; color:var(--muted); text-align:right; }
-  .train-bot .tb-stat b { color:var(--text); }
-  .train-bot .tb-chart { width:100%; height:60px; display:block; }
-  .train-bot .tb-foot { display:flex; justify-content:space-between; margin-top:0.3rem; font-size:0.65rem; color:var(--muted); }
-  .train-none { color:var(--muted); font-size:0.8rem; padding:0.5rem 0; }
-  .tb-ms-head { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-top:0.6rem; margin-bottom:0.25rem; }
-  .tb-milestones { max-height:130px; overflow-y:auto; }
-  .tb-ms { display:flex; justify-content:space-between; align-items:baseline; padding:2px 0; border-bottom:1px solid var(--border); font-size:0.75rem; }
-  .tb-ms:last-child { border-bottom:none; }
-  .tb-ms-win { font-weight:700; }
-  .tb-ms-meta { color:var(--muted); font-size:0.67rem; }
-  .tb-ms-empty { font-size:0.72rem; color:var(--muted); margin-top:0.4rem; }
-
-  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
   @keyframes slideIn { from{opacity:0; transform:translateX(-6px);} to{opacity:1; transform:none;} }
   @keyframes shake { 0%,100%{transform:none;} 20%{transform:translateX(-7px) rotate(-4deg);} 40%{transform:translateX(7px) rotate(4deg);} 60%{transform:translateX(-5px);} 80%{transform:translateX(5px);} }
   @keyframes flashRed { 0%{background:#3a1d22;} 100%{background:var(--surface2);} }
@@ -242,15 +222,7 @@ PAGE = r'''<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- TRAINING PROGRESS -->
-  <div class="row3">
-    <div class="card">
-      <h2>Training Progress <span class="sub" id="train-iter-tag"></span></h2>
-      <div class="train-grid" id="train-grid"><div class="train-none">Waiting for first eval…</div></div>
-    </div>
-  </div>
-
-  <div class="footer">Continuously simulated · stats persist across restarts · logs auto-pruned</div>
+<div class="footer">Continuously simulated · stats persist across restarts · logs auto-pruned</div>
 </div>
 
 <script>
@@ -545,116 +517,6 @@ async function replayLoop(){
 pollStats();
 replayLoop();
 
-/* ---------------- training progress ---------------- */
-const TRAIN_COLORS = { Rhino:'#6b7280', Gorilla:'#f97316', Elephant:'#7c3aed' };
-const TRAIN_EMOJI  = { Rhino:'🦏', Gorilla:'🦍', Elephant:'🐘' };
-
-function trainChart(pts, color){
-  const W=300, H=60, pad=4;
-  if(!pts.length) return `<svg class="tb-chart" viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2+5}" text-anchor="middle" fill="#64748b" font-size="11">no data yet</text></svg>`;
-  const wins = pts.map(p=>p.win);
-  const bests = pts.map(p=>p.best);
-  const minV = Math.min(...wins, ...bests);
-  const maxV = Math.max(...wins, ...bests);
-  const span = (maxV - minV) || 1;
-  const x = i => (pad + (i/(pts.length-1||1))*(W-pad*2)).toFixed(1);
-  const y = v => (H - pad - ((v-minV)/span)*(H-pad*2)).toFixed(1);
-  const winLine  = pts.map((p,i)=>`${x(i)},${y(p.win)}`).join(' ');
-  const bestLine = pts.map((p,i)=>`${x(i)},${y(p.best)}`).join(' ');
-  // shaded area under win line
-  const area = `${x(0)},${H-pad} ` + winLine + ` ${x(pts.length-1)},${H-pad}`;
-  return `<svg class="tb-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <polygon points="${area}" fill="${color}" opacity="0.12"/>
-    <polyline points="${bestLine}" fill="none" stroke="${color}" stroke-width="1" stroke-dasharray="3,2" opacity="0.5" vector-effect="non-scaling-stroke"/>
-    <polyline points="${winLine}"  fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>
-  </svg>`;
-}
-
-function fmtAge(t){
-  const s = Math.floor(Date.now()/1000 - t);
-  if(s < 90) return `${s}s ago`;
-  if(s < 3600) return `${Math.floor(s/60)}m ago`;
-  if(s < 86400) return `${Math.floor(s/3600)}h ago`;
-  return `${Math.floor(s/86400)}d ago`;
-}
-
-function renderTraining(data){
-  const bots = ['Rhino','Gorilla','Elephant'];
-  const anyData = bots.some(b => data[b] && (data[b].points||[]).length > 0);
-  if(!anyData){
-    $('train-grid').innerHTML = '<div class="train-none">Waiting for first eval (iter 10)…</div>';
-    return;
-  }
-  $('train-grid').innerHTML = bots.map(name => {
-    const entry = data[name] || {};
-    const pts = entry.points || [];
-    const bests = entry.bests || [];
-    const color = TRAIN_COLORS[name];
-    const emoji = TRAIN_EMOJI[name];
-    const label = name === 'Gorilla' ? 'Orangutan2' : name;
-    if(!pts.length) return `<div class="train-bot">
-      <div class="tb-head"><span class="tb-name">${emoji} ${label}</span><span class="tb-stat">not running</span></div>
-      ${trainChart([], color)}
-    </div>`;
-    const last = pts[pts.length-1];
-    const milestonesHtml = bests.length
-      ? `<div class="tb-milestones">${[...bests].reverse().slice(0,8).map(b=>`
-          <div class="tb-ms"><span class="tb-ms-win" style="color:${color}">${b.win.toFixed(2)}%</span><span class="tb-ms-meta">iter ${b.iter} · place ${b.place} · ${fmtAge(b.t)}</span></div>`).join('')}
-        </div>`
-      : `<div class="tb-ms-empty">No bests saved yet — writes on new session</div>`;
-    return `<div class="train-bot">
-      <div class="tb-head">
-        <span class="tb-name">${emoji} ${label}</span>
-        <span class="tb-stat">win <b>${last.win.toFixed(1)}%</b> · best <b>${last.best.toFixed(1)}%</b></span>
-      </div>
-      ${trainChart(pts, color)}
-      <div class="tb-foot"><span>iter ${last.iter}</span><span>place ${last.place.toFixed(2)}</span></div>
-      <div class="tb-ms-head">Best milestones</div>
-      ${milestonesHtml}
-    </div>`;
-  }).join('');
-}
-
-// Track best seen per bot so we can fire a notification on improvement
-const _trainBest = {};
-
-function _notifyNewBest(name, pct){
-  const label = name === 'Gorilla' ? 'Orangutan2' : name;
-  const emoji = TRAIN_EMOJI[name];
-  if(Notification.permission === 'granted'){
-    new Notification(`${emoji} ${label} — new best!`, {
-      body: `${pct.toFixed(2)}% greedy win rate vs full fleet`,
-      icon: '/favicon.ico',
-      tag: `train-best-${name}`,  // replaces previous notification for same bot
-    });
-  }
-  // Also flash the card border briefly
-  const cards = document.querySelectorAll('.train-bot');
-  cards.forEach(c=>{ if(c.querySelector('.tb-name')?.textContent.includes(label)){ c.style.outline='2px solid var(--green)'; setTimeout(()=>c.style.outline='',4000); }});
-}
-
-async function pollTraining(){
-  // Ask for notification permission once on first poll
-  if(Notification.permission === 'default') Notification.requestPermission();
-  while(true){
-    try{
-      const d = await (await fetch('/api/training')).json();
-      // Check for new bests before rendering
-      for(const [name, entry] of Object.entries(d)){
-        const pts = entry.points || [];
-        if(!pts.length) continue;
-        const best = pts[pts.length-1].best;
-        if(_trainBest[name] !== undefined && best > _trainBest[name] + 0.001){
-          _notifyNewBest(name, best);
-        }
-        _trainBest[name] = best;
-      }
-      renderTraining(d);
-    }catch(e){}
-    await new Promise(r=>setTimeout(r,30000));
-  }
-}
-pollTraining();
 </script>
 </body>
 </html>'''

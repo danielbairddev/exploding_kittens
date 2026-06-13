@@ -72,6 +72,7 @@ while true; do
     log "origin/$BRANCH moved: $short_local -> $short_remote"
     if smoke_test "$remote_sha"; then
       log "smoke ok; pulling"
+      git -C "$APP_DIR" checkout -- agents/ 2>/dev/null || true
       git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
       restart_dashboard || log "WARN: restart failed"
     else
