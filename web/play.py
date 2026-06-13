@@ -145,7 +145,8 @@ class Session:
                     'id': ev.get('event_id', 0),
                     'type': t,
                     'player': ev.get('player', -1),
-                    'target': ev.get('target', -1),
+                    # engine uses 'from_player' for favor/cat_steal, 'target' for attack
+                    'target': ev.get('target', ev.get('from_player', -1)),
                 })
             self._last_eid = ev.get('event_id', self._last_eid)
 
@@ -162,7 +163,8 @@ class Session:
         t = ev.get("type", "")
         p = ev.get("player", -1)
         nm = self.names[p] if 0 <= p < len(self.names) else f"P{p}"
-        tgt = ev.get("target", -1)
+        # engine uses 'target' for attack but 'from_player' for favor/cat_steal
+        tgt = ev.get("target", ev.get("from_player", -1))
         tnm = self.names[tgt] if 0 <= tgt < len(self.names) else f"P{tgt}"
         card = ev.get("card", "")
         if t == "draw":        return f"{nm} draws a card"

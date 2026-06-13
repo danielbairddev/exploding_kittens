@@ -183,6 +183,22 @@ button.ghost:hover{border-color:var(--accent2);}
 .fl-yellow{animation:flYellow .75s ease-in-out !important;}
 .fl-purple{animation:flPurple .75s ease-in-out !important;}
 
+/* Player action bubbles */
+.player-pop{
+  position:absolute;bottom:calc(100% + 6px);left:50%;
+  transform:translateX(-50%);
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:10px;padding:4px 9px;font-size:.72rem;font-weight:700;
+  white-space:nowrap;pointer-events:none;z-index:20;
+  animation:playerPopFade var(--pop-dur, 1.8s) ease-in-out forwards;
+}
+@keyframes playerPopFade{
+  0%  {opacity:0;transform:translateX(-50%) translateY(6px);}
+  15% {opacity:1;transform:translateX(-50%) translateY(0);}
+  70% {opacity:1;}
+  100%{opacity:0;transform:translateX(-50%) translateY(-10px);}
+}
+
 /* ---- PLAYING CARDS (hand) ---- */
 .hand-wrap{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 .2rem;}
 .pcard{
@@ -343,11 +359,12 @@ button.ghost:hover{border-color:var(--accent2);}
       <h2>Game log <span class="speed-ctrl">
         Speed:
         <select id="anim-speed">
-          <option value="1400">Slow</option>
+          <option value="5000">Glacial</option>
+          <option value="2500">Very slow</option>
+          <option value="1400" selected>Slow</option>
           <option value="700">Normal</option>
-          <option value="320" selected>Fast</option>
-          <option value="140">Very fast</option>
-          <option value="55">Turbo</option>
+          <option value="280">Fast</option>
+          <option value="80">Turbo</option>
         </select>
       </span></h2>
       <div class="log-wrap" id="log"></div>
@@ -391,17 +408,17 @@ const ACT_EMO = {
 // ---- Animation stage config ----
 // Maps event type → {icon, cls, flash for actor, flashTarget, sub(nm, tnm)}
 const STAGE_CFG = {
-  explode:      {icon:'💣', cls:'ev-explode', flash:'fl-red',    sub:(nm)       => `${nm} EXPLODES!`},
-  defuse:       {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',  sub:(nm)       => `${nm} defuses it!`},
-  attack:       {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} attacks ${tnm}`},
-  skip:         {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} skips`},
-  favor:        {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, sub:(nm,tnm) => `${nm} favors ${tnm}`},
-  shuffle:      {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} shuffles the deck`},
-  see_future:   {icon:'🔮', cls:'ev-future',  flash:'fl-purple', sub:(nm)       => `${nm} sees the future`},
-  nope:         {icon:'⛔', cls:'ev-nope',    flash:'fl-red',    sub:(nm)       => `${nm} plays Nope!`},
-  action_noped: {icon:'🚫', cls:'ev-nope',    flash:null,        sub:(nm)       => `Action noped — cancelled!`},
-  cat_steal:    {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} steals from ${tnm}`},
-  draw:         {icon:'🂠', cls:'',           flash:null,        sub:(nm)       => `${nm} draws`},
+  explode:      {icon:'💣', cls:'ev-explode', flash:'fl-red',                                 popText:'💣 BOOM!',         sub:(nm)       => `${nm} EXPLODES!`},
+  defuse:       {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',                               popText:'🛡️ defused!',      sub:(nm)       => `${nm} defuses it!`},
+  attack:       {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, popText:'⚔️ attacks!', popTgt:'💥 targeted', sub:(nm,tnm) => `${nm} attacks ${tnm}`},
+  skip:         {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'⏭️ skips',         sub:(nm)       => `${nm} skips`},
+  favor:        {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, popText:'🙏 favors',   popTgt:'🎁 lost a card', sub:(nm,tnm) => `${nm} favors ${tnm}`},
+  shuffle:      {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'🔀 shuffles',      sub:(nm)       => `${nm} shuffles the deck`},
+  see_future:   {icon:'🔮', cls:'ev-future',  flash:'fl-purple',                               popText:'🔮 peeks',         sub:(nm)       => `${nm} sees the future`},
+  nope:         {icon:'⛔', cls:'ev-nope',    flash:'fl-red',                                 popText:'⛔ NOPE!',         sub:(nm)       => `${nm} plays Nope!`},
+  action_noped: {icon:'🚫', cls:'ev-nope',    flash:null,                                      popText:null,               sub:()         => `Action cancelled by Nope!`},
+  cat_steal:    {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, popText:'🐱 steals!',  popTgt:'🎴 stolen from', sub:(nm,tnm) => `${nm} steals from ${tnm}`},
+  draw:         {icon:'🂠', cls:'',           flash:null,                                      popText:null,               sub:(nm)       => `${nm} draws`},
 };
 
 // Action type → display emoji for nope stack
@@ -434,17 +451,26 @@ function _processQueue() {
   if (!_animQueue.length) { _animRunning = false; return; }
   _animRunning = true;
   const ev = _animQueue.shift();
-  _animCursor = Math.max(_animCursor, ev.id);
-  _showStageEvent(ev);
+  if (ev.id !== undefined) _animCursor = Math.max(_animCursor, ev.id);
+  const cont = _showStageEvent(ev);
+  if (cont === false) return; // nope prompt took over; stop queue
   const t = setTimeout(_processQueue, getSpeed());
   _animTimers.push(t);
 }
 
 function _showStageEvent(ev) {
+  if (ev.type === '_nope_prompt') {
+    // Nope prompt injected into queue — show it now
+    _animRunning = false;
+    renderNopeStack(ev.pending);
+    if (ev.log) renderLog(ev.log);
+    return false; // signal: don't schedule next
+  }
+
   const cfg = STAGE_CFG[ev.type];
-  if (!cfg) return;
+  if (!cfg) return true;
   const stageEl = $('stage');
-  if (!stageEl) return;
+  if (!stageEl) return true;
 
   const names = window._curNames || [];
   const nm  = names[ev.player] || (ev.player >= 0 ? `P${ev.player}` : '');
@@ -456,12 +482,20 @@ function _showStageEvent(ev) {
     <div class="stage-text">${cfg.sub(nm, tnm)}</div>
   `;
 
-  // Flash actor
+  // Flash + popup actor
   if (cfg.flash && ev.player >= 0) _flashPlayer(ev.player, cfg.flash);
-  // Flash target after a beat
-  if (cfg.tgt && ev.target >= 0 && cfg.flashTgt) {
-    const t2 = setTimeout(() => _flashPlayer(ev.target, cfg.flashTgt), 180);
-    _animTimers.push(t2);
+  if (cfg.popText && ev.player >= 0) _popAbovePlayer(ev.player, cfg.popText, null);
+
+  // Flash + popup target after a beat
+  if (cfg.tgt && ev.target >= 0) {
+    if (cfg.flashTgt) {
+      const t2 = setTimeout(() => _flashPlayer(ev.target, cfg.flashTgt), 200);
+      _animTimers.push(t2);
+    }
+    if (cfg.popTgt) {
+      const t3 = setTimeout(() => _popAbovePlayer(ev.target, cfg.popTgt, 'var(--red)'), 200);
+      _animTimers.push(t3);
+    }
   }
 
   // Hide stage after delay
@@ -470,6 +504,8 @@ function _showStageEvent(ev) {
     const el = $('stage');
     if (el && !_animQueue.length) el.className = '';
   }, getSpeed() * 2.2);
+
+  return true;
 }
 
 function _flashPlayer(idx, cls) {
@@ -481,6 +517,25 @@ function _flashPlayer(idx, cls) {
   void cards[idx].offsetWidth; // force reflow to restart animation
   cards[idx].classList.add(cls);
   const t = setTimeout(() => { if (cards[idx]) cards[idx].classList.remove(cls); }, 850);
+  _animTimers.push(t);
+}
+
+function _popAbovePlayer(idx, text, borderColor) {
+  const players = $('players');
+  if (!players) return;
+  const cards = players.querySelectorAll('.player');
+  if (!cards[idx]) return;
+  // Remove any existing popup on this player
+  const old = cards[idx].querySelector('.player-pop');
+  if (old) old.remove();
+  const dur = Math.max(getSpeed() * 2.5, 1400);
+  const pop = document.createElement('div');
+  pop.className = 'player-pop';
+  pop.style.setProperty('--pop-dur', dur + 'ms');
+  if (borderColor) pop.style.borderColor = borderColor;
+  pop.textContent = text;
+  cards[idx].appendChild(pop);
+  const t = setTimeout(() => { if (pop.parentNode) pop.remove(); }, dur + 100);
   _animTimers.push(t);
 }
 
@@ -650,6 +705,51 @@ async function send(i) {
   }
 }
 
+function renderStateView(st, names) {
+  $('players').innerHTML = names.map((nm,i) => {
+    const alive = st.alive.includes(i);
+    const hs = st.hand_sizes?.[String(i)] ?? 0;
+    const isCur = i === st.current_player && alive;
+    const isHero = i === 0;
+    let cls = 'player';
+    if (isCur) cls += ' current';
+    if (isHero) cls += ' hero';
+    if (!alive) cls += ' dead';
+    const miniCards = alive ? Array(Math.min(hs,8)).fill('<i></i>').join('') : '';
+    return `<div class="${cls}">
+      <div class="av">${isHero?'🧍':BOT_EMOJI(nm)}</div>
+      <div class="nm">${nm}</div>
+      <div class="hs">${alive?(hs+' card'+(hs!==1?'s':'')):'💀'}</div>
+      <div class="mini-hand">${miniCards}</div>
+    </div>`;
+  }).join('');
+
+  if (st.my_hand && st.my_hand.length > 0) {
+    $('hand').innerHTML = st.my_hand.map(c => {
+      const cd = CARD_DATA[c.type] || {e:'🃏',l:c.type};
+      return `<div class="pcard" data-t="${c.type}" title="${nice(c.type)}">
+        <div class="emo">${cd.e}</div>
+        <div class="lbl">${cd.l}</div>
+        ${c.n > 1 ? `<div class="cnt">×${c.n}</div>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Empty hand</span>';
+  }
+
+  if (st.discard_pile && st.discard_pile.length) {
+    const disc = [...st.discard_pile].reverse();
+    $('discard').innerHTML = disc.map((t,idx) => {
+      const cd = CARD_DATA[t] || {e:'🃏'};
+      return `<div class="dcard" title="${nice(t)}" style="${idx===0?`border-color:${cd.c||'var(--muted)'}`:''}">
+        ${cd.e}
+      </div>`;
+    }).join('');
+  } else {
+    $('discard').innerHTML = '<span class="muted" style="font-size:.78rem">Empty</span>';
+  }
+}
+
 function render(s) {
   SID = s.id || SID;
   if (s.names) window._curNames = s.names;
@@ -657,9 +757,9 @@ function render(s) {
   // Enqueue any new animation events
   if (s.anim_events) enqueueEvents(s.anim_events);
 
-  // Clear nope overlay by default
+  // Clear nope overlay (will be re-shown by queue when its turn comes)
   const _nopeEl = $('nope-overlay');
-  if (_nopeEl && (!s.pending || s.pending.kind !== 'nope')) _nopeEl.className = '';
+  if (_nopeEl) _nopeEl.className = '';
 
   // Game over
   if (s.result) {
@@ -710,23 +810,24 @@ function render(s) {
   const st = p.state;
   const names = st.names || s.names || [];
 
-  // Nope stack overlay
-  if (p.kind === 'nope') {
-    renderNopeStack(p);
-  } else {
-    const no = $('nope-overlay');
-    if (no) no.className = '';
-  }
-
   // Turn banner
   const isYourTurn = p.kind === 'choose_action' && st.current_player === 0;
   const isNope = p.kind === 'nope';
   const isPrompt = p.kind === 'give' || p.kind === 'place_exact';
   if (isNope) {
-    $('turn-banner').className = 'prompt-turn fadein';
-    $('banner-icon').textContent = '⛔';
-    $('banner-who').textContent = p.currently_noped ? 'Counter-nope opportunity!' : 'Nope opportunity!';
+    // Show game state, but queue the nope overlay to appear after animations
+    $('turn-banner').className = 'prompt-turn';
+    $('banner-icon').textContent = '⚡';
+    $('banner-who').textContent = 'Nope opportunity incoming…';
     $('banner-sub').textContent = p.action_label || '';
+    $('act-prompt').textContent = '';
+    $('act-grid').innerHTML = '';
+    // Render players/hand/discard now so state is visible
+    renderStateView(st, names);
+    // Inject the nope prompt at the END of the animation queue
+    _animQueue.push({type: '_nope_prompt', pending: p, log: s.log});
+    if (!_animRunning) _processQueue();
+    return;
   } else if (isYourTurn) {
     $('turn-banner').className = 'your-turn fadein';
     $('banner-icon').textContent = '🧍';
@@ -753,50 +854,7 @@ function render(s) {
     $('atk-line').style.display = 'none';
   }
 
-  $('players').innerHTML = names.map((nm,i) => {
-    const alive = st.alive.includes(i);
-    const hs = st.hand_sizes?.[String(i)] ?? 0;
-    const isCur = i === st.current_player && alive;
-    const isHero = i === 0;
-    const isWinner = !!(s.result && s.result.winner === i);
-    let cls = 'player';
-    if (isCur) cls += ' current';
-    if (isHero) cls += ' hero';
-    if (!alive) cls += ' dead';
-    if (isWinner) cls += ' winner';
-    const miniCards = alive ? Array(Math.min(hs,8)).fill('<i></i>').join('') : '';
-    return `<div class="${cls}">
-      <div class="av">${isHero?'🧍':BOT_EMOJI(nm)}</div>
-      <div class="nm">${nm}</div>
-      <div class="hs">${alive?(hs+' card'+(hs!==1?'s':'')):'💀'}</div>
-      <div class="mini-hand">${miniCards}</div>
-    </div>`;
-  }).join('');
-
-  if (st.my_hand && st.my_hand.length > 0) {
-    $('hand').innerHTML = st.my_hand.map(c => {
-      const cd = CARD_DATA[c.type] || {e:'🃏',l:c.type};
-      return `<div class="pcard" data-t="${c.type}" title="${nice(c.type)}">
-        <div class="emo">${cd.e}</div>
-        <div class="lbl">${cd.l}</div>
-        ${c.n > 1 ? `<div class="cnt">×${c.n}</div>` : ''}
-      </div>`;
-    }).join('');
-  } else {
-    $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Empty hand</span>';
-  }
-
-  if (st.discard_pile && st.discard_pile.length) {
-    const disc = [...st.discard_pile].reverse();
-    $('discard').innerHTML = disc.map((t,i) => {
-      const cd = CARD_DATA[t] || {e:'🃏'};
-      return `<div class="dcard" title="${nice(t)}" style="${i===0?`border-color:${cd.c||'var(--muted)'}`:''}">
-        ${cd.e}
-      </div>`;
-    }).join('');
-  } else {
-    $('discard').innerHTML = '<span class="muted" style="font-size:.78rem">Empty</span>';
-  }
+  renderStateView(st, names);
 
   $('act-prompt').textContent = p.kind === 'nope' ? '' :
     (p.note || (p.kind==='choose_action'?'Choose your action:':'Choose:'));
@@ -838,6 +896,12 @@ function render(s) {
 }
 
 function renderNopeStack(p) {
+  // Update banner now that animations have played and nope is shown
+  $('turn-banner').className = 'prompt-turn fadein';
+  $('banner-icon').textContent = '⛔';
+  $('banner-who').textContent = p.currently_noped ? 'Counter-nope opportunity!' : 'Nope opportunity!';
+  $('banner-sub').textContent = p.action_label || '';
+
   const el = $('nope-overlay');
   if (!el) return;
 
