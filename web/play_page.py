@@ -407,18 +407,21 @@ const ACT_EMO = {
 
 // ---- Animation stage config ----
 // Maps event type → {icon, cls, flash for actor, flashTarget, sub(nm, tnm)}
+// Conjugate verb: strip trailing 's' for "You"
+const _v = (nm, w) => nm === 'You' ? w.replace(/s$/, '') : w;
+
 const STAGE_CFG = {
   explode:      {icon:'💣', cls:'ev-explode', flash:'fl-red',                                 popText:'💣 BOOM!',         sub:(nm)       => `${nm} EXPLODES!`},
   defuse:       {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',                               popText:'🛡️ defused!',      sub:(nm)       => `${nm} defuses it!`},
-  attack:       {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, popText:'⚔️ attacks!', popTgt:'💥 targeted', sub:(nm,tnm) => `${nm} attacks ${tnm}`},
-  skip:         {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'⏭️ skips',         sub:(nm)       => `${nm} skips`},
-  favor:        {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, popText:'🙏 favors',   popTgt:'🎁 lost a card', sub:(nm,tnm) => `${nm} favors ${tnm}`},
-  shuffle:      {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'🔀 shuffles',      sub:(nm)       => `${nm} shuffles the deck`},
-  see_future:   {icon:'🔮', cls:'ev-future',  flash:'fl-purple',                               popText:'🔮 peeks',         sub:(nm)       => `${nm} sees the future`},
+  attack:       {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, popText:'⚔️ attacks!', popTgt:'💥 targeted', sub:(nm,tnm) => `${nm} ${_v(nm,'attacks')} ${tnm}`},
+  skip:         {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'⏭️ skips',         sub:(nm)       => `${nm} ${_v(nm,'skips')}`},
+  favor:        {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, popText:'🙏 favors',   popTgt:'🎁 lost a card', sub:(nm,tnm) => `${nm} ${_v(nm,'favors')} ${tnm}`},
+  shuffle:      {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow',                               popText:'🔀 shuffles',      sub:(nm)       => `${nm} ${_v(nm,'shuffles')} the deck`},
+  see_future:   {icon:'🔮', cls:'ev-future',  flash:'fl-purple',                               popText:'🔮 peeks',         sub:(nm)       => `${nm} ${_v(nm,'sees')} the future`},
   nope:         {icon:'⛔', cls:'ev-nope',    flash:'fl-red',                                 popText:'⛔ NOPE!',         sub:(nm)       => `${nm} plays Nope!`},
   action_noped: {icon:'🚫', cls:'ev-nope',    flash:null,                                      popText:null,               sub:()         => `Action cancelled by Nope!`},
-  cat_steal:    {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, popText:'🐱 steals!',  popTgt:'🎴 stolen from', sub:(nm,tnm) => `${nm} steals from ${tnm}`},
-  draw:         {icon:'🂠', cls:'',           flash:null,                                      popText:null,               sub:(nm)       => `${nm} draws`},
+  cat_steal:    {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, popText:'🐱 steals!',  popTgt:'🎴 stolen from', sub:(nm,tnm) => `${nm} ${_v(nm,'steals')} from ${tnm}`},
+  draw:         {icon:'🂠', cls:'',           flash:null,                                      popText:null,               sub:(nm)       => `${nm} ${_v(nm,'draws')}`},
 };
 
 // Action type → display emoji for nope stack
