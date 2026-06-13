@@ -137,7 +137,7 @@ def _nope_prob(a2, currently_noped, w):
 
 
 # ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.35  # fraction of turns replaced with a random valid action
+_ARENA_NOISE = 0.40  # fraction of turns replaced with a random valid action
 
 
 class RhinoAgent(Agent):
