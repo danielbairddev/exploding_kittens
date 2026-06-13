@@ -90,6 +90,26 @@ button.ghost:hover{border-color:var(--accent2);}
 .banner-deck{margin-left:auto;text-align:right;font-size:.82rem;color:var(--muted);}
 .banner-deck b{color:var(--text);font-size:.95rem;}
 
+/* ---- STAGE (bot action animations) ---- */
+#stage{
+  border-radius:14px;padding:1.2rem;margin-bottom:.9rem;
+  background:var(--surface);border:1.5px solid var(--border);
+  text-align:center;position:relative;display:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+#stage.active{display:block;}
+#stage.ev-explode{border-color:#ef4444;box-shadow:0 0 50px -8px #ef4444;}
+#stage.ev-defuse {border-color:var(--green);box-shadow:0 0 40px -8px var(--green);}
+#stage.ev-nope   {border-color:var(--red);box-shadow:0 0 30px -6px var(--red);}
+#stage.ev-attack {border-color:var(--accent);box-shadow:0 0 30px -6px var(--accent);}
+#stage.ev-cat    {border-color:var(--pink);box-shadow:0 0 24px -6px var(--pink);}
+#stage.ev-favor  {border-color:#c084fc;box-shadow:0 0 24px -6px #c084fc;}
+#stage.ev-shuffle{border-color:#2dd4bf;box-shadow:0 0 24px -6px #2dd4bf;}
+#stage.ev-future {border-color:var(--accent2);box-shadow:0 0 24px -6px var(--accent2);}
+.stage-icon{font-size:2.8rem;line-height:1;animation:stagePop .35s cubic-bezier(.17,.67,.36,1.4) forwards;}
+.stage-text{font-size:1.05rem;font-weight:700;margin-top:.5rem;}
+.stage-sub{font-size:.82rem;color:var(--muted);margin-top:.2rem;}
+
 /* Players row */
 .players{display:grid;grid-template-columns:repeat(5,1fr);gap:.45rem;margin-bottom:.9rem;}
 @media(max-width:600px){.players{grid-template-columns:repeat(3,1fr);}}
@@ -109,6 +129,16 @@ button.ghost:hover{border-color:var(--accent2);}
 .player.winner{border-color:var(--yellow);box-shadow:0 0 24px -4px var(--yellow);}
 .player.winner::after{content:"👑";position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:1.1rem;}
 .player .pop{position:absolute;top:-6px;right:-4px;font-size:1rem;animation:popUp .9s ease-out forwards;pointer-events:none;}
+
+/* Player flash effects */
+@keyframes flRed   {0%,100%{background:var(--surface2);}50%{background:rgba(248,113,113,.25);box-shadow:inset 0 0 20px rgba(248,113,113,.3);}}
+@keyframes flGreen {0%,100%{background:var(--surface2);}50%{background:rgba(74,222,128,.2);box-shadow:inset 0 0 20px rgba(74,222,128,.25);}}
+@keyframes flYellow{0%,100%{background:var(--surface2);}50%{background:rgba(251,191,36,.18);box-shadow:inset 0 0 20px rgba(251,191,36,.22);}}
+@keyframes flPurple{0%,100%{background:var(--surface2);}50%{background:rgba(192,132,252,.18);box-shadow:inset 0 0 20px rgba(192,132,252,.22);}}
+.fl-red   {animation:flRed    .75s ease-in-out !important;}
+.fl-green {animation:flGreen  .75s ease-in-out !important;}
+.fl-yellow{animation:flYellow .75s ease-in-out !important;}
+.fl-purple{animation:flPurple .75s ease-in-out !important;}
 
 /* ---- PLAYING CARDS (hand) ---- */
 .hand-wrap{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 .2rem;}
@@ -173,6 +203,13 @@ button.ghost:hover{border-color:var(--accent2);}
 .log-line b{color:var(--text);}
 .log-line.hot b{color:var(--accent);}
 
+/* Speed control */
+.speed-ctrl{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--muted);}
+.speed-ctrl select{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:5px;font-size:.7rem;padding:2px 5px;cursor:pointer;
+}
+
 /* ---- GAMEOVER ---- */
 .gameover{font-size:1.3rem;font-weight:700;text-align:center;padding:1.5rem;color:var(--yellow);}
 
@@ -180,7 +217,7 @@ button.ghost:hover{border-color:var(--accent2);}
 @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
 @keyframes slideIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
 @keyframes popUp{0%{opacity:1;transform:translateY(0);}100%{opacity:0;transform:translateY(-28px);}}
-@keyframes flashRed{0%,100%{background:transparent;}50%{background:rgba(248,113,113,.15);}}
+@keyframes stagePop{from{transform:scale(.5);opacity:0;}to{transform:scale(1);opacity:1;}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 .fadein{animation:fadeIn .35s forwards;}
 </style>
@@ -229,6 +266,9 @@ button.ghost:hover{border-color:var(--accent2);}
       </div>
     </div>
 
+    <!-- Stage (bot action animations) -->
+    <div id="stage"></div>
+
     <!-- Players -->
     <div class="players" id="players"></div>
 
@@ -254,7 +294,16 @@ button.ghost:hover{border-color:var(--accent2);}
 
     <!-- Game log -->
     <div class="card">
-      <h2>Game log</h2>
+      <h2>Game log <span class="speed-ctrl">
+        Speed:
+        <select id="anim-speed">
+          <option value="1400">Slow</option>
+          <option value="700">Normal</option>
+          <option value="320" selected>Fast</option>
+          <option value="140">Very fast</option>
+          <option value="55">Turbo</option>
+        </select>
+      </span></h2>
       <div class="log-wrap" id="log"></div>
       <div style="margin-top:.7rem;display:none" id="again-wrap">
         <button class="ghost" id="again-btn">New game</button>
@@ -293,9 +342,108 @@ const ACT_EMO = {
   PLACE:'📍',
 };
 
+// ---- Animation stage config ----
+// Maps event type → {icon, cls, flash for actor, flashTarget, sub(nm, tnm)}
+const STAGE_CFG = {
+  explode:    {icon:'💣', cls:'ev-explode', flash:'fl-red',    sub:(nm)       => `${nm} EXPLODES!`},
+  defuse:     {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',  sub:(nm)       => `${nm} defuses it!`},
+  attack:     {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} attacks ${tnm}`},
+  skip:       {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} skips`},
+  favor:      {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, sub:(nm,tnm) => `${nm} favors ${tnm}`},
+  shuffle:    {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} shuffles the deck`},
+  see_future: {icon:'🔮', cls:'ev-future',  flash:'fl-purple', sub:(nm)       => `${nm} sees the future`},
+  nope:       {icon:'⛔', cls:'ev-nope',    flash:'fl-red',    sub:(nm)       => `${nm} nopes it!`},
+  cat_steal:  {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} steals from ${tnm}`},
+  draw:       {icon:'🂠', cls:'',           flash:null,        sub:(nm)       => `${nm} draws`},
+};
+
+// ---- Animation queue state ----
+let _animQueue   = [];
+let _animCursor  = -1;
+let _animRunning = false;
+let _animTimers  = [];
+let _stageHide   = null;
+
+function getSpeed() {
+  const el = document.getElementById('anim-speed');
+  return el ? parseInt(el.value) : 320;
+}
+
+function enqueueEvents(events) {
+  if (!events || !events.length) return;
+  const novel = events.filter(e => e.id > _animCursor);
+  if (!novel.length) return;
+  _animQueue.push(...novel);
+  if (!_animRunning) _processQueue();
+}
+
+function _processQueue() {
+  if (!_animQueue.length) { _animRunning = false; return; }
+  _animRunning = true;
+  const ev = _animQueue.shift();
+  _animCursor = Math.max(_animCursor, ev.id);
+  _showStageEvent(ev);
+  const t = setTimeout(_processQueue, getSpeed());
+  _animTimers.push(t);
+}
+
+function _showStageEvent(ev) {
+  const cfg = STAGE_CFG[ev.type];
+  if (!cfg) return;
+  const stageEl = $('stage');
+  if (!stageEl) return;
+
+  const names = window._curNames || [];
+  const nm  = names[ev.player] || (ev.player >= 0 ? `P${ev.player}` : '');
+  const tnm = names[ev.target] || (ev.target  >= 0 ? `P${ev.target}` : '');
+
+  stageEl.className = 'active' + (cfg.cls ? ' ' + cfg.cls : '');
+  stageEl.innerHTML = `
+    <div class="stage-icon">${cfg.icon}</div>
+    <div class="stage-text">${cfg.sub(nm, tnm)}</div>
+  `;
+
+  // Flash actor
+  if (cfg.flash && ev.player >= 0) _flashPlayer(ev.player, cfg.flash);
+  // Flash target after a beat
+  if (cfg.tgt && ev.target >= 0 && cfg.flashTgt) {
+    const t2 = setTimeout(() => _flashPlayer(ev.target, cfg.flashTgt), 180);
+    _animTimers.push(t2);
+  }
+
+  // Hide stage after delay
+  if (_stageHide) clearTimeout(_stageHide);
+  _stageHide = setTimeout(() => {
+    const el = $('stage');
+    if (el && !_animQueue.length) el.className = '';
+  }, getSpeed() * 2.2);
+}
+
+function _flashPlayer(idx, cls) {
+  const players = $('players');
+  if (!players) return;
+  const cards = players.querySelectorAll('.player');
+  if (!cards[idx]) return;
+  cards[idx].classList.remove('fl-red','fl-green','fl-yellow','fl-purple');
+  void cards[idx].offsetWidth; // force reflow to restart animation
+  cards[idx].classList.add(cls);
+  const t = setTimeout(() => { if (cards[idx]) cards[idx].classList.remove(cls); }, 850);
+  _animTimers.push(t);
+}
+
+function cancelAnim() {
+  _animTimers.forEach(clearTimeout);
+  _animTimers  = [];
+  _animQueue   = [];
+  _animRunning = false;
+  if (_stageHide) { clearTimeout(_stageHide); _stageHide = null; }
+  const el = $('stage');
+  if (el) el.className = '';
+}
+
 // ---- state ----
 let SID = null;
-let lineup = [];  // array of bot names (allows duplicates)
+let lineup = [];
 let gabrielUnlocked = false;
 
 // Secret console command
@@ -349,7 +497,6 @@ function changePick(name, delta) {
 }
 
 function syncLineup() {
-  // Update bot cards
   const allNames = new Set([..._botList.map(b=>b.name), gabrielUnlocked?'Gabriel':null].filter(Boolean));
   allNames.forEach(nm => {
     const el = document.getElementById('bc-'+nm);
@@ -358,7 +505,6 @@ function syncLineup() {
     el.className = 'botcard' + (cnt>0?' picked':'') + (nm==='Gabriel'?' gabriel':'');
     el.querySelector('.cnt').textContent = cnt || '·';
   });
-  // Lineup preview
   $('seat-count').textContent = lineup.length === 0 ? '— pick up to 4 opponents' :
     `— ${lineup.length}/4 opponent${lineup.length!==1?'s':''}`;
   if (lineup.length === 0) {
@@ -384,6 +530,8 @@ $('start-btn').onclick = startGame;
 async function startGame() {
   const opps = lineup.length ? lineup : ['Coyote','Rhino','Lucky'];
   $('start-btn').disabled = true;
+  cancelAnim();
+  _animCursor = -1;
   const s = await (await fetch('/api/play/new',{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({opponents:opps})
@@ -407,22 +555,20 @@ function startThinking() {
   $('act-prompt').textContent = 'Bot turns in progress…';
   $('act-grid').innerHTML = '';
 
-  // Tick elapsed time at 100ms
   _thinkTimer = setInterval(() => {
-    const sub = document.getElementById('banner-sub');
+    const sub = $('banner-sub');
     if (sub) sub.textContent = ((Date.now() - _thinkStart) / 1000).toFixed(1) + 's';
   }, 100);
 
-  // Poll log every 600ms so new events appear as bots play
   _thinkPoll = setInterval(async () => {
     if (!SID) return;
     try {
       const snap = await (await fetch('/api/play/state?id=' + SID)).json();
       if (snap.log) renderLog(snap.log);
-      // Show latest log line in banner sub while waiting
+      if (snap.anim_events) enqueueEvents(snap.anim_events);
       if (snap.log && snap.log.length) {
         const last = snap.log[snap.log.length - 1];
-        const sub = document.getElementById('banner-sub');
+        const sub = $('banner-sub');
         const t = ((Date.now() - _thinkStart) / 1000).toFixed(1);
         if (sub) sub.textContent = t + 's — ' + last.replace(/[🎉💀🛡️⚔️⏭️🙏🔀🔮⛔🐱💣]/gu, '').trim().slice(0, 40);
       }
@@ -453,6 +599,10 @@ async function send(i) {
 
 function render(s) {
   SID = s.id || SID;
+  if (s.names) window._curNames = s.names;
+
+  // Enqueue any new animation events
+  if (s.anim_events) enqueueEvents(s.anim_events);
 
   // Game over
   if (s.result) {
@@ -461,13 +611,11 @@ function render(s) {
     const names = s.names || [];
     const survivors = s.result.survivors || (w >= 0 ? [w] : []);
 
-    // Banner
     $('turn-banner').className = w === 0 ? 'your-turn' : 'bot-turn';
     $('banner-icon').textContent = w===0?'🎉':(w>0?'💀':'💔');
     $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
     $('banner-sub').textContent = `Game over after ${s.result.turns||'?'} turns`;
 
-    // Players — show final dead/alive state (clears stale TURN badge)
     $('players').innerHTML = names.map((nm, i) => {
       const alive = survivors.includes(i);
       const isWinner = i === w;
@@ -493,7 +641,6 @@ function render(s) {
 
   const p = s.pending;
   if (!p) {
-    // bots are thinking
     $('turn-banner').className = 'bot-turn';
     $('banner-icon').textContent = '⏳';
     $('banner-who').textContent = 'Bots are thinking…';
@@ -527,7 +674,6 @@ function render(s) {
     $('banner-sub').textContent = '';
   }
 
-  // Deck / attack counter
   $('deck-count').textContent = st.deck_size;
   if (st.turns_remaining > 1) {
     $('atk-line').style.display = '';
@@ -536,7 +682,6 @@ function render(s) {
     $('atk-line').style.display = 'none';
   }
 
-  // Players
   $('players').innerHTML = names.map((nm,i) => {
     const alive = st.alive.includes(i);
     const hs = st.hand_sizes?.[String(i)] ?? 0;
@@ -557,7 +702,6 @@ function render(s) {
     </div>`;
   }).join('');
 
-  // Hand
   if (st.my_hand && st.my_hand.length > 0) {
     $('hand').innerHTML = st.my_hand.map(c => {
       const cd = CARD_DATA[c.type] || {e:'🃏',l:c.type};
@@ -571,7 +715,6 @@ function render(s) {
     $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Empty hand</span>';
   }
 
-  // Discard
   if (st.discard_pile && st.discard_pile.length) {
     const disc = [...st.discard_pile].reverse();
     $('discard').innerHTML = disc.map((t,i) => {
@@ -584,7 +727,6 @@ function render(s) {
     $('discard').innerHTML = '<span class="muted" style="font-size:.78rem">Empty</span>';
   }
 
-  // Actions
   $('act-prompt').textContent = p.note || (p.kind==='choose_action'?'Choose your action:':
     p.kind==='nope'?'Do you want to Nope?':'Choose:');
 
@@ -630,12 +772,12 @@ function updatePlaceLabel(pos, ds) {
   else if (pos <= Math.ceil(ds * 0.25)) label = 'Near the top — dangerous';
   else if (pos >= Math.floor(ds * 0.75)) label = 'Near the bottom — relatively safe';
   else label = 'Middle of the deck';
-  const el = document.getElementById('place-label');
+  const el = $('place-label');
   if (el) el.textContent = label;
 }
 
 async function sendPlace(ds) {
-  const slider = document.getElementById('place-slider');
+  const slider = $('place-slider');
   const pos = slider ? parseInt(slider.value) : Math.floor(ds / 2);
   document.querySelectorAll('#act-grid button').forEach(b => b.disabled = true);
   startThinking();
@@ -656,7 +798,6 @@ let _lastLogLen = 0;
 function renderLog(lines) {
   if (!lines || !lines.length) return;
   const el = $('log');
-  // Append only new lines
   const newLines = lines.slice(_lastLogLen);
   newLines.forEach(l => {
     const d = document.createElement('div');

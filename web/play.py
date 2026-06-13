@@ -102,7 +102,8 @@ class Session:
         self.result = None
         self.action_in = queue.Queue()
         self._cur = None
-        self._last_eid = -1  # last event_id flushed to log
+        self._last_eid = -1      # last event_id flushed to log
+        self._anim_events = []   # structured events for frontend animation
 
         # seat 0 = human, then chosen opponents
         self.human = HumanAgent(self)
@@ -128,6 +129,7 @@ class Session:
 
     def _flush_events(self, state):
         """Log any new events from state.recent_events since last flush."""
+        _SKIP = {'turn_start', 'game_over'}
         new = sorted(
             [e for e in getattr(state, 'recent_events', [])
              if e.get('event_id', 0) > self._last_eid],
@@ -137,6 +139,14 @@ class Session:
             msg = self._fmt_event(ev)
             if msg:
                 self.note(msg)
+            t = ev.get('type', '')
+            if t not in _SKIP:
+                self._anim_events.append({
+                    'id': ev.get('event_id', 0),
+                    'type': t,
+                    'player': ev.get('player', -1),
+                    'target': ev.get('target', -1),
+                })
             self._last_eid = ev.get('event_id', self._last_eid)
 
     def _run(self):
@@ -254,6 +264,7 @@ class Session:
             "result": self.result,
             "log": self.log[-20:],
             "names": self.names,
+            "anim_events": self._anim_events[-100:],
         }
 
     def wait(self, timeout=25):
