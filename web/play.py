@@ -180,16 +180,17 @@ class Session:
         # conjugate verb for "You" (first person) vs third person
         def _v(third):
             return third[:-1] if nm == "You" and third.endswith("s") else third
-        if t == "draw":        return f"{nm} {_v('draws')} a card"
-        if t == "explode":     return f"💣 {nm} exploded!"
-        if t == "defuse":      return f"🛡️ {nm} defused the kitten!"
-        if t == "attack":      return f"⚔️ {nm} {_v('attacks')} {tnm}"
-        if t == "skip":        return f"⏭️ {nm} {_v('skips')}"
-        if t == "favor":       return f"🙏 {nm} {_v('favors')} {tnm}"
-        if t == "shuffle":     return f"🔀 {nm} {_v('shuffles')} the deck"
-        if t == "see_future":  return f"🔮 {nm} {_v('sees')} the future"
-        if t == "nope":        return f"⛔ {nm} {_v('nopes')}!"
-        if t == "cat_steal":   return f"🐱 {nm} {_v('steals')} from {tnm}"
+        b, bt = f"**{nm}**", f"**{tnm}**"
+        if t == "draw":        return f"{b} {_v('draws')} a card"
+        if t == "explode":     return f"💣 {b} exploded!"
+        if t == "defuse":      return f"🛡️ {b} defused the kitten!"
+        if t == "attack":      return f"⚔️ {b} {_v('attacks')} {bt}"
+        if t == "skip":        return f"⏭️ {b} {_v('skips')}"
+        if t == "favor":       return f"🙏 {b} {_v('favors')} {bt}"
+        if t == "shuffle":     return f"🔀 {b} {_v('shuffles')} the deck"
+        if t == "see_future":  return f"🔮 {b} {_v('sees')} the future"
+        if t == "nope":        return f"⛔ {b} {_v('nopes')}!"
+        if t == "cat_steal":   return f"🐱 {b} {_v('steals')} from {bt}"
         return None
 
     def note(self, msg):

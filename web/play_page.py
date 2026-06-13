@@ -268,10 +268,36 @@ button.ghost:hover{border-color:var(--accent2);}
 .act-btn .act-emo{font-size:1.1rem;flex-shrink:0;}
 
 /* ---- GAME LOG ---- */
-.log-wrap{max-height:200px;overflow-y:auto;margin-top:.3rem;}
-.log-line{font-size:.78rem;color:var(--muted);padding:2px 0;opacity:0;animation:slideIn .3s forwards;}
-.log-line b{color:var(--text);}
-.log-line.hot b{color:var(--accent);}
+.log-wrap{max-height:260px;overflow-y:auto;margin-top:.3rem;}
+.log-line{
+  font-size:.8rem;color:var(--muted);
+  padding:3px 4px 3px 10px;
+  border-left:2px solid var(--border);
+  margin-bottom:2px;border-radius:0 4px 4px 0;
+  opacity:0;animation:slideIn .3s forwards;
+  line-height:1.4;
+}
+.log-line b{color:var(--text);font-weight:600;}
+/* Event-type left-border colours */
+.ll-explode{border-left-color:var(--red)!important;color:var(--text);}
+.ll-explode b{color:var(--red);}
+.ll-defuse {border-left-color:var(--green)!important;}
+.ll-defuse b{color:var(--green);}
+.ll-attack {border-left-color:#f97316!important;}
+.ll-attack b{color:#f97316;}
+.ll-nope   {border-left-color:var(--red)!important;}
+.ll-nope b {color:var(--red);}
+.ll-favor  {border-left-color:#c084fc!important;}
+.ll-favor b{color:#c084fc;}
+.ll-cat    {border-left-color:var(--pink)!important;}
+.ll-cat b  {color:var(--pink);}
+.ll-shuffle{border-left-color:#2dd4bf!important;}
+.ll-future {border-left-color:var(--accent2)!important;}
+.ll-future b{color:var(--accent2);}
+.ll-skip   {border-left-color:#60a5fa!important;}
+.ll-draw   {border-left-color:var(--border);}
+/* "You" actions slightly brighter */
+.log-line.is-you{background:rgba(129,140,248,.04);}
 
 /* Speed control */
 .speed-ctrl{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--muted);}
@@ -630,7 +656,7 @@ function _applyStateUpdate(ev) {
 function _showStageEvent(ev) {
   const cfg = STAGE_CFG[ev.type];
   if (!cfg) return;
-  if (ev.log) appendLogLine(ev.log);
+  if (ev.log) appendLogLine(ev.log, ev.type);
   const stageEl = $('stage');
   if (!stageEl) return;
 
@@ -1062,15 +1088,28 @@ function nopeDecide(i) {
   send(i);
 }
 
+// Map event type → CSS class suffix (must match ll-* CSS above)
+const LOG_TYPE_CLS = {
+  explode:'ll-explode', defuse:'ll-defuse', attack:'ll-attack',
+  nope:'ll-nope', favor:'ll-favor', cat_steal:'ll-cat',
+  shuffle:'ll-shuffle', see_future:'ll-future', skip:'ll-skip', draw:'ll-draw',
+};
+
+function _logLineEl(msg, evType) {
+  const d = document.createElement('div');
+  const tc  = evType ? (LOG_TYPE_CLS[evType] || '') : '';
+  const you = msg && (msg.includes('**You**') || msg.startsWith('🔮 You'));
+  d.className = 'log-line' + (tc ? ' ' + tc : '') + (you ? ' is-you' : '');
+  d.innerHTML = (msg || '').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  return d;
+}
+
 let _lastLogLen = 0;
-function appendLogLine(msg) {
+function appendLogLine(msg, evType) {
   if (!msg) return;
   const el = $('log');
   if (!el) return;
-  const d = document.createElement('div');
-  d.className = 'log-line' + (msg.includes('explod') || msg.includes('win') ? ' hot' : '');
-  d.innerHTML = msg.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
-  el.appendChild(d);
+  el.appendChild(_logLineEl(msg, evType));
   el.scrollTop = el.scrollHeight;
   _lastLogLen++;
 }
@@ -1078,12 +1117,7 @@ function renderLog(lines) {
   if (!lines || !lines.length) return;
   const el = $('log');
   const newLines = lines.slice(_lastLogLen);
-  newLines.forEach(l => {
-    const d = document.createElement('div');
-    d.className = 'log-line' + (l.includes('explod') || l.includes('win') ? ' hot' : '');
-    d.innerHTML = l.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
-    el.appendChild(d);
-  });
+  newLines.forEach(l => el.appendChild(_logLineEl(l)));
   if (newLines.length) {
     _lastLogLen = lines.length;
     el.scrollTop = el.scrollHeight;
