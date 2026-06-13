@@ -87,6 +87,16 @@ class GameEngine:
             deck.append(Card(CardType.EXPLODING_KITTEN))
         self.rng.shuffle(deck)
 
+        # Don't let EKs land in the top 5 positions — with a small deck (5-player
+        # games leave only 16 cards), a fully random shuffle gives ~25% first-draw
+        # EK rate which feels broken. Swap any top-5 EKs to a random position in
+        # the bottom half so the early game is survivable.
+        safe_zone = min(5, len(deck) // 2)
+        for i in range(safe_zone):
+            if deck[i].card_type == CardType.EXPLODING_KITTEN:
+                j = self.rng.randint(safe_zone, len(deck) - 1)
+                deck[i], deck[j] = deck[j], deck[i]
+
         return GameState(
             players=players,
             draw_pile=deck,
