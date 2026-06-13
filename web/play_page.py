@@ -476,9 +476,13 @@ function _processQueue() {
 // Apply deferred state update (fires after animations for this batch)
 function _applyStateUpdate(ev) {
   if (ev.result !== undefined) {
-    // Game over
+    // Game over — update banner now that final animations have played
     const w = ev.result.winner;
     const names = ev.names || [];
+    $('turn-banner').className = w === 0 ? 'your-turn' : 'bot-turn';
+    $('banner-icon').textContent = w===0?'🎉':(w>0?'💀':'💔');
+    $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
+    $('banner-sub').textContent = `Game over after ${ev.result.turns||'?'} turns`;
     const survivors = ev.result.survivors || (w >= 0 ? [w] : []);
     $('players').innerHTML = names.map((nm, i) => {
       const alive = survivors.includes(i);
@@ -501,6 +505,33 @@ function _applyStateUpdate(ev) {
   }
 
   const {st, names, p} = ev;
+
+  // Banner — now that animations for this batch have played
+  const isYourTurn = p && p.kind === 'choose_action' && st.current_player === 0;
+  const isNope     = p && p.kind === 'nope';
+  const isPrompt   = p && (p.kind === 'give' || p.kind === 'place_exact');
+  if (isNope) {
+    $('turn-banner').className = 'prompt-turn';
+    $('banner-icon').textContent = '⚡';
+    $('banner-who').textContent = 'Nope opportunity incoming…';
+    $('banner-sub').textContent = p.action_label || '';
+  } else if (isYourTurn) {
+    $('turn-banner').className = 'your-turn fadein';
+    $('banner-icon').textContent = '🧍';
+    $('banner-who').textContent = 'Your turn!';
+    $('banner-sub').textContent = '';
+  } else if (isPrompt) {
+    $('turn-banner').className = 'prompt-turn fadein';
+    $('banner-icon').textContent = '❓';
+    $('banner-who').textContent = p.note || 'You need to choose';
+    $('banner-sub').textContent = '';
+  } else {
+    const cp = st.current_player;
+    $('turn-banner').className = 'bot-turn';
+    $('banner-icon').textContent = cp >= 0 && cp < names.length ? BOT_EMOJI(names[cp]) : '🤖';
+    $('banner-who').textContent = `${names[cp] || 'Bot'}'s turn`;
+    $('banner-sub').textContent = '';
+  }
 
   // Deck / attack counter
   $('deck-count').textContent = st.deck_size;
@@ -857,21 +888,16 @@ function render(s) {
   const _nopeEl = $('nope-overlay');
   if (_nopeEl) _nopeEl.className = '';
 
-  // Game over: banner immediately, player panel queued after animations
+  // Game over — queue everything after animations
   if (s.result) {
-    const w = s.result.winner;
-    const names = s.names || [];
-    $('turn-banner').className = w === 0 ? 'your-turn' : 'bot-turn';
-    $('banner-icon').textContent = w===0?'🎉':(w>0?'💀':'💔');
-    $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
-    $('banner-sub').textContent = `Game over after ${s.result.turns||'?'} turns`;
-    _animQueue.push({type: '_state_update', result: s.result, winner: w, names});
+    _animQueue.push({type: '_state_update', result: s.result, names: s.names || []});
     if (!_animRunning) _processQueue();
     return;
   }
 
   const p = s.pending;
   if (!p) {
+    // Timeout fallback: bots still computing, nothing to queue
     $('turn-banner').className = 'bot-turn';
     $('banner-icon').textContent = '⏳';
     $('banner-who').textContent = 'Bots are thinking…';
@@ -884,36 +910,9 @@ function render(s) {
   const st = p.state;
   const names = st.names || s.names || [];
 
-  // Banner: update immediately (doesn't show who's dead)
-  const isYourTurn = p.kind === 'choose_action' && st.current_player === 0;
-  const isNope = p.kind === 'nope';
-  const isPrompt = p.kind === 'give' || p.kind === 'place_exact';
-  if (isNope) {
-    $('turn-banner').className = 'prompt-turn';
-    $('banner-icon').textContent = '⚡';
-    $('banner-who').textContent = 'Nope opportunity incoming…';
-    $('banner-sub').textContent = p.action_label || '';
-  } else if (isYourTurn) {
-    $('turn-banner').className = 'your-turn fadein';
-    $('banner-icon').textContent = '🧍';
-    $('banner-who').textContent = 'Your turn!';
-    $('banner-sub').textContent = '';
-  } else if (isPrompt) {
-    $('turn-banner').className = 'prompt-turn fadein';
-    $('banner-icon').textContent = '❓';
-    $('banner-who').textContent = p.note || 'You need to choose';
-    $('banner-sub').textContent = '';
-  } else {
-    const cp = st.current_player;
-    $('turn-banner').className = 'bot-turn';
-    $('banner-icon').textContent = cp >= 0 && cp < names.length ? BOT_EMOJI(names[cp]) : '🤖';
-    $('banner-who').textContent = `${names[cp] || 'Bot'}'s turn`;
-    $('banner-sub').textContent = '';
-  }
-
-  // Queue state update (players/hand/discard/deck/actions) — fires AFTER animations
+  // Queue EVERYTHING — banner, deck, players, hand, actions — all after animations
   _animQueue.push({type: '_state_update', st, names, p});
-  if (isNope) _animQueue.push({type: '_nope_prompt', pending: p});
+  if (p.kind === 'nope') _animQueue.push({type: '_nope_prompt', pending: p});
   if (!_animRunning) _processQueue();
 }
 
