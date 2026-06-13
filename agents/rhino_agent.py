@@ -144,7 +144,7 @@ class RhinoAgent(Agent):
     ARENA = {
         'name': 'Rhino', 'emoji': '🦏', 'color': '#6b7280',
         'blurb': 'Reads the room. Remembers everything.',
-        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 26,
+        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 27,
     }
 
     _WEIGHTS = _load()
