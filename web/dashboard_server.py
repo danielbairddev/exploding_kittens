@@ -71,7 +71,7 @@ ARENA_BOTS = [
     Perdition2Agent,   # Perdition
     RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
-    GabrielAgent,      # Gabriel (GRU-128, trained to die first)
+    # GabrielAgent,      # Gabriel — benched (let them think they have a chance)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
 PLAYERS_PER_GAME = 5             # full Exploding Kittens table
