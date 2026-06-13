@@ -65,7 +65,7 @@ ARENA_BOTS = [
     SurvivalAgentV2,   # Sly2
     CoyoteAgent,       # Coyote
     OrangutanAgent,    # Orangutan
-    # Orangutan2Agent,   # Orangutan2 — benched during training
+    Orangutan2Agent,    # Orangutan2
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
     Perdition2Agent,   # Perdition
