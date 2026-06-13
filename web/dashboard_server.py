@@ -626,7 +626,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = ARENA.showcase_payload()
             self._send(json.dumps(payload) if payload else "null")
         elif path == "/api/play/bots":
-            self._send(json.dumps([{"name": n, "emoji": e} for n, (c, e) in play.PLAYABLE.items()]))
+            self._send(json.dumps([{"name": n, "emoji": play.PLAYABLE[n][1]}
+                                    for n in play.PUBLIC_BOTS]))
         elif path == "/api/play/state":
             self._send(json.dumps(play.state(q.get("id", [""])[0])))
         elif path == "/daniel":
@@ -652,7 +653,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError):
             body = {}
         if path == "/api/play/new":
-            self._send(json.dumps(play.new_session(body.get("opponents", []), bool(body.get("coach", True)))))
+            self._send(json.dumps(play.new_session(body.get("opponents", []))))
         elif path == "/api/play/act":
             self._send(json.dumps(play.act(body.get("id", ""), int(body.get("index", 0)))))
         else:

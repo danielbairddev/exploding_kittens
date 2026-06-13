@@ -52,7 +52,7 @@ class Perdition2Agent(CoyoteAgent):
         return self._matvec(w["W3"], h, w["b3"])
 
     def choose_action(self, state, valid_actions):
-        if _EXPLORE_RATE > 0.0 and random.random() < _EXPLORE_RATE:
+        if _EXPLORE_RATE > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _EXPLORE_RATE:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return super().choose_action(state, valid_actions)

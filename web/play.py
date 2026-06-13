@@ -1,12 +1,4 @@
-"""Play Exploding Kittens vs the bots, with an optional Orangutan coach.
-
-Each session runs a real GameEngine in a daemon thread; the human is a
-HumanAgent whose decision methods block until the browser submits a move. The
-coach (when on) reports what Orangutan would play and the Monte-Carlo
-expected-value loss of the human's move (win-probability rollouts from the true
-game state, playing it out with Orangutan in the hero's seat).
-"""
-import copy
+"""Play Exploding Kittens vs the bots (human vs AI, no coach)."""
 import queue
 import threading
 import time
@@ -14,6 +6,9 @@ import uuid
 
 from agents.base import Agent
 from agents.orangutan_agent import OrangutanAgent
+from agents.rhino_agent import RhinoAgent
+from agents.elephant_agent import ElephantAgent
+from agents.perdition2_agent import Perdition2Agent
 from agents.coyote_agent import CoyoteAgent
 from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
@@ -21,6 +16,7 @@ from agents.aggressive_agent import AggressiveAgent
 from agents.chaos_agent import ChaosAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.random_agent import RandomAgent
+from agents.gabriel_agent import GabrielAgent
 from game.engine import GameEngine
 from game.actions import Action, ActionType
 from game.cards import CardType
@@ -28,14 +24,26 @@ from game.cards import CardType
 NOPE = CardType.NOPE
 DEF = CardType.DEFUSE
 
-# Opponents you can pick (display name -> class). Mirrors the arena personas.
+# All playable opponents (display name → class).
+# Gabriel is included here so the server accepts it, but not listed in /api/play/bots.
 PLAYABLE = {
-    "Orangutan": (OrangutanAgent, "\U0001F9A7"), "Coyote": (CoyoteAgent, "\U0001F43A"),
-    "Sly2": (SurvivalAgentV2, "\U0001F99D"), "Sly": (SurvivalAgent, "\U0001F98A"),
-    "Maverick": (AggressiveAgent, "\U0001F4A5"), "Gremlin": (ChaosAgent, "\U0001F300"),
-    "Professor": (HeuristicAgent, "\U0001F9E0"), "Lucky": (RandomAgent, "\U0001F3B2"),
+    "Rhino":      (RhinoAgent,       "🦏"),
+    "Elephant":   (ElephantAgent,    "🐘"),
+    "Orangutan":  (OrangutanAgent,   "🦧"),
+    "Coyote":     (CoyoteAgent,      "🐺"),
+    "Sly2":       (SurvivalAgentV2,  "🦝"),
+    "Sly":        (SurvivalAgent,    "🦊"),
+    "Maverick":   (AggressiveAgent,  "💥"),
+    "Gremlin":    (ChaosAgent,       "🌀"),
+    "Professor":  (HeuristicAgent,   "🧠"),
+    "Lucky":      (RandomAgent,      "🎲"),
+    "Perdition2": (Perdition2Agent,  "🥶"),
+    # Secret — not listed in /api/play/bots but accepted by /api/play/new
+    "Gabriel":    (GabrielAgent,     "🪬"),
 }
-MC_ROLLOUTS = 120
+
+# Bots shown publicly in the picker (Gabriel hidden until unlocked client-side)
+PUBLIC_BOTS = [k for k in PLAYABLE if k != "Gabriel"]
 
 SESSIONS = {}
 _LOCK = threading.Lock()
@@ -49,7 +57,7 @@ def act_label(a):
     if a.action_type == ActionType.PLAY_SEE_THE_FUTURE:
         return "See the Future"
     if a.target_player is not None:
-        cat = f" {a.cat_type.name.replace('_',' ').title()}" if a.cat_type else ""
+        cat = f" {a.cat_type.name.replace('_', ' ').title()}" if a.cat_type else ""
         return f"{t}{cat} → P{a.target_player}"
     return t
 
@@ -58,32 +66,6 @@ def action_to_dict(a):
     return {"action_type": a.action_type.name,
             "target_player": a.target_player,
             "cat_type": a.cat_type.name if a.cat_type else None}
-
-
-class ForcedFirst(OrangutanAgent):
-    """For coach rollouts: play a forced action once, then play as Orangutan."""
-    def __init__(self, action, name="hero"):
-        super().__init__(name)
-        self._forced = action
-        self._used = False
-
-    def choose_action(self, state, valid_actions):
-        if not self._used:
-            self._used = True
-            return self._forced
-        return super().choose_action(state, valid_actions)
-
-
-def mc_winrate(snapshot, first_action, seat_classes, hero_seat, n=MC_ROLLOUTS):
-    wins = 0
-    for _ in range(n):
-        s = copy.deepcopy(snapshot)
-        agents = [ForcedFirst(first_action) if i == hero_seat else seat_classes[i]()
-                  for i in range(len(s.players))]
-        res = GameEngine(agents).play_out(s)
-        if res["winner"] == hero_seat:
-            wins += 1
-    return wins / n
 
 
 # --------------------------------------------------------------------------
@@ -99,7 +81,7 @@ class HumanAgent(Agent):
         return self.session.ask_action(state, valid_actions)
 
     def want_to_nope(self, state, action, currently_noped=False):
-        return False                       # v1: human doesn't Nope (bots still do)
+        return self.session.ask_nope(state, action, currently_noped)
 
     def give_card(self, state, requester_id):
         return self.session.ask_pick(state, "give", requester_id)
@@ -109,31 +91,36 @@ class HumanAgent(Agent):
 
     def see_future(self, state, top3):
         names = [c.card_type.name.replace("_", " ").title() for c in top3]
-        self.session.note("\U0001F52E You peek: " + ", ".join(names))
+        self.session.note("🔮 You peek: " + ", ".join(names))
 
 
 class Session:
-    def __init__(self, opponents, coach):
+    def __init__(self, opponents):
         self.id = uuid.uuid4().hex[:12]
-        self.coach = coach
         self.log = []
         self.pending = None
         self.result = None
-        self.coach_feedback = None
         self.action_in = queue.Queue()
-        self._cur = None                   # current valid actions (Action objects)
-        self._snap = None                  # deepcopy of true state at decision
-        self._orec = None                  # Orangutan's recommended action
-        # seat 0 = human, then the chosen opponents in order
+        self._cur = None
+
+        # seat 0 = human, then chosen opponents
         self.human = HumanAgent(self)
-        self.seat_classes = [None]         # index 0 = human (no class)
         agents = [self.human]
+        display_names = ["You"]
+        counts = {}
         for nm in opponents:
-            cls = PLAYABLE[nm][0]
-            self.seat_classes.append(cls)
-            agents.append(cls(name=nm))
-        self.names = ["You"] + list(opponents)
-        self.engine = GameEngine(agents, collect_events=False)
+            if nm not in PLAYABLE:
+                continue
+            counts[nm] = counts.get(nm, 0) + 1
+            cls, _emoji = PLAYABLE[nm]
+            label = nm if counts[nm] == 1 else f"{nm} {counts[nm]}"
+            bot = cls(name=label)
+            bot._play_mode = True  # full strength — no explore-rate noise
+            agents.append(bot)
+            display_names.append(label)
+
+        self.names = display_names
+        self.engine = GameEngine(agents, collect_events=True)
         self.n = len(agents)
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -141,103 +128,125 @@ class Session:
     def _run(self):
         try:
             self.result = self.engine.play_game(self.n)
-        except Exception as exc:                      # never wedge the session
+            # log game events so the ticker is populated
+            for ev in (self.result.get("events") or []):
+                msg = self._fmt_event(ev)
+                if msg:
+                    self.note(msg)
+        except Exception as exc:
             self.result = {"winner": -1, "error": repr(exc)}
         w = self.result.get("winner", -1)
-        self.note("\U0001F389 You win!" if w == 0 else
-                  (f"\U0001F480 {self.names[w]} wins — better luck next time." if w >= 0 else "Game over."))
+        self.note("🎉 You win!" if w == 0 else
+                  (f"💀 {self.names[w]} wins — better luck next time." if w >= 0 else "Game over."))
+
+    def _fmt_event(self, ev):
+        t = ev.get("type", "")
+        p = ev.get("player", -1)
+        nm = self.names[p] if 0 <= p < len(self.names) else f"P{p}"
+        tgt = ev.get("target", -1)
+        tnm = self.names[tgt] if 0 <= tgt < len(self.names) else f"P{tgt}"
+        card = ev.get("card", "")
+        if t == "draw":        return f"{nm} draws a card"
+        if t == "explode":     return f"💣 {nm} exploded!"
+        if t == "defuse":      return f"🛡️ {nm} defused the kitten!"
+        if t == "attack":      return f"⚔️ {nm} attacks {tnm}"
+        if t == "skip":        return f"⏭️ {nm} skips"
+        if t == "favor":       return f"🙏 {nm} favors {tnm}"
+        if t == "shuffle":     return f"🔀 {nm} shuffles the deck"
+        if t == "see_future":  return f"🔮 {nm} sees the future"
+        if t == "nope":        return f"⛔ {nm} nopes!"
+        if t == "cat_steal":   return f"🐱 {nm} steals from {tnm}"
+        return None
 
     def note(self, msg):
         self.log.append(msg)
-        self.log = self.log[-40:]
+        self.log = self.log[-60:]
 
-    # ---- decision hooks (run in the game thread; block on the human) ----
+    # ---- decision hooks ----
     def ask_action(self, state, valid):
         self._cur = list(valid)
-        if self.coach and self.engine._state is not None:
-            self._snap = copy.deepcopy(self.engine._state)
-            self._orec = OrangutanAgent(name="coach").choose_action(state, valid)
         self.pending = {
             "kind": "choose_action",
             "state": self._state_view(state),
-            "valid": [{"i": i, "label": act_label(a)} for i, a in enumerate(valid)],
-            "orangutan": act_label(self._orec) if (self.coach and self._orec) else None,
+            "valid": [{"i": i, "label": act_label(a), "type": a.action_type.name}
+                      for i, a in enumerate(valid)],
         }
-        chosen = self.action_in.get()                 # block for the human
+        chosen = self.action_in.get()
         self.pending = None
-        if self.coach and self._snap is not None:
-            self._grade(chosen)
         return chosen
+
+    def ask_nope(self, state, action, currently_noped):
+        self.pending = {
+            "kind": "nope",
+            "state": self._state_view(state),
+            "note": f"{'Counter-nope' if currently_noped else 'Nope'} {act_label(action)}?",
+            "valid": [{"i": 0, "label": "⛔ Nope it!", "type": "NOPE"},
+                      {"i": 1, "label": "Let it happen", "type": "PASS"}],
+        }
+        i = self.action_in.get()
+        self.pending = None
+        return i == 0
 
     def ask_pick(self, state, kind, arg):
         if kind == "give":
             opts = sorted({c.card_type for c in state.my_hand}, key=lambda t: t.name)
-            self.pending = {"kind": "give", "state": self._state_view(state),
-                            "options": [{"i": i, "label": t.name.replace("_", " ").title()}
-                                        for i, t in enumerate(opts)],
-                            "note": f"P{arg} played a Favor — pick a card to give."}
-            i = self.action_in.get(); self.pending = None
+            self.pending = {
+                "kind": "give",
+                "state": self._state_view(state),
+                "options": [{"i": i, "label": t.name.replace("_", " ").title(),
+                             "type": t.name}
+                            for i, t in enumerate(opts)],
+                "note": f"{self.names[arg]} played a Favor — pick a card to give.",
+            }
+            i = self.action_in.get()
+            self.pending = None
             return opts[i]
         # place: arg = deck_size
-        opts = [("Top (next player draws it!)", 0), ("Middle", arg // 2), ("Bottom (safe)", arg)]
-        self.pending = {"kind": "place", "state": self._state_view(state),
-                        "options": [{"i": i, "label": l} for i, (l, _) in enumerate(opts)],
-                        "note": "You defused! Where do you put the kitten back?"}
-        i = self.action_in.get(); self.pending = None
+        opts = [("Top — next player draws it! ☠️", 0),
+                ("Middle of the deck", arg // 2),
+                ("Bottom — safe for now", arg)]
+        self.pending = {
+            "kind": "place",
+            "state": self._state_view(state),
+            "options": [{"i": i, "label": l, "type": "PLACE"} for i, (l, _) in enumerate(opts)],
+            "note": "You defused! 🛡️ Where do you bury the kitten?",
+        }
+        i = self.action_in.get()
+        self.pending = None
         return opts[i][1]
 
     def submit(self, i):
         p = self.pending
-        self.pending = None              # clear NOW so wait() blocks for the next decision
+        self.pending = None
         if p and p["kind"] == "choose_action":
             self.action_in.put(self._cur[i])
         else:
             self.action_in.put(i)
 
-    def _grade(self, chosen):
-        # Evaluate the actual options by rollout (always include the human's
-        # move); recommend the rollout-best so the advice and the EV agree.
-        cands = [chosen]
-        for a in self._cur:
-            if a is chosen:
-                continue
-            if len(cands) >= 6:
-                break
-            cands.append(a)
-        evs = [(a, mc_winrate(self._snap, a, self.seat_classes, 0)) for a in cands]
-        your_ev = next(ev for a, ev in evs if a is chosen)
-        best_a, best_ev = max(evs, key=lambda t: t[1])
-        loss = max(0.0, best_ev - your_ev)
-        match = best_a is chosen
-        self.coach_feedback = {"match": match, "your_move": act_label(chosen),
-                               "best_move": act_label(best_a),
-                               "your_ev": round(your_ev * 100, 1), "best_ev": round(best_ev * 100, 1),
-                               "ev_loss": round(loss * 100, 1),
-                               "orangutan": act_label(self._orec) if self._orec else None}
-        tag = ("✅ optimal" if match else "⚠️ blunder" if loss >= 0.08 else
-               "\U0001F7E1 slight miss" if loss >= 0.02 else "≈ fine")
-        self.note(f"{tag} Coach: you played {act_label(chosen)} ({your_ev*100:.0f}% win); "
-                  f"best is {act_label(best_a)} ({best_ev*100:.0f}% win) — EV loss {loss*100:.1f}%")
-        self._snap = None
-
-    # ---- views ----
+    # ---- state view ----
     def _state_view(self, state):
         from collections import Counter
         hand = Counter(c.card_type.name for c in state.my_hand)
-        disc = state.discard_pile[-6:]
+        disc = state.discard_pile[-8:]
         return {
             "my_hand": [{"type": t, "n": n} for t, n in sorted(hand.items())],
             "hand_sizes": {str(k): v for k, v in state.hand_sizes.items()},
-            "alive": state.alive_players, "deck_size": state.deck_size,
-            "turns_remaining": state.turns_remaining, "current_player": state.current_player,
-            "discard_top": disc[-1].card_type.name if disc else None,
+            "alive": state.alive_players,
+            "deck_size": state.deck_size,
+            "turns_remaining": state.turns_remaining,
+            "current_player": state.current_player,
+            "discard_pile": [c.card_type.name for c in disc],
             "names": self.names,
         }
 
     def snapshot(self):
-        return {"id": self.id, "pending": self.pending, "result": self.result,
-                "log": self.log[-12:], "coach": self.coach_feedback, "names": self.names,
-                "coach_on": self.coach}
+        return {
+            "id": self.id,
+            "pending": self.pending,
+            "result": self.result,
+            "log": self.log[-20:],
+            "names": self.names,
+        }
 
     def wait(self, timeout=25):
         end = time.time() + timeout
@@ -246,14 +255,14 @@ class Session:
         return self.snapshot()
 
 
-def new_session(opponents, coach):
+def new_session(opponents):
     opponents = [o for o in opponents if o in PLAYABLE][:4]
     if not opponents:
-        opponents = ["Coyote", "Sly2", "Lucky"]
-    s = Session(opponents, coach)
+        opponents = ["Coyote", "Rhino", "Lucky"]
+    s = Session(opponents)
     with _LOCK:
         SESSIONS[s.id] = s
-        if len(SESSIONS) > 60:                        # cap memory
+        if len(SESSIONS) > 60:
             for k in list(SESSIONS)[:-60]:
                 SESSIONS.pop(k, None)
     return s.wait()
@@ -263,7 +272,6 @@ def act(session_id, choice):
     s = SESSIONS.get(session_id)
     if not s:
         return {"error": "no session"}
-    s.coach_feedback = None
     s.submit(choice)
     return s.wait()
 
