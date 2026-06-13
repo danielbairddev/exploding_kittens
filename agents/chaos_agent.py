@@ -16,7 +16,7 @@ class ChaosAgent(Agent):
 
     ARENA = {"name": "Gremlin", "emoji": "\U0001F300", "color": "#4ade80",
              "blurb": "An agent of pure chaos.", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 11}
+             "llm_assisted": True, "stats_version": 12}
 
     def __init__(self, name: str = "Chaos", seed: int | None = None):
         self.name = name
