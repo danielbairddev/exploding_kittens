@@ -6,9 +6,9 @@ then prints a table so you can pick values that preserve relative order but
 compress strength toward the heuristic bots.
 
 Usage:
-    python3 scripts/tune_noise.py
-    python3 scripts/tune_noise.py --games 1000  # faster, noisier
-    python3 scripts/tune_noise.py --games 4000  # slower, more accurate
+    python3 scripts/eval_winrates.py
+    python3 scripts/eval_winrates.py --games 1000  # faster, noisier
+    python3 scripts/eval_winrates.py --games 4000  # slower, more accurate
 """
 import argparse, sys, os, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

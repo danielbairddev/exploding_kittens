@@ -24,8 +24,8 @@ except ImportError:
                   'EXPLODING_KITTEN']
     N_EVENT = 39
 
-# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.25  # fraction of turns replaced with a random valid action
+# ---- Exploration (controls play diversity) ----
+_EXPLORE_RATE = 0.25  # fraction of turns that explore randomly
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
 
@@ -189,7 +189,7 @@ class ElephantAgent(Agent):
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
 
     def choose_action(self, state, valid_actions):
-        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+        if _EXPLORE_RATE > 0.0 and random.random() < _EXPLORE_RATE:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)

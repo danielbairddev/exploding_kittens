@@ -136,8 +136,8 @@ def _nope_prob(a2, currently_noped, w):
     return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
-# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.20  # fraction of turns replaced with a random valid action
+# ---- Exploration (controls play diversity) ----
+_EXPLORE_RATE = 0.20  # fraction of turns that explore randomly
 
 
 class RhinoAgent(Agent):
@@ -197,7 +197,7 @@ class RhinoAgent(Agent):
     # ---- decision methods ----
 
     def choose_action(self, state, valid_actions):
-        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+        if _EXPLORE_RATE > 0.0 and random.random() < _EXPLORE_RATE:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)

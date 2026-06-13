@@ -16,8 +16,8 @@ from game.cards import CardType
 
 DEF = CardType.DEFUSE
 
-# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.30  # fraction of turns replaced with a random valid action
+# ---- Exploration (controls play diversity) ----
+_EXPLORE_RATE = 0.30  # fraction of turns that explore randomly
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orangutan_weights.json")
 
@@ -57,7 +57,7 @@ class OrangutanAgent(CoyoteAgent):
         return self._matvec(w["W3"], h, w["b3"])
 
     def choose_action(self, state, valid_actions):
-        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+        if _EXPLORE_RATE > 0.0 and random.random() < _EXPLORE_RATE:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return super().choose_action(state, valid_actions)
