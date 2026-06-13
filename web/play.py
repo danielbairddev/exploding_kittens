@@ -85,6 +85,12 @@ class HumanAgent(Agent):
     def want_to_nope(self, state, action, currently_noped=False):
         if state.current_player == state.my_id:
             return False  # never nope your own card
+        if currently_noped:
+            # Don't counter-nope the nope you just played
+            recent_nopes = [e for e in getattr(state, 'recent_events', [])
+                            if e.get('type') == 'nope']
+            if recent_nopes and recent_nopes[-1].get('player') == state.my_id:
+                return False
         return self.session.ask_nope(state, action, currently_noped)
 
     def give_card(self, state, requester_id):
