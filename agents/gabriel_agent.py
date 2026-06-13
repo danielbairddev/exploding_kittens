@@ -131,7 +131,7 @@ def _nope_prob(a2, currently_noped, w):
 class GabrielAgent(Agent):
     ARENA = {
         'name': 'Gabriel', 'emoji': '⚰️', 'color': '#d4af37',
-        'blurb': 'The first angel sounded — and there came hail and fire mixed with blood.',
+        'blurb': 'I have the keys of hell and of death.',
         'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 1,
     }
 
