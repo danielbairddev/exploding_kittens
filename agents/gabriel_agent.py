@@ -1,11 +1,7 @@
-"""Rhino — fully-ML GRU-based agent.
+"""Gabriel — GRU-128 angel bot trained to die first.
 
-All decisions go through the learned policy — no heuristics inherited from Coyote.
-The GRU processes the full public event log; its hidden state plus the current
-snapshot are fed through a shared trunk and then five separate heads:
-  policy / value / target / want_to_nope / give_card / place_exploding_kitten.
-
-Uses numpy for fast inference when available, falls back to pure Python otherwise.
+Same architecture as Elephant (GRU(39→128) + Trunk(180→128→64) + 5 heads),
+but trained with an inverted reward: glory comes from being the first to explode.
 """
 import json, math, os
 from agents.base import Agent
@@ -28,9 +24,9 @@ except ImportError:
                   'EXPLODING_KITTEN']
     N_EVENT = 39
 
-_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rhino_weights.json')
+_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gabriel_weights.json')
 
-_GRU_H     = 64
+_GRU_H     = 128
 _N_TARGETS = 5
 _N_CARDS   = 13
 _N_BUCKETS = 5
@@ -53,8 +49,6 @@ def _load():
     except (OSError, ValueError):
         return None
 
-
-# ---- numpy inference (fast path) ----
 
 def _np_sigmoid(x):
     return 1.0 / (1.0 + _np.exp(-_np.clip(x, -20.0, 20.0)))
@@ -85,8 +79,6 @@ def _np_masked_argmax(scores, mask):
     idx = int(_np.argmax(masked))
     return idx if mask[idx] else None
 
-
-# ---- pure-Python fallback ----
 
 def _mv(W, v):
     return [sum(w * vi for w, vi in zip(row, v)) for row in W]
@@ -126,30 +118,29 @@ def _trunk(h, snap, w):
     a1 = _relu(_add(_mv(w['W1'], x), w['b1']))
     return _relu(_add(_mv(w['W2'], a1), w['b2']))
 
-def _policy(a2, w):      return _add(_mv(w['W3'], a2), w['b3'])
-def _target_scores(a2, w): return _add(_mv(w['Wtgt'], a2), w['btgt'])
-def _give_scores(a2, w): return _add(_mv(w['Wgive'], a2), w['bgive'])
-def _place_probs(a2, w): return _softmax(_add(_mv(w['Wplace'], a2), w['bplace']))
+def _policy(a2, w):          return _add(_mv(w['W3'], a2), w['b3'])
+def _target_scores(a2, w):   return _add(_mv(w['Wtgt'], a2), w['btgt'])
+def _give_scores(a2, w):     return _add(_mv(w['Wgive'], a2), w['bgive'])
+def _place_probs(a2, w):     return _softmax(_add(_mv(w['Wplace'], a2), w['bplace']))
 
 def _nope_prob(a2, currently_noped, w):
     ext = list(a2) + [float(currently_noped)]
     return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
-class RhinoAgent(Agent):
+class GabrielAgent(Agent):
     ARENA = {
-        'name': 'Rhino', 'emoji': '🦏', 'color': '#6b7280',
-        'blurb': 'Reads the room. Remembers everything.',
-        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 24,
+        'name': 'Gabriel', 'emoji': '👼', 'color': '#d4af37',
+        'blurb': 'Blessed are those who explode first.',
+        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 1,
     }
 
     _WEIGHTS = _load()
 
-    def __init__(self, name='Rhino', seed=None):
+    def __init__(self, name='Gabriel', seed=None):
         self.name = name
         self._h = [0.0] * _GRU_H
         self._last_eid = -1
-        # Coyote-compatible state used by snap_encode
         self._top = None; self._top_deck = -1
 
     def game_start(self, state):
@@ -189,8 +180,6 @@ class RhinoAgent(Agent):
         if _HAS_NP:
             return _np_trunk(self._h, _np.array(self._snap(state), dtype=_np.float32), self._WEIGHTS)
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
-
-    # ---- decision methods ----
 
     def choose_action(self, state, valid_actions):
         if self._WEIGHTS is None:
