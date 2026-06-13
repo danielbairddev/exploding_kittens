@@ -17,7 +17,7 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 
 # ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
-_ARENA_NOISE = 0.35  # fraction of turns replaced with a random valid action
+_ARENA_NOISE = 0.30  # fraction of turns replaced with a random valid action
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orangutan_weights.json")
 
