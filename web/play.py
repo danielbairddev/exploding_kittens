@@ -3,6 +3,7 @@ import queue
 import threading
 import time
 import uuid
+from collections import Counter
 
 from agents.base import Agent
 from agents.orangutan_agent import OrangutanAgent
@@ -101,7 +102,7 @@ class HumanAgent(Agent):
 
     def see_future(self, state, top3):
         names = [c.card_type.name.replace("_", " ").title() for c in top3]
-        self.session.note("🔮 You peek: " + ", ".join(names))
+        self.session.note("🔮 **You** peeked: " + ", ".join(f"**{n}**" for n in names))
         self.session._peek_cards = [c.card_type.name for c in top3]
 
 
@@ -116,6 +117,10 @@ class Session:
         self._last_eid = -1      # last event_id flushed to log
         self._anim_events = []   # structured events for frontend animation
         self._peek_cards = None  # set by HumanAgent.see_future, attached to next see_future anim event
+        # Track hand between ask_action calls so we can annotate what was drawn/stolen/received
+        self._prev_hand = None          # Counter(CardType → count)
+        self._delta_added = Counter()   # cards gained since last ask_action
+        self._delta_removed = Counter() # cards lost since last ask_action
 
         # seat 0 = human, then chosen opponents
         self.human = HumanAgent(self)
@@ -148,24 +153,69 @@ class Session:
             key=lambda e: e.get('event_id', 0)
         )
         for ev in new:
+            t   = ev.get('type', '')
+            p   = ev.get('player', -1)
+            tgt = ev.get('target', ev.get('from_player', -1))
+
             msg = self._fmt_event(ev)
+
+            # Enrich log messages for the human with private card info derived from hand delta
+            msg = self._enrich_msg(msg, t, p, tgt)
+
             if msg:
                 self.note(msg)
-            t = ev.get('type', '')
             if t not in _SKIP:
                 aev = {
                     'id': ev.get('event_id', 0),
                     'type': t,
-                    'player': ev.get('player', -1),
-                    # engine uses 'from_player' for favor/cat_steal, 'target' for attack
-                    'target': ev.get('target', ev.get('from_player', -1)),
-                    'log': msg,   # log message in sync with this animation
+                    'player': p,
+                    'target': tgt,
+                    'log': msg,
                 }
                 if t == 'see_future' and self._peek_cards:
                     aev['cards'] = self._peek_cards
                     self._peek_cards = None
                 self._anim_events.append(aev)
             self._last_eid = ev.get('event_id', self._last_eid)
+
+    def _card_name(self, ct):
+        return ct.name.replace("_", " ").title()
+
+    def _enrich_msg(self, msg, t, p, tgt):
+        """Replace generic log messages with card-specific ones using hand delta."""
+        def _added():
+            ct = next(iter(self._delta_added.elements()), None)
+            return f"**{self._card_name(ct)}**" if ct else None
+        def _removed():
+            ct = next(iter(self._delta_removed.elements()), None)
+            return f"**{self._card_name(ct)}**" if ct else None
+
+        nm  = self.names[p]   if 0 <= p   < len(self.names) else f"P{p}"
+        tnm = self.names[tgt] if 0 <= tgt < len(self.names) else f"P{tgt}"
+
+        if p == 0:  # human is the actor
+            if t == 'draw':
+                card = _added()
+                if card:
+                    self._delta_added = Counter()
+                    return f"**You** draw a {card}"
+            elif t in ('cat_steal', 'favor') and self._delta_added:
+                card = _added()
+                if card:
+                    self._delta_added = Counter()
+                    if t == 'cat_steal':
+                        return f"🐱 **You** steal a {card} from **{tnm}**"
+                    else:
+                        return f"🙏 **You** favor **{tnm}** and receive a {card}"
+        elif tgt == 0:  # human is the victim
+            if t in ('cat_steal', 'favor') and self._delta_removed:
+                card = _removed()
+                if card:
+                    self._delta_removed = Counter()
+                    if t == 'cat_steal':
+                        return f"🐱 **{nm}** steals a {card} from **You**"
+                    # favor: human picks in give_card, note appended there
+        return msg
 
     def _run(self):
         try:
@@ -205,7 +255,14 @@ class Session:
 
     # ---- decision hooks ----
     def ask_action(self, state, valid):
+        curr = Counter(c.card_type for c in state.my_hand)
+        if self._prev_hand is not None:
+            self._delta_added   = curr - self._prev_hand
+            self._delta_removed = self._prev_hand - curr
+        self._prev_hand = curr
         self._flush_events(state)
+        self._delta_added = Counter()    # clear so stale deltas don't leak into nope/pick flushes
+        self._delta_removed = Counter()
         self._cur = list(valid)
         self.pending = {
             "kind": "choose_action",
@@ -274,7 +331,9 @@ class Session:
             }
             i = self.action_in.get()
             self.pending = None
-            return opts[i]
+            given = opts[i]
+            self.note(f"🙏 **You** gave away a **{given.name.replace('_', ' ').title()}**")
+            return given
         # place: arg = deck_size — human picks exact position via slider
         self.pending = {
             "kind": "place_exact",
