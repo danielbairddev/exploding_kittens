@@ -459,12 +459,32 @@ function render(s) {
     renderLog(s.log);
     const w = s.result.winner;
     const names = s.names || [];
-    $('turn-banner').className = 'bot-turn';
+    const survivors = s.result.survivors || (w >= 0 ? [w] : []);
+
+    // Banner
+    $('turn-banner').className = w === 0 ? 'your-turn' : 'bot-turn';
     $('banner-icon').textContent = w===0?'🎉':(w>0?'💀':'💔');
     $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
-    $('banner-sub').textContent = '';
+    $('banner-sub').textContent = `Game over after ${s.result.turns||'?'} turns`;
+
+    // Players — show final dead/alive state (clears stale TURN badge)
+    $('players').innerHTML = names.map((nm, i) => {
+      const alive = survivors.includes(i);
+      const isWinner = i === w;
+      let cls = 'player' + (i===0?' hero':'') + (!alive?' dead':'') + (isWinner?' winner':'');
+      return `<div class="${cls}">
+        <div class="av">${i===0?'🧍':BOT_EMOJI(nm)}</div>
+        <div class="nm">${nm}</div>
+        <div class="hs">${alive?'🏆 survived':'💀 exploded'}</div>
+        <div class="mini-hand"></div>
+      </div>`;
+    }).join('');
+
+    $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Game over</span>';
+    $('discard').innerHTML = '';
     $('act-grid').innerHTML = `<div class="gameover">${w===0?'🎉 You win!':(w>0?('💀 '+names[w]+' wins — better luck next time.'):'Game over')}</div>`;
     $('act-prompt').textContent = '';
+    $('atk-line').style.display = 'none';
     $('again-wrap').style.display = '';
     return;
   }
