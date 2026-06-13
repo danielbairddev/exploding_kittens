@@ -454,26 +454,118 @@ function _processQueue() {
   if (!_animQueue.length) { _animRunning = false; return; }
   _animRunning = true;
   const ev = _animQueue.shift();
+
+  // Pseudo-events: apply state then continue immediately (no delay)
+  if (ev.type === '_state_update') {
+    _applyStateUpdate(ev);
+    _processQueue();
+    return;
+  }
+  if (ev.type === '_nope_prompt') {
+    _animRunning = false;
+    renderNopeStack(ev.pending);
+    return;
+  }
+
   if (ev.id !== undefined) _animCursor = Math.max(_animCursor, ev.id);
-  const cont = _showStageEvent(ev);
-  if (cont === false) return; // nope prompt took over; stop queue
+  _showStageEvent(ev);
   const t = setTimeout(_processQueue, getSpeed());
   _animTimers.push(t);
 }
 
-function _showStageEvent(ev) {
-  if (ev.type === '_nope_prompt') {
-    // Nope prompt injected into queue — show it now
-    _animRunning = false;
-    renderNopeStack(ev.pending);
-    if (ev.log) renderLog(ev.log);
-    return false; // signal: don't schedule next
+// Apply deferred state update (fires after animations for this batch)
+function _applyStateUpdate(ev) {
+  if (ev.result !== undefined) {
+    // Game over
+    const w = ev.result.winner;
+    const names = ev.names || [];
+    const survivors = ev.result.survivors || (w >= 0 ? [w] : []);
+    $('players').innerHTML = names.map((nm, i) => {
+      const alive = survivors.includes(i);
+      const isWinner = i === w;
+      let cls = 'player' + (i===0?' hero':'') + (!alive?' dead':'') + (isWinner?' winner':'');
+      return `<div class="${cls}">
+        <div class="av">${i===0?'🧍':BOT_EMOJI(nm)}</div>
+        <div class="nm">${nm}</div>
+        <div class="hs">${alive?'🏆 survived':'💀 exploded'}</div>
+        <div class="mini-hand"></div>
+      </div>`;
+    }).join('');
+    $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Game over</span>';
+    $('discard').innerHTML = '';
+    $('act-grid').innerHTML = `<div class="gameover">${w===0?'🎉 You win!':(w>0?('💀 '+names[w]+' wins — better luck next time.'):'Game over')}</div>`;
+    $('act-prompt').textContent = '';
+    $('atk-line').style.display = 'none';
+    $('again-wrap').style.display = '';
+    return;
   }
 
+  const {st, names, p} = ev;
+
+  // Deck / attack counter
+  $('deck-count').textContent = st.deck_size;
+  if (st.turns_remaining > 1) {
+    $('atk-line').style.display = '';
+    $('atk-count').textContent = st.turns_remaining;
+  } else {
+    $('atk-line').style.display = 'none';
+  }
+
+  // Players / hand / discard
+  renderStateView(st, names);
+
+  // Action grid (skip for nope — that's handled by _nope_prompt)
+  if (!p || p.kind === 'nope') return;
+
+  $('act-prompt').textContent = p.note || (p.kind==='choose_action' ? 'Choose your action:' : 'Choose:');
+
+  if (p.kind === 'place_exact') {
+    const ds = p.deck_size;
+    $('act-grid').innerHTML = `
+      <div style="margin:.3rem 0 .6rem">
+        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:.35rem;">
+          <span>☠️ Top (pos 0) — next player draws it</span>
+          <span>Bottom (pos ${ds}) — safe</span>
+        </div>
+        <input id="place-slider" type="range" min="0" max="${ds}" value="${Math.floor(ds/2)}"
+          style="width:100%;accent-color:var(--accent2);cursor:pointer;"
+          oninput="$('place-val').textContent=this.value;updatePlaceLabel(this.value,${ds})">
+        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.7rem;">
+          <span style="font-size:.82rem;color:var(--muted)">Position:</span>
+          <span id="place-val" style="font-weight:700;font-size:1rem;min-width:2ch">${Math.floor(ds/2)}</span>
+          <span id="place-label" style="font-size:.78rem;color:var(--muted)"></span>
+        </div>
+      </div>
+      <button class="act-btn" onclick="sendPlace(${ds})">
+        <span class="act-emo">📍</span> Bury kitten here
+      </button>`;
+    updatePlaceLabel(Math.floor(ds/2), ds);
+  } else if (p.kind === 'give') {
+    const opts = p.options || [];
+    $('act-grid').innerHTML = opts.map(o => {
+      const emo = ACT_EMO[o.type] || '🃏';
+      return `<button class="act-btn" onclick="send(${o.i})">
+        <span class="act-emo">${emo}</span> ${o.label}
+      </button>`;
+    }).join('');
+  } else {
+    const opts = p.valid || [];
+    $('act-grid').innerHTML = opts.map(o => {
+      const emo = ACT_EMO[o.type] || '▶';
+      const isDraw = o.type === 'DRAW';
+      const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
+      return `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${o.i})">
+        <span class="act-emo">${emo}</span> ${o.label}
+      </button>`;
+    }).join('');
+  }
+}
+
+function _showStageEvent(ev) {
   const cfg = STAGE_CFG[ev.type];
-  if (!cfg) return true;
+  if (!cfg) return;
   const stageEl = $('stage');
-  if (!stageEl) return true;
+  if (!stageEl) return;
 
   const names = window._curNames || [];
   const nm  = names[ev.player] || (ev.player >= 0 ? `P${ev.player}` : '');
@@ -507,8 +599,6 @@ function _showStageEvent(ev) {
     const el = $('stage');
     if (el && !_animQueue.length) el.className = '';
   }, getSpeed() * 2.2);
-
-  return true;
 }
 
 function _flashPlayer(idx, cls) {
@@ -757,47 +847,28 @@ function render(s) {
   SID = s.id || SID;
   if (s.names) window._curNames = s.names;
 
-  // Enqueue any new animation events
+  // Log lines are safe to show immediately (no player-state info)
+  renderLog(s.log);
+
+  // Queue animation events FIRST so they run before the state update
   if (s.anim_events) enqueueEvents(s.anim_events);
 
-  // Clear nope overlay (will be re-shown by queue when its turn comes)
+  // Clear nope overlay (re-shown by queue when its turn comes)
   const _nopeEl = $('nope-overlay');
   if (_nopeEl) _nopeEl.className = '';
 
-  // Game over
+  // Game over: banner immediately, player panel queued after animations
   if (s.result) {
-    renderLog(s.log);
     const w = s.result.winner;
     const names = s.names || [];
-    const survivors = s.result.survivors || (w >= 0 ? [w] : []);
-
     $('turn-banner').className = w === 0 ? 'your-turn' : 'bot-turn';
     $('banner-icon').textContent = w===0?'🎉':(w>0?'💀':'💔');
     $('banner-who').textContent = w===0?'You win!':(w>0?`${names[w]} wins!`:'Game over');
     $('banner-sub').textContent = `Game over after ${s.result.turns||'?'} turns`;
-
-    $('players').innerHTML = names.map((nm, i) => {
-      const alive = survivors.includes(i);
-      const isWinner = i === w;
-      let cls = 'player' + (i===0?' hero':'') + (!alive?' dead':'') + (isWinner?' winner':'');
-      return `<div class="${cls}">
-        <div class="av">${i===0?'🧍':BOT_EMOJI(nm)}</div>
-        <div class="nm">${nm}</div>
-        <div class="hs">${alive?'🏆 survived':'💀 exploded'}</div>
-        <div class="mini-hand"></div>
-      </div>`;
-    }).join('');
-
-    $('hand').innerHTML = '<span class="muted" style="font-size:.82rem">Game over</span>';
-    $('discard').innerHTML = '';
-    $('act-grid').innerHTML = `<div class="gameover">${w===0?'🎉 You win!':(w>0?('💀 '+names[w]+' wins — better luck next time.'):'Game over')}</div>`;
-    $('act-prompt').textContent = '';
-    $('atk-line').style.display = 'none';
-    $('again-wrap').style.display = '';
+    _animQueue.push({type: '_state_update', result: s.result, winner: w, names});
+    if (!_animRunning) _processQueue();
     return;
   }
-
-  renderLog(s.log);
 
   const p = s.pending;
   if (!p) {
@@ -813,29 +884,20 @@ function render(s) {
   const st = p.state;
   const names = st.names || s.names || [];
 
-  // Turn banner
+  // Banner: update immediately (doesn't show who's dead)
   const isYourTurn = p.kind === 'choose_action' && st.current_player === 0;
   const isNope = p.kind === 'nope';
   const isPrompt = p.kind === 'give' || p.kind === 'place_exact';
   if (isNope) {
-    // Show game state, but queue the nope overlay to appear after animations
     $('turn-banner').className = 'prompt-turn';
     $('banner-icon').textContent = '⚡';
     $('banner-who').textContent = 'Nope opportunity incoming…';
     $('banner-sub').textContent = p.action_label || '';
-    $('act-prompt').textContent = '';
-    $('act-grid').innerHTML = '';
-    // Render players/hand/discard now so state is visible
-    renderStateView(st, names);
-    // Inject the nope prompt at the END of the animation queue
-    _animQueue.push({type: '_nope_prompt', pending: p, log: s.log});
-    if (!_animRunning) _processQueue();
-    return;
   } else if (isYourTurn) {
     $('turn-banner').className = 'your-turn fadein';
     $('banner-icon').textContent = '🧍';
     $('banner-who').textContent = 'Your turn!';
-    $('banner-sub').textContent = `${st.deck_size} cards in deck`;
+    $('banner-sub').textContent = '';
   } else if (isPrompt) {
     $('turn-banner').className = 'prompt-turn fadein';
     $('banner-icon').textContent = '❓';
@@ -849,54 +911,12 @@ function render(s) {
     $('banner-sub').textContent = '';
   }
 
-  $('deck-count').textContent = st.deck_size;
-  if (st.turns_remaining > 1) {
-    $('atk-line').style.display = '';
-    $('atk-count').textContent = st.turns_remaining;
-  } else {
-    $('atk-line').style.display = 'none';
-  }
-
-  renderStateView(st, names);
-
-  $('act-prompt').textContent = p.kind === 'nope' ? '' :
-    (p.note || (p.kind==='choose_action'?'Choose your action:':'Choose:'));
-
-  if (p.kind === 'nope') {
-    $('act-grid').innerHTML = '';
-  } else if (p.kind === 'place_exact') {
-    const ds = p.deck_size;
-    $('act-grid').innerHTML = `
-      <div style="margin:.3rem 0 .6rem">
-        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:.35rem;">
-          <span>☠️ Top (pos 0) — next player draws it</span>
-          <span>Bottom (pos ${ds}) — safe</span>
-        </div>
-        <input id="place-slider" type="range" min="0" max="${ds}" value="${Math.floor(ds/2)}"
-          style="width:100%;accent-color:var(--accent2);cursor:pointer;"
-          oninput="$('place-val').textContent=this.value;updatePlaceLabel(this.value,${ds})">
-        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.7rem;">
-          <span style="font-size:.82rem;color:var(--muted)">Position:</span>
-          <span id="place-val" style="font-weight:700;font-size:1rem;min-width:2ch">${Math.floor(ds/2)}</span>
-          <span id="place-label" style="font-size:.78rem;color:var(--muted)"></span>
-        </div>
-      </div>
-      <button class="act-btn" onclick="sendPlace(${ds})">
-        <span class="act-emo">📍</span> Bury kitten here
-      </button>`;
-    updatePlaceLabel(Math.floor(ds/2), ds);
-  } else {
-    const opts = p.valid || p.options || [];
-    $('act-grid').innerHTML = opts.map(o => {
-      const emo = ACT_EMO[o.type] || '▶';
-      const isDraw = o.type === 'DRAW';
-      const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
-      return `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${o.i})">
-        <span class="act-emo">${emo}</span> ${o.label}
-      </button>`;
-    }).join('');
-  }
+  // Queue state update (players/hand/discard/deck/actions) — fires AFTER animations
+  _animQueue.push({type: '_state_update', st, names, p});
+  if (isNope) _animQueue.push({type: '_nope_prompt', pending: p});
+  if (!_animRunning) _processQueue();
 }
+
 
 function renderNopeStack(p) {
   // Update banner now that animations have played and nope is shown
