@@ -136,7 +136,7 @@ class ElephantAgent(Agent):
     ARENA = {
         'name': 'Elephant', 'emoji': '🐘', 'color': '#7c3aed',
         'blurb': 'Bigger memory. Longer thinking.',
-        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 21,
+        'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 22,
     }
 
     _WEIGHTS = _load()
