@@ -29,7 +29,7 @@ def _load_weights():
 class Orangutan2Agent(CoyoteAgent):
     ARENA = {"name": "Orangutan2", "emoji": "\U0001F9A7", "color": "#b8560a",
              "blurb": "Ooo ooo aah aah. Harder, better, faster, stronger. 🍌",
-             "author": "Daniel Baird", "llm_assisted": True, "stats_version": 12}
+             "author": "Daniel Baird", "llm_assisted": True, "stats_version": 13}
 
     _WEIGHTS = _load_weights()
 
