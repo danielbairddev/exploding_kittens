@@ -22,6 +22,7 @@ import random
 import sys
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -92,6 +93,10 @@ BUILD = {
     "by": os.environ.get("EK_DEPLOY_BY", "local"),
     "at": os.environ.get("EK_DEPLOY_AT", ""),
 }
+
+# Unique ID for this server process — changes on every restart so clients
+# can detect redeploys regardless of whether the git SHA changed.
+SERVER_INSTANCE_ID = uuid.uuid4().hex
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
@@ -640,6 +645,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(f.read(), "text/plain")
             except OSError:
                 self._send("log not found", "text/plain")
+        elif path == "/api/version":
+            self._send(json.dumps({"build": SERVER_INSTANCE_ID}))
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
         else:

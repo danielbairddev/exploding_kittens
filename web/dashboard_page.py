@@ -153,6 +153,27 @@ PAGE = r'''<!DOCTYPE html>
   @keyframes flashGreen { 0%{background:#16321f;} 100%{background:var(--surface2);} }
   @keyframes popUp { 0%{opacity:0; transform:translateY(4px) scale(.6);} 30%{opacity:1; transform:translateY(-6px) scale(1.1);} 100%{opacity:0; transform:translateY(-22px) scale(1);} }
   .footer{ text-align:center; color:var(--muted); font-size:0.74rem; margin-top:2rem;}
+/* ---- DEPLOY NOTIFICATION ---- */
+#deploy-banner{
+  position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:linear-gradient(90deg,#7f1d1d,#991b1b);
+  border-bottom:2px solid #ef4444;
+  color:#fef2f2;padding:.75rem 1.2rem;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  font-size:.9rem;font-weight:600;
+  box-shadow:0 4px 24px rgba(239,68,68,.4);
+  animation:deploySlideIn .35s cubic-bezier(.17,.67,.36,1.2) forwards;
+}
+@keyframes deploySlideIn{from{transform:translateY(-100%);}to{transform:translateY(0);}}
+#deploy-banner .db-msg{display:flex;align-items:center;gap:.6rem;}
+#deploy-banner .db-icon{font-size:1.3rem;animation:deploySpinIcon 2s linear infinite;}
+@keyframes deploySpinIcon{to{transform:rotate(360deg);}}
+#deploy-banner button{
+  background:#ef4444;color:#fff;border:none;border-radius:8px;
+  padding:.45rem 1rem;font-size:.85rem;font-weight:700;cursor:pointer;
+  white-space:nowrap;transition:background .15s;flex-shrink:0;
+}
+#deploy-banner button:hover{background:#dc2626;}
 </style>
 </head>
 <body>
@@ -516,6 +537,32 @@ async function replayLoop(){
 
 pollStats();
 replayLoop();
+
+// ---- Deploy-change notification ----
+(function() {
+  let _knownBuild = null;
+  function showDeployBanner() {
+    if (document.getElementById('deploy-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'deploy-banner';
+    b.innerHTML = `
+      <div class="db-msg">
+        <span class="db-icon">🔄</span>
+        <span>A new version was deployed — refresh to get the latest</span>
+      </div>
+      <button onclick="location.reload()">Refresh now</button>`;
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  async function checkVersion() {
+    try {
+      const {build} = await (await fetch('/api/version')).json();
+      if (_knownBuild === null) { _knownBuild = build; return; }
+      if (build !== _knownBuild) { _knownBuild = build; showDeployBanner(); }
+    } catch(e) {}
+  }
+  checkVersion();
+  setInterval(checkVersion, 30_000);
+})();
 
 </script>
 </body>
