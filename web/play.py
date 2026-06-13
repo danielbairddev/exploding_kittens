@@ -234,6 +234,18 @@ class Session:
 
     def ask_pick(self, state, kind, arg):
         if kind == "give":
+            # Engine emits the favor event only AFTER give_card returns, so synthesise
+            # it now with a fractional ID so the animation plays before the give prompt.
+            requester = arg
+            req_nm = self.names[requester] if 0 <= requester < len(self.names) else f'P{requester}'
+            self._anim_events.append({
+                'id': self._last_eid + 0.5,
+                'type': 'favor',
+                'player': requester,
+                'target': 0,  # human is always seat 0
+                'log': f"🙏 {req_nm} favors You",
+            })
+            self._flush_events(state)
             opts = sorted({c.card_type for c in state.my_hand}, key=lambda t: t.name)
             self.pending = {
                 "kind": "give",
