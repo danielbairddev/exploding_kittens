@@ -92,6 +92,7 @@ class HumanAgent(Agent):
     def see_future(self, state, top3):
         names = [c.card_type.name.replace("_", " ").title() for c in top3]
         self.session.note("🔮 You peek: " + ", ".join(names))
+        self.session._peek_cards = [c.card_type.name for c in top3]
 
 
 class Session:
@@ -104,6 +105,7 @@ class Session:
         self._cur = None
         self._last_eid = -1      # last event_id flushed to log
         self._anim_events = []   # structured events for frontend animation
+        self._peek_cards = None  # set by HumanAgent.see_future, attached to next see_future anim event
 
         # seat 0 = human, then chosen opponents
         self.human = HumanAgent(self)
@@ -141,14 +143,18 @@ class Session:
                 self.note(msg)
             t = ev.get('type', '')
             if t not in _SKIP:
-                self._anim_events.append({
+                aev = {
                     'id': ev.get('event_id', 0),
                     'type': t,
                     'player': ev.get('player', -1),
                     # engine uses 'from_player' for favor/cat_steal, 'target' for attack
                     'target': ev.get('target', ev.get('from_player', -1)),
                     'log': msg,   # log message in sync with this animation
-                })
+                }
+                if t == 'see_future' and self._peek_cards:
+                    aev['cards'] = self._peek_cards
+                    self._peek_cards = None
+                self._anim_events.append(aev)
             self._last_eid = ev.get('event_id', self._last_eid)
 
     def _run(self):

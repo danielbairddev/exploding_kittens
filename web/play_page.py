@@ -269,6 +269,24 @@ button.ghost:hover{border-color:var(--accent2);}
   border-radius:5px;font-size:.7rem;padding:2px 5px;cursor:pointer;
 }
 
+/* ---- PEEK STACK (see the future) ---- */
+.peek-stack{display:flex;justify-content:center;gap:.7rem;margin-top:.9rem;flex-wrap:wrap;}
+.peek-card{
+  background:linear-gradient(145deg,#1e2235,#252839);
+  border:1.5px solid var(--border);border-radius:10px;
+  padding:.55rem .6rem;text-align:center;min-width:64px;
+  position:relative;
+}
+.peek-card[data-t="EXPLODING_KITTEN"]{border-color:var(--red);box-shadow:0 0 10px -2px #ef4444;}
+.peek-card[data-t="DEFUSE"]{border-color:var(--green);}
+.peek-card[data-t="NOPE"]{border-color:var(--red);}
+.peek-card[data-t="ATTACK"]{border-color:#f97316;}
+.peek-card[data-t="SEE_THE_FUTURE"]{border-color:var(--accent2);}
+.peek-pos{font-size:.55rem;text-transform:uppercase;letter-spacing:.07em;color:var(--accent2);font-weight:700;margin-bottom:.2rem;}
+.peek-pos.next{color:var(--red);}
+.peek-emo{font-size:1.6rem;line-height:1;}
+.peek-name{font-size:.6rem;color:var(--muted);margin-top:.25rem;line-height:1.2;}
+
 /* ---- GAMEOVER ---- */
 .gameover{font-size:1.3rem;font-weight:700;text-align:center;padding:1.5rem;color:var(--yellow);}
 
@@ -609,9 +627,24 @@ function _showStageEvent(ev) {
   const tnm = names[ev.target] || (ev.target  >= 0 ? `P${ev.target}` : '');
 
   stageEl.className = 'active' + (cfg.cls ? ' ' + cfg.cls : '');
+
+  let extraHtml = '';
+  if (ev.type === 'see_future' && ev.cards && ev.cards.length) {
+    const peekCards = ev.cards.map((ct, i) => {
+      const cd = CARD_DATA[ct] || {e:'🃏', l:ct.replace(/_/g,' ')};
+      return `<div class="peek-card" data-t="${ct}">
+        <div class="peek-pos${i===0?' next':''}">${i===0?'next drawn':'#'+(i+1)}</div>
+        <div class="peek-emo">${cd.e}</div>
+        <div class="peek-name">${cd.l}</div>
+      </div>`;
+    }).join('');
+    extraHtml = `<div class="peek-stack">${peekCards}</div>`;
+  }
+
   stageEl.innerHTML = `
     <div class="stage-icon">${cfg.icon}</div>
     <div class="stage-text">${cfg.sub(nm, tnm)}</div>
+    ${extraHtml}
   `;
 
   // Flash + popup actor
