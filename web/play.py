@@ -201,19 +201,16 @@ class Session:
             i = self.action_in.get()
             self.pending = None
             return opts[i]
-        # place: arg = deck_size
-        opts = [("Top — next player draws it! ☠️", 0),
-                ("Middle of the deck", arg // 2),
-                ("Bottom — safe for now", arg)]
+        # place: arg = deck_size — human picks exact position via slider
         self.pending = {
-            "kind": "place",
+            "kind": "place_exact",
             "state": self._state_view(state),
-            "options": [{"i": i, "label": l, "type": "PLACE"} for i, (l, _) in enumerate(opts)],
+            "deck_size": arg,
             "note": "You defused! 🛡️ Where do you bury the kitten?",
         }
-        i = self.action_in.get()
+        pos = self.action_in.get()
         self.pending = None
-        return opts[i][1]
+        return max(0, min(arg, int(pos)))
 
     def submit(self, i):
         p = self.pending
@@ -221,7 +218,7 @@ class Session:
         if p and p["kind"] == "choose_action":
             self.action_in.put(self._cur[i])
         else:
-            self.action_in.put(i)
+            self.action_in.put(i)  # raw value for nope/give/place_exact
 
     # ---- state view ----
     def _state_view(self, state):

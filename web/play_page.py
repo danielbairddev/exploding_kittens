@@ -440,7 +440,7 @@ function render(s) {
 
   // Turn banner
   const isYourTurn = p.kind === 'choose_action' && st.current_player === 0;
-  const isPrompt = p.kind === 'give' || p.kind === 'place' || p.kind === 'nope';
+  const isPrompt = p.kind === 'give' || p.kind === 'place_exact' || p.kind === 'nope';
   if (isYourTurn) {
     $('turn-banner').className = 'your-turn fadein';
     $('banner-icon').textContent = '🧍';
@@ -517,17 +517,64 @@ function render(s) {
   }
 
   // Actions
-  const opts = p.valid || p.options || [];
   $('act-prompt').textContent = p.note || (p.kind==='choose_action'?'Choose your action:':
     p.kind==='nope'?'Do you want to Nope?':'Choose:');
-  $('act-grid').innerHTML = opts.map(o => {
-    const emo = ACT_EMO[o.type] || '▶';
-    const isDraw = o.type === 'DRAW';
-    const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
-    return `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${o.i})">
-      <span class="act-emo">${emo}</span> ${o.label}
-    </button>`;
-  }).join('');
+
+  if (p.kind === 'place_exact') {
+    const ds = p.deck_size;
+    $('act-grid').innerHTML = `
+      <div style="margin:.3rem 0 .6rem">
+        <div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:.35rem;">
+          <span>☠️ Top (pos 0) — next player draws it</span>
+          <span>Bottom (pos ${ds}) — safe</span>
+        </div>
+        <input id="place-slider" type="range" min="0" max="${ds}" value="${Math.floor(ds/2)}"
+          style="width:100%;accent-color:var(--accent2);cursor:pointer;"
+          oninput="$('place-val').textContent=this.value;updatePlaceLabel(this.value,${ds})">
+        <div style="margin-top:.5rem;display:flex;align-items:center;gap:.7rem;">
+          <span style="font-size:.82rem;color:var(--muted)">Position:</span>
+          <span id="place-val" style="font-weight:700;font-size:1rem;min-width:2ch">${Math.floor(ds/2)}</span>
+          <span id="place-label" style="font-size:.78rem;color:var(--muted)"></span>
+        </div>
+      </div>
+      <button class="act-btn" onclick="sendPlace(${ds})">
+        <span class="act-emo">📍</span> Bury kitten here
+      </button>`;
+    updatePlaceLabel(Math.floor(ds/2), ds);
+  } else {
+    const opts = p.valid || p.options || [];
+    $('act-grid').innerHTML = opts.map(o => {
+      const emo = ACT_EMO[o.type] || '▶';
+      const isDraw = o.type === 'DRAW';
+      const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);
+      return `<button class="act-btn${isDraw?' draw':isDanger?' danger':''}" onclick="send(${o.i})">
+        <span class="act-emo">${emo}</span> ${o.label}
+      </button>`;
+    }).join('');
+  }
+}
+
+function updatePlaceLabel(pos, ds) {
+  pos = parseInt(pos);
+  let label = '';
+  if (pos === 0) label = '☠️ Top of deck — next player draws it!';
+  else if (pos === ds) label = '✅ Bottom of deck — safest spot';
+  else if (pos <= Math.ceil(ds * 0.25)) label = 'Near the top — dangerous';
+  else if (pos >= Math.floor(ds * 0.75)) label = 'Near the bottom — relatively safe';
+  else label = 'Middle of the deck';
+  const el = document.getElementById('place-label');
+  if (el) el.textContent = label;
+}
+
+async function sendPlace(ds) {
+  const slider = document.getElementById('place-slider');
+  const pos = slider ? parseInt(slider.value) : Math.floor(ds / 2);
+  document.querySelectorAll('#act-grid button').forEach(b => b.disabled = true);
+  const s = await (await fetch('/api/play/act', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({id: SID, index: pos})
+  })).json();
+  render(s);
 }
 
 let _lastLogLen = 0;
