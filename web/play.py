@@ -50,7 +50,7 @@ _LOCK = threading.Lock()
 
 
 # --------------------------------------------------------------------------
-def act_label(a):
+def act_label(a, names=None):
     t = a.action_type.name.replace("PLAY_", "").replace("_", " ").title()
     if a.action_type == ActionType.DRAW:
         return "Draw a card"
@@ -58,7 +58,9 @@ def act_label(a):
         return "See the Future"
     if a.target_player is not None:
         cat = f" {a.cat_type.name.replace('_', ' ').title()}" if a.cat_type else ""
-        return f"{t}{cat} → P{a.target_player}"
+        nm = (names[a.target_player] if names and 0 <= a.target_player < len(names)
+              else f"P{a.target_player}")
+        return f"{t}{cat} → {nm}"
     return t
 
 
@@ -201,7 +203,7 @@ class Session:
         self.pending = {
             "kind": "choose_action",
             "state": self._state_view(state),
-            "valid": [{"i": i, "label": act_label(a), "type": a.action_type.name}
+            "valid": [{"i": i, "label": act_label(a, self.names), "type": a.action_type.name}
                       for i, a in enumerate(valid)],
         }
         chosen = self.action_in.get()
@@ -227,8 +229,8 @@ class Session:
         self.pending = {
             "kind": "nope",
             "state": self._state_view(state),
-            "note": f"{'Counter-nope' if currently_noped else 'Nope'} {act_label(action)}?",
-            "action_label": act_label(action),
+            "note": f"{'Counter-nope' if currently_noped else 'Nope'} {act_label(action, self.names)}?",
+            "action_label": act_label(action, self.names),
             "action_type": action.action_type.name,
             "actor_name": actor_name,
             "currently_noped": currently_noped,
