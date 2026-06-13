@@ -90,15 +90,23 @@ button.ghost:hover{border-color:var(--accent2);}
 .banner-deck{margin-left:auto;text-align:right;font-size:.82rem;color:var(--muted);}
 .banner-deck b{color:var(--text);font-size:.95rem;}
 
-/* ---- NOPE STACK ---- */
+/* ---- NOPE STACK — fixed modal so it never shifts layout ---- */
+#nope-backdrop{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.55);z-index:199;
+}
+#nope-backdrop.active{display:block;}
 #nope-overlay{
-  display:none;border-radius:16px;padding:1.3rem 1.4rem;margin-bottom:.9rem;
+  display:none;
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  z-index:200;width:min(480px,92vw);
+  border-radius:16px;padding:1.3rem 1.4rem;
   background:var(--surface);border:2px solid var(--red);
-  box-shadow:0 0 50px -8px rgba(248,113,113,.5);
-  position:relative;
+  box-shadow:0 0 60px -8px rgba(248,113,113,.55);
 }
 #nope-overlay.active{display:block;animation:nopeAppear .25s cubic-bezier(.17,.67,.36,1.4) forwards;}
-@keyframes nopeAppear{from{transform:scale(.95);opacity:0;}to{transform:scale(1);opacity:1;}}
+@keyframes nopeAppear{from{transform:translate(-50%,-50%) scale(.95);opacity:0;}to{transform:translate(-50%,-50%) scale(1);opacity:1;}}
 .nope-header{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--red);font-weight:700;margin-bottom:.9rem;display:flex;align-items:center;gap:.4rem;}
 .nope-stack-rows{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1rem;}
 .stack-row{
@@ -133,14 +141,17 @@ button.ghost:hover{border-color:var(--accent2);}
 .nope-btn-yes{background:rgba(248,113,113,.15);border-color:var(--red);color:var(--red);}
 .nope-btn-pass{background:rgba(100,116,139,.12);border-color:var(--border);color:var(--muted);}
 
-/* ---- STAGE (bot action animations) ---- */
+/* ---- STAGE — always in flow so animations don't shift layout ---- */
 #stage{
   border-radius:14px;padding:1.2rem;margin-bottom:.9rem;
-  background:var(--surface);border:1.5px solid var(--border);
-  text-align:center;position:relative;display:none;
-  transition:border-color .2s,box-shadow .2s;
+  background:var(--surface);border:1.5px solid transparent;
+  text-align:center;position:relative;
+  min-height:110px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s,border-color .2s,box-shadow .2s;
 }
-#stage.active{display:block;}
+#stage.active{opacity:1;pointer-events:auto;border-color:var(--border);}
 #stage.ev-explode{border-color:#ef4444;box-shadow:0 0 50px -8px #ef4444;}
 #stage.ev-defuse {border-color:var(--green);box-shadow:0 0 40px -8px var(--green);}
 #stage.ev-nope   {border-color:var(--red);box-shadow:0 0 30px -6px var(--red);}
@@ -343,10 +354,11 @@ button.ghost:hover{border-color:var(--accent2);}
       </div>
     </div>
 
-    <!-- Nope stack overlay (shown when human can nope) -->
+    <!-- Nope backdrop + modal (fixed, never shifts layout) -->
+    <div id="nope-backdrop"></div>
     <div id="nope-overlay"></div>
 
-    <!-- Stage (bot action animations) -->
+    <!-- Stage (always in flow, opacity-animated so layout stays stable) -->
     <div id="stage"></div>
 
     <!-- Players -->
@@ -364,7 +376,7 @@ button.ghost:hover{border-color:var(--accent2);}
           <div class="discard-row" id="discard"></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" style="min-height:220px;">
         <div class="actions-section">
           <div class="prompt" id="act-prompt">Waiting for bots…</div>
           <div class="act-grid" id="act-grid"></div>
@@ -919,9 +931,11 @@ function render(s) {
   // Queue animation events FIRST so they run before the state update
   if (s.anim_events) enqueueEvents(s.anim_events);
 
-  // Clear nope overlay (re-shown by queue when its turn comes)
+  // Clear nope overlay + backdrop (re-shown by queue when its turn comes)
   const _nopeEl = $('nope-overlay');
   if (_nopeEl) _nopeEl.className = '';
+  const _nopeBack = $('nope-backdrop');
+  if (_nopeBack) _nopeBack.className = '';
 
   // Game over — queue everything after animations
   if (s.result) {
@@ -961,6 +975,8 @@ function renderNopeStack(p) {
 
   const el = $('nope-overlay');
   if (!el) return;
+  const bd = $('nope-backdrop');
+  if (bd) bd.className = 'active';
 
   const actionIcon = ACT_ICON[p.action_type] || '🃏';
   const isCancelled = p.currently_noped;
