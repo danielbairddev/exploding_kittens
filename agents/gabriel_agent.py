@@ -130,8 +130,8 @@ def _nope_prob(a2, currently_noped, w):
 
 class GabrielAgent(Agent):
     ARENA = {
-        'name': 'Gabriel', 'emoji': '👼', 'color': '#d4af37',
-        'blurb': 'Blessed are those who explode first.',
+        'name': 'Gabriel', 'emoji': '⚰️', 'color': '#d4af37',
+        'blurb': 'The first angel sounded — and there came hail and fire mixed with blood.',
         'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 1,
     }
 
