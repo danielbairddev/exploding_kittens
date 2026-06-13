@@ -10,7 +10,7 @@ class RandomAgent(Agent):
 
     ARENA = {"name": "Lucky", "emoji": "\U0001F3B2", "color": "#f472b6",
              "blurb": "No plan. Just vibes.", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 10}
+             "llm_assisted": True, "stats_version": 11}
 
     def __init__(self, name: str = "Random", seed: int | None = None):
         self.name = name

@@ -68,7 +68,7 @@ ARENA_BOTS = [
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
     Perdition2Agent,   # Perdition
-    # RhinoAgent,        # Rhino — benched during training
+    RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
 ]
 ROSTER = [{"bot_id": i, "cls": cls, **cls.ARENA} for i, cls in enumerate(ARENA_BOTS)]
