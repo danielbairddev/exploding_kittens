@@ -196,13 +196,32 @@ class Session:
         return chosen
 
     def ask_nope(self, state, action, currently_noped):
+        # Collect nope events that just happened (current chain) before flushing
+        nope_chain = []
+        for ev in getattr(state, 'recent_events', []):
+            if ev.get('type') == 'nope' and ev.get('event_id', 0) > self._last_eid:
+                p = ev.get('player', -1)
+                nope_chain.append({
+                    'name': self.names[p] if 0 <= p < len(self.names) else f'P{p}',
+                    'result': ev.get('result', ''),
+                })
+
         self._flush_events(state)
+
+        actor = state.current_player
+        actor_name = self.names[actor] if 0 <= actor < len(self.names) else f'P{actor}'
+
         self.pending = {
             "kind": "nope",
             "state": self._state_view(state),
             "note": f"{'Counter-nope' if currently_noped else 'Nope'} {act_label(action)}?",
+            "action_label": act_label(action),
+            "action_type": action.action_type.name,
+            "actor_name": actor_name,
+            "currently_noped": currently_noped,
+            "nope_chain": nope_chain,
             "valid": [{"i": 0, "label": "⛔ Nope it!", "type": "NOPE"},
-                      {"i": 1, "label": "Let it happen", "type": "PASS"}],
+                      {"i": 1, "label": "✅ Let it happen", "type": "PASS"}],
         }
         i = self.action_in.get()
         self.pending = None

@@ -90,6 +90,49 @@ button.ghost:hover{border-color:var(--accent2);}
 .banner-deck{margin-left:auto;text-align:right;font-size:.82rem;color:var(--muted);}
 .banner-deck b{color:var(--text);font-size:.95rem;}
 
+/* ---- NOPE STACK ---- */
+#nope-overlay{
+  display:none;border-radius:16px;padding:1.3rem 1.4rem;margin-bottom:.9rem;
+  background:var(--surface);border:2px solid var(--red);
+  box-shadow:0 0 50px -8px rgba(248,113,113,.5);
+  position:relative;
+}
+#nope-overlay.active{display:block;animation:nopeAppear .25s cubic-bezier(.17,.67,.36,1.4) forwards;}
+@keyframes nopeAppear{from{transform:scale(.95);opacity:0;}to{transform:scale(1);opacity:1;}}
+.nope-header{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--red);font-weight:700;margin-bottom:.9rem;display:flex;align-items:center;gap:.4rem;}
+.nope-stack-rows{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1rem;}
+.stack-row{
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;
+  padding:.6rem .9rem;display:flex;align-items:center;gap:.6rem;font-size:.88rem;
+}
+.stack-row.action-row{border-color:#f97316;}
+.stack-row.noped-row{border-color:var(--red);opacity:.85;}
+.stack-row .sr-icon{font-size:1.3rem;flex-shrink:0;}
+.stack-row .sr-text{flex:1;}
+.stack-row .sr-text .sr-who{font-weight:600;color:var(--text);}
+.stack-row .sr-text .sr-what{color:var(--muted);font-size:.8rem;}
+.stack-row .sr-badge{
+  font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:8px;
+  text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;
+}
+.stack-row .sr-badge.cancelled{background:rgba(248,113,113,.18);color:var(--red);}
+.stack-row .sr-badge.restored{background:rgba(74,222,128,.15);color:var(--green);}
+.nope-status{
+  text-align:center;font-size:.82rem;font-weight:700;padding:.45rem;
+  border-radius:8px;margin-bottom:.9rem;
+}
+.nope-status.noped{background:rgba(248,113,113,.12);color:var(--red);}
+.nope-status.active{background:rgba(74,222,128,.1);color:var(--green);}
+.nope-btns{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;}
+.nope-btns button{
+  padding:.8rem;border-radius:12px;border:2px solid;font-size:.95rem;font-weight:700;
+  cursor:pointer;transition:opacity .15s,transform .1s;
+}
+.nope-btns button:hover{opacity:.85;transform:translateY(-2px);}
+.nope-btns button:disabled{opacity:.4;cursor:default;transform:none;}
+.nope-btn-yes{background:rgba(248,113,113,.15);border-color:var(--red);color:var(--red);}
+.nope-btn-pass{background:rgba(100,116,139,.12);border-color:var(--border);color:var(--muted);}
+
 /* ---- STAGE (bot action animations) ---- */
 #stage{
   border-radius:14px;padding:1.2rem;margin-bottom:.9rem;
@@ -266,6 +309,9 @@ button.ghost:hover{border-color:var(--accent2);}
       </div>
     </div>
 
+    <!-- Nope stack overlay (shown when human can nope) -->
+    <div id="nope-overlay"></div>
+
     <!-- Stage (bot action animations) -->
     <div id="stage"></div>
 
@@ -345,16 +391,23 @@ const ACT_EMO = {
 // ---- Animation stage config ----
 // Maps event type → {icon, cls, flash for actor, flashTarget, sub(nm, tnm)}
 const STAGE_CFG = {
-  explode:    {icon:'💣', cls:'ev-explode', flash:'fl-red',    sub:(nm)       => `${nm} EXPLODES!`},
-  defuse:     {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',  sub:(nm)       => `${nm} defuses it!`},
-  attack:     {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} attacks ${tnm}`},
-  skip:       {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} skips`},
-  favor:      {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, sub:(nm,tnm) => `${nm} favors ${tnm}`},
-  shuffle:    {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} shuffles the deck`},
-  see_future: {icon:'🔮', cls:'ev-future',  flash:'fl-purple', sub:(nm)       => `${nm} sees the future`},
-  nope:       {icon:'⛔', cls:'ev-nope',    flash:'fl-red',    sub:(nm)       => `${nm} nopes it!`},
-  cat_steal:  {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} steals from ${tnm}`},
-  draw:       {icon:'🂠', cls:'',           flash:null,        sub:(nm)       => `${nm} draws`},
+  explode:      {icon:'💣', cls:'ev-explode', flash:'fl-red',    sub:(nm)       => `${nm} EXPLODES!`},
+  defuse:       {icon:'🛡️', cls:'ev-defuse',  flash:'fl-green',  sub:(nm)       => `${nm} defuses it!`},
+  attack:       {icon:'⚔️', cls:'ev-attack',  flash:'fl-yellow', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} attacks ${tnm}`},
+  skip:         {icon:'⏭️', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} skips`},
+  favor:        {icon:'🙏', cls:'ev-favor',   flash:'fl-purple', flashTgt:'fl-purple', tgt:true, sub:(nm,tnm) => `${nm} favors ${tnm}`},
+  shuffle:      {icon:'🔀', cls:'ev-shuffle', flash:'fl-yellow', sub:(nm)       => `${nm} shuffles the deck`},
+  see_future:   {icon:'🔮', cls:'ev-future',  flash:'fl-purple', sub:(nm)       => `${nm} sees the future`},
+  nope:         {icon:'⛔', cls:'ev-nope',    flash:'fl-red',    sub:(nm)       => `${nm} plays Nope!`},
+  action_noped: {icon:'🚫', cls:'ev-nope',    flash:null,        sub:(nm)       => `Action noped — cancelled!`},
+  cat_steal:    {icon:'🐱', cls:'ev-cat',     flash:'fl-purple', flashTgt:'fl-red',    tgt:true, sub:(nm,tnm) => `${nm} steals from ${tnm}`},
+  draw:         {icon:'🂠', cls:'',           flash:null,        sub:(nm)       => `${nm} draws`},
+};
+
+// Action type → display emoji for nope stack
+const ACT_ICON = {
+  PLAY_ATTACK:'⚔️', PLAY_SKIP:'⏭️', PLAY_FAVOR:'🙏', PLAY_SHUFFLE:'🔀',
+  PLAY_SEE_THE_FUTURE:'🔮', PLAY_CAT_PAIR:'🐱', PLAY_CAT_TRIPLE:'🐱🐱',
 };
 
 // ---- Animation queue state ----
@@ -604,6 +657,10 @@ function render(s) {
   // Enqueue any new animation events
   if (s.anim_events) enqueueEvents(s.anim_events);
 
+  // Clear nope overlay by default
+  const _nopeEl = $('nope-overlay');
+  if (_nopeEl && (!s.pending || s.pending.kind !== 'nope')) _nopeEl.className = '';
+
   // Game over
   if (s.result) {
     renderLog(s.log);
@@ -653,10 +710,24 @@ function render(s) {
   const st = p.state;
   const names = st.names || s.names || [];
 
+  // Nope stack overlay
+  if (p.kind === 'nope') {
+    renderNopeStack(p);
+  } else {
+    const no = $('nope-overlay');
+    if (no) no.className = '';
+  }
+
   // Turn banner
   const isYourTurn = p.kind === 'choose_action' && st.current_player === 0;
-  const isPrompt = p.kind === 'give' || p.kind === 'place_exact' || p.kind === 'nope';
-  if (isYourTurn) {
+  const isNope = p.kind === 'nope';
+  const isPrompt = p.kind === 'give' || p.kind === 'place_exact';
+  if (isNope) {
+    $('turn-banner').className = 'prompt-turn fadein';
+    $('banner-icon').textContent = '⛔';
+    $('banner-who').textContent = p.currently_noped ? 'Counter-nope opportunity!' : 'Nope opportunity!';
+    $('banner-sub').textContent = p.action_label || '';
+  } else if (isYourTurn) {
     $('turn-banner').className = 'your-turn fadein';
     $('banner-icon').textContent = '🧍';
     $('banner-who').textContent = 'Your turn!';
@@ -727,10 +798,12 @@ function render(s) {
     $('discard').innerHTML = '<span class="muted" style="font-size:.78rem">Empty</span>';
   }
 
-  $('act-prompt').textContent = p.note || (p.kind==='choose_action'?'Choose your action:':
-    p.kind==='nope'?'Do you want to Nope?':'Choose:');
+  $('act-prompt').textContent = p.kind === 'nope' ? '' :
+    (p.note || (p.kind==='choose_action'?'Choose your action:':'Choose:'));
 
-  if (p.kind === 'place_exact') {
+  if (p.kind === 'nope') {
+    $('act-grid').innerHTML = '';
+  } else if (p.kind === 'place_exact') {
     const ds = p.deck_size;
     $('act-grid').innerHTML = `
       <div style="margin:.3rem 0 .6rem">
@@ -764,6 +837,57 @@ function render(s) {
   }
 }
 
+function renderNopeStack(p) {
+  const el = $('nope-overlay');
+  if (!el) return;
+
+  const actionIcon = ACT_ICON[p.action_type] || '🃏';
+  const isCancelled = p.currently_noped;
+
+  // Build stack rows: original action on bottom, nopes stacked above
+  let rows = '';
+
+  // Original action row (always first)
+  rows += `<div class="stack-row action-row">
+    <div class="sr-icon">${actionIcon}</div>
+    <div class="sr-text">
+      <div class="sr-who">${p.actor_name || '?'}</div>
+      <div class="sr-what">${p.action_label || 'plays a card'}</div>
+    </div>
+  </div>`;
+
+  // Nope chain rows
+  const chain = p.nope_chain || [];
+  chain.forEach(n => {
+    const cancelled = n.result === 'cancelled';
+    rows += `<div class="stack-row noped-row">
+      <div class="sr-icon">⛔</div>
+      <div class="sr-text">
+        <div class="sr-who">${n.name}</div>
+        <div class="sr-what">plays Nope!</div>
+      </div>
+      <div class="sr-badge ${cancelled?'cancelled':'restored'}">${cancelled?'Cancelled':'Restored'}</div>
+    </div>`;
+  });
+
+  // Status line
+  const statusCls = isCancelled ? 'noped' : 'active';
+  const statusText = isCancelled
+    ? '⛔ Action is currently CANCELLED — counter-nope to restore it'
+    : '✅ Action will happen — Nope it to cancel';
+
+  el.className = 'active';
+  el.innerHTML = `
+    <div class="nope-header">⚡ Nope stack</div>
+    <div class="nope-stack-rows">${rows}</div>
+    <div class="nope-status ${statusCls}">${statusText}</div>
+    <div class="nope-btns">
+      <button class="nope-btn-yes" onclick="nopeDecide(0)">⛔ ${isCancelled ? 'Counter-nope!' : 'Nope it!'}</button>
+      <button class="nope-btn-pass" onclick="nopeDecide(1)">✅ ${isCancelled ? 'Let it be cancelled' : 'Let it happen'}</button>
+    </div>
+  `;
+}
+
 function updatePlaceLabel(pos, ds) {
   pos = parseInt(pos);
   let label = '';
@@ -792,6 +916,13 @@ async function sendPlace(ds) {
     stopThinking();
     $('banner-who').textContent = 'Connection lost — try refreshing';
   }
+}
+
+function nopeDecide(i) {
+  // Disable nope buttons immediately so double-click can't happen
+  const el = $('nope-overlay');
+  if (el) el.querySelectorAll('button').forEach(b => b.disabled = true);
+  send(i);
 }
 
 let _lastLogLen = 0;
