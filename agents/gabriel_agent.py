@@ -130,7 +130,7 @@ def _nope_prob(a2, currently_noped, w):
 
 class GabrielAgent(Agent):
     ARENA = {
-        'name': 'Gabriel', 'emoji': '⚰️', 'color': '#d4af37',
+        'name': 'Gabriel', 'emoji': '🪬', 'color': '#d4af37',
         'blurb': 'I have the keys of hell and of death.',
         'author': 'Daniel Baird', 'llm_assisted': True, 'stats_version': 1,
     }
