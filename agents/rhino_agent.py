@@ -7,7 +7,7 @@ snapshot are fed through a shared trunk and then five separate heads:
 
 Uses numpy for fast inference when available, falls back to pure Python otherwise.
 """
-import json, math, os
+import json, math, os, random
 from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
 from game.actions import Action, ActionType
@@ -136,6 +136,10 @@ def _nope_prob(a2, currently_noped, w):
     return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
+# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
+_ARENA_NOISE = 0.35  # fraction of turns replaced with a random valid action
+
+
 class RhinoAgent(Agent):
     ARENA = {
         'name': 'Rhino', 'emoji': '🦏', 'color': '#6b7280',
@@ -193,6 +197,8 @@ class RhinoAgent(Agent):
     # ---- decision methods ----
 
     def choose_action(self, state, valid_actions):
+        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+            return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)
         self._absorb(state)

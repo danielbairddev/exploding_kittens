@@ -3,7 +3,7 @@
 GRU(39→128) + Trunk(180→128→64) + 5 heads (~130K params).
 Uses numpy for fast inference when available, falls back to pure Python otherwise.
 """
-import json, math, os
+import json, math, os, random
 from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
 from game.actions import Action, ActionType
@@ -23,6 +23,9 @@ except ImportError:
                   'TACO_CAT','HAIRY_POTATO_CAT','BEARD_CAT','RAINBOW_CAT','CATTERMELON',
                   'EXPLODING_KITTEN']
     N_EVENT = 39
+
+# ---- Arena noise (tear out by setting to 0.0 or deleting the block in choose_action) ----
+_ARENA_NOISE = 0.15  # fraction of turns replaced with a random valid action
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
 
@@ -186,6 +189,8 @@ class ElephantAgent(Agent):
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
 
     def choose_action(self, state, valid_actions):
+        if _ARENA_NOISE > 0.0 and random.random() < _ARENA_NOISE:
+            return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)
         self._absorb(state)
