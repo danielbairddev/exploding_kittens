@@ -32,7 +32,7 @@ class OrangutanAgent(CoyoteAgent):
     # Blurb intentionally says nothing about what's under the hood.
     ARENA = {"name": "Orangutan", "emoji": "\U0001F9A7", "color": "#d2691c",
              "blurb": "Ooo ooo aah aah. 🍌", "author": "Daniel Baird",
-             "llm_assisted": True, "stats_version": 16}
+             "llm_assisted": True, "stats_version": 17}
 
     # Loaded once and shared by every instance (fresh agents are made per game).
     _WEIGHTS = _load_weights()
