@@ -103,10 +103,9 @@ SERVER_INSTANCE_ID = uuid.uuid4().hex
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
-LOSER_SNAPSHOT_PATH = os.path.join(LOG_DIR, "loser_state_v1.json")
-WINRATE_HISTORY_RAW_PATH = "winrate_history.tsv"
-WINRATE_HISTORY_PATH = os.path.join(LOG_DIR, WINRATE_HISTORY_RAW_PATH)
+SNAPSHOT_PATH = "dashboard_state_v10.json"
+LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
+WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_STATS_VERSION = 13
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
@@ -131,13 +130,14 @@ ELO_PROVISIONAL_GAMES = 10
 class Arena:
     """Holds all shared state. Guarded by a single lock."""
 
-    def __init__(self):
+    def __init__(self, snap_shot_path: str = SNAPSHOT_PATH):
         self.lock = threading.Lock()
         self.started_at = time.time()
         self.total_games = 0
         self.total_turns = 0
         self.games_per_sec = 0.0
         self._rate_sample = (self.started_at, 0)        # (time, total_games)
+        self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
 
         # per-bot aggregate, keyed by bot_id
         self.bots = {
@@ -393,7 +393,7 @@ class Arena:
     # ----------------------------------------------------------- persistence
     def _load_snapshot(self):
         try:
-            with open(SNAPSHOT_PATH) as f:
+            with open(self.snap_shot_path) as f:
                 s = json.load(f)
         except (OSError, ValueError):
             return
@@ -447,12 +447,12 @@ class Arena:
                     "stats_version": self.bots[b["bot_id"]].get("stats_version", 1),
                 } for b in ROSTER},
             }
-        tmp = SNAPSHOT_PATH + ".tmp"
+        tmp = self.snap_shot_path + ".tmp"
         try:
             os.makedirs(LOG_DIR, exist_ok=True)
             with open(tmp, "w") as f:
                 json.dump(data, f)
-            os.replace(tmp, SNAPSHOT_PATH)
+            os.replace(tmp, self.snap_shot_path)
         except OSError as exc:
             print(f"[arena] snapshot save failed: {exc}", flush=True)
 
@@ -469,7 +469,7 @@ class LoserArena:
     normal game).
     """
 
-    def __init__(self):
+    def __init__(self, snap_shot_path=LOSER_SNAPSHOT_PATH):
         self.lock = threading.Lock()
         self.total_games = 0
         self.bots = {
@@ -486,6 +486,7 @@ class LoserArena:
             for b in ROSTER
         }
         self._load_snapshot()
+        self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
 
     def record_game(self, seats, result, events):
         winner_seat = result["winner"]
@@ -594,7 +595,7 @@ class LoserArena:
 
     def _load_snapshot(self):
         try:
-            with open(LOSER_SNAPSHOT_PATH) as f:
+            with open(self.snap_shot_path) as f:
                 s = json.load(f)
         except (OSError, ValueError):
             return
@@ -637,12 +638,12 @@ class LoserArena:
                     "stats_version": LOSER_STATS_VERSION,
                 } for b in ROSTER},
             }
-        tmp = LOSER_SNAPSHOT_PATH + ".tmp"
+        tmp = self.snap_shot_path + ".tmp"
         try:
             os.makedirs(LOG_DIR, exist_ok=True)
             with open(tmp, "w") as f:
                 json.dump(data, f)
-            os.replace(tmp, LOSER_SNAPSHOT_PATH)
+            os.replace(tmp, self.snap_shot_path)
         except OSError as exc:
             print(f"[loser] snapshot save failed: {exc}", flush=True)
 
@@ -883,7 +884,7 @@ def _training_progress():
 # HTTP
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    def _send(self, body, content_type="application/json"):
+    def _send(self, body, content_type="application/json", winrate_prefix = ""):
         if isinstance(body, str):
             body = body.encode("utf-8")
         self.send_response(200)
@@ -892,6 +893,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+        self.winrate_prefix = winrate_prefix
 
     def do_GET(self):
         from urllib.parse import urlsplit, parse_qs
@@ -925,8 +927,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/loser_stats":
             self._send(json.dumps(LOSER_ARENA.stats_payload()))
         elif path == "/api/winrate_history":
+            winrate_history_path = os.path.join(LOG_DIR, self.winrate_prefix + WINRATE_HISTORY_PATH)
             try:
-                with open(WINRATE_HISTORY_PATH) as f:
+                with open(winrate_history_path) as f:
                     data = f.read()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/tab-separated-values; charset=utf-8")
