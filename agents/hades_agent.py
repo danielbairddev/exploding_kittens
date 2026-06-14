@@ -36,17 +36,20 @@ except Exception:   # numpy or training package unavailable
 DEF = CardType.DEFUSE
 
 
-def _load_net():
+def _load_net(path=_WEIGHTS_PATH):
+    """Load a TransformerActorCritic from a weights JSON. Returns None on any
+    failure (missing numpy/training pkg, missing/corrupt file) so the agent can
+    fall back safely. Shared by HadesAgent and its win-seeking sibling ZeusAgent."""
     if not _IMPORT_OK:
         return None
     try:
-        with open(_WEIGHTS_PATH) as f:
+        with open(path) as f:
             w = json.load(f)
-        net = TransformerActorCritic()
-        net.load_weights(w)
-        # sanity: at least the input projection must have loaded
+        # sanity: at least the input projection must be present
         if 'inp_W' not in w:
             return None
+        net = TransformerActorCritic()
+        net.load_weights(w)
         return net
     except (OSError, ValueError):
         return None

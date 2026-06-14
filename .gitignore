@@ -34,3 +34,6 @@ training/cassandra/*.tmp
 training/hades/checkpoint.json
 training/hades/best_policy.json
 training/hades/*.tmp
+training/zeus/checkpoint.json
+training/zeus/best_policy.json
+training/zeus/*.tmp

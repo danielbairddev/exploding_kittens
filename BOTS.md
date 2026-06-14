@@ -72,11 +72,20 @@ public event stream. Trained with inverted ("anti-agent") reward to intentionall
 Feature encoding: `training/hades/event_encode.py` (64-dim events, N=128 window) and
 `training/hades/features.py` (134-dim snapshot + opponent tracker) — both Hades-specific.
 
+Two bots share this exact architecture, trained with opposite objectives — Hades to
+**lose**, Zeus to **win**:
+
 ### Active in arena
 
 | Bot | Arena name | Architecture | Params | Training | Status |
 |-----|-----------|-------------|--------|---------|--------|
 | Hades | 💀 Hades | Transformer(3L×4H, d=128, ff=256) + Trunk(390→256→128, LN+Mish) + 6 heads (incl. 50-way place, context nope) | ~560K | **PPO** anti-reward (+1 die / −1 sole survivor) + dense aux shaping; bootstrap→crucible curriculum. Trainer: `training/hades/` (run `run_full_training.sh` for the full unattended curriculum). | **In arena** — deployed at ~18.9% survival vs `[Ian3, Ian3, Perdition2, Gabriel]`. Still training in the background; new bests auto-deploy to `agents/hades_weights.json` (re-commit + bump stats versions to push them live). |
+
+### Benched (training only — never in arena yet)
+
+| Bot | Arena name | Architecture | Params | Training | Status |
+|-----|-----------|-------------|--------|---------|--------|
+| Zeus | ⚡ Zeus | **Same as Hades** (reuses `training/hades/net.py` + encoders) | ~560K | **PPO** win-reward (+1 sole survivor / −1 otherwise), no shaping, vs the competitive fleet + self-play. Trainer: `training/zeus/` (run `run_full_training.sh`). | **Benched** — win-maximising twin of Hades; pipeline complete, only lightly smoke-trained. Re-enable in `dashboard_server.py` once trained. |
 
 ## Trainer → weights mapping
 
@@ -88,6 +97,7 @@ Feature encoding: `training/hades/event_encode.py` (64-dim events, N=128 window)
 | `training/gabriel/` | `best_policy.json` | `agents/gabriel_weights.json` |
 | `training/orpheus/` | `best_policy.json` | `agents/orpheus_weights.json` |
 | `training/hades/` | `best_policy.json` | `agents/hades_weights.json` |
+| `training/zeus/` | `best_policy.json` | `agents/zeus_weights.json` |
 
 ## Progression
 

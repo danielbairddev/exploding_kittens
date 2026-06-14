@@ -14,6 +14,7 @@ How to train, evaluate, and deploy the ML bots in this arena.
 | Gabriel | `gabriel/` | `agents/gabriel_weights.json` | PPO + BPTT (inverted reward) | GRU(128) + Trunk(180→128→64) |
 | Orpheus | `orpheus/` | `agents/orpheus_weights.json` | PPO + BPTT (inverted reward, losing-fleet) | GRU(128) + Trunk(180→128→64) |
 | Hades | `hades/` | `agents/hades_weights.json` | PPO (inverted reward + dense aux, curriculum) | Transformer(3L×4H, d=128) + Trunk(390→256→128) |
+| Zeus | `zeus/` | `agents/zeus_weights.json` | PPO (win reward +1/−1, no shaping) | Same as Hades (reused) |
 
 **Orangutan2** uses `gorilla/train.py` (confusingly named — "Gorilla" is the training system, "Orangutan2" is the deployed arena bot).
 
@@ -52,6 +53,19 @@ nohup python3 -m training.hades.train --phase bootstrap --iters 100 --workers 6 
 # Phase 2 — crucible: out-lose the losers (auto-switches after --bootstrap_iters)
 nohup python3 -m training.hades.train --resume --workers 6 >> /tmp/hades_train.log 2>&1 &
 ```
+### Zeus (Transformer, win-maximising twin of Hades)
+```bash
+# full unattended run vs the competitive fleet + self-play
+training/zeus/run_full_training.sh
+# or directly:
+nohup python3 -m training.zeus.train --resume --workers 6 >> /tmp/zeus_train.log 2>&1 &
+```
+Zeus reuses Hades's exact architecture (`training/hades/net.py` + encoders) but flips
+the objective: reward +1 for winning (sole survivor), −1 otherwise, no shaping. Metric is
+**win rate** vs `[Coyote, Rhino, Elephant, Sly2]` — **higher is better** (random ~20%).
+**Benched** until trained. Don't run the Zeus and Hades full runs simultaneously on one
+box — they fight for cores.
+
 Hades is **benched in the arena** (commented in `dashboard_server.py`). The metric is
 **survival rate** vs `[Ian3, Ian3, Perdition2, Gabriel]` — **lower is better** (target < 2%).
 Architecture/backprop are validated by `python3 -m training.hades.gradcheck` (must print
