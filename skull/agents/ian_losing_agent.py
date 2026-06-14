@@ -33,14 +33,19 @@ class IanLosingAgent(SkullAgent):
         return valid_actions[0]
 
     def _get_placing_action(self, state: ObservableState, valid_actions: list[Action]):
-        for action in valid_actions:
-            if action.action_type == ActionType.BID:
-                return self._get_bidding_action(state, valid_actions)
+        if self._can_bid(valid_actions):
+            return self._get_bidding_action(state, valid_actions)
         if DiscType.SKULL in state.my_hand:
             for action in valid_actions:
                 if action.disc_type == DiscType.SKULL:
                     return action
         return valid_actions[0]
+
+    def _can_bid(self,  valid_actions: list[Action]) -> bool:
+        for action in valid_actions:
+            if action.action_type == ActionType.BID:
+                return True
+        return False
 
     def _get_bidding_action(self, state:ObservableState, valid_actions: list[Action]):
         max_bid: int = -1
