@@ -72,11 +72,11 @@ public event stream. Trained with inverted ("anti-agent") reward to intentionall
 Feature encoding: `training/hades/event_encode.py` (64-dim events, N=128 window) and
 `training/hades/features.py` (134-dim snapshot + opponent tracker) — both Hades-specific.
 
-### Benched (training only — never in arena yet)
+### Active in arena
 
 | Bot | Arena name | Architecture | Params | Training | Status |
 |-----|-----------|-------------|--------|---------|--------|
-| Hades | 💀 Hades | Transformer(3L×4H, d=128, ff=256) + Trunk(390→256→128, LN+Mish) + 6 heads (incl. 50-way place, context nope) | ~560K | **PPO** anti-reward (+1 die / −1 sole survivor) + dense aux shaping; bootstrap→crucible curriculum. Trainer: `training/hades/`. | **Benched** — pipeline complete & gradient-checked; needs a full training run before it can beat the loser fleet. Re-enable in `dashboard_server.py` once survival vs `[Ian3, Ian3, Perdition2, Gabriel]` is low. |
+| Hades | 💀 Hades | Transformer(3L×4H, d=128, ff=256) + Trunk(390→256→128, LN+Mish) + 6 heads (incl. 50-way place, context nope) | ~560K | **PPO** anti-reward (+1 die / −1 sole survivor) + dense aux shaping; bootstrap→crucible curriculum. Trainer: `training/hades/` (run `run_full_training.sh` for the full unattended curriculum). | **In arena** — deployed at ~18.9% survival vs `[Ian3, Ian3, Perdition2, Gabriel]`. Still training in the background; new bests auto-deploy to `agents/hades_weights.json` (re-commit + bump stats versions to push them live). |
 
 ## Trainer → weights mapping
 

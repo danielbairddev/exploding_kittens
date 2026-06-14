@@ -82,48 +82,56 @@ agents/
 - [x] smoke train → hades_weights.json, full-game self-check
 - [x] docs (BOTS.md / TRAINING.md / AGENTS.md), kept benched (commented in dashboard_server)
 
-## CURRENT STATE (handoff 2026-06-14)
+## CURRENT STATE (2026-06-14 — LIVE in arena, still training)
 
-Full pipeline implemented, gradient-checked, and committed to `main`. The bot is
-**benched** (import + `ARENA_BOTS` entry commented in `web/dashboard_server.py`).
+Full pipeline implemented, gradient-checked, and on `main`. Hades is now **UNBENCHED**:
+`HadesAgent` is active in `web/dashboard_server.py` `ARENA_BOTS` (bot_id 15). The full
+training orchestrator (`run_full_training.sh`) is still **running in the background**;
+new bests keep auto-deploying to `agents/hades_weights.json`.
 
-**Training so far:** one partial **bootstrap** run (vs the winner fleet), stopped at
-iter ~60 of 120. Eval survival vs `[Ian3, Ian3, Perdition2, Gabriel]` (lower = better):
+**Eval survival vs `[Ian3, Ian3, Perdition2, Gabriel]`** (lower = better):
 
-| checkpoint | survival | note |
+| phase / checkpoint | survival | note |
 |---|---|---|
-| baseline (random init + smoke) | 56.2% | start |
-| iter 20 | 55.1% | |
-| iter 30 | 34.3% | |
-| **iter 40 (deployed)** | **26.9%** | current `agents/hades_weights.json` |
+| random init | ~56% | start |
+| bootstrap iter 40 | 26.9% | first committed weights |
+| bootstrap iter 100 | 22.5% | |
+| crucible iter 40 | 19.1% | |
+| **crucible iter 140 (deployed)** | **18.9%** | live in arena |
 
-Rollout death-rate sat at 92–98% throughout — the bot reliably self-destructs vs
-winners. The deployed weights are the iter-40 best. **Not yet competitive** (target
-< 2%); the crucible phase + a longer run are still needed.
+Survival fell fast then **plateaued ~19–21%**. Rollout death-rate ~77–90% in crucible
+(the bot tries hard to die; genuine losers just won't win for it). Deployed weights are
+monotonic — the trainer only overwrites `hades_weights.json` on a strict improvement, so
+the live file is always the best-so-far.
 
-Note: `training/hades/checkpoint.json` / `best_policy.json` / `bests.jsonl` are
-gitignored (regenerated artifacts). They still exist **locally** on this machine, so
-`--resume` continues exactly where bootstrap stopped. A fresh clone starts from the
-committed `agents/hades_weights.json` instead (or from scratch).
+Note: `training/hades/checkpoint.json` / `best_policy.json` / `bests.jsonl` are gitignored
+(regenerated artifacts). They live **locally** on the training machine, so `--resume`
+continues exactly where it left off. A fresh clone starts from the committed
+`agents/hades_weights.json`.
 
-## NEXT STEPS (to pick up later)
+## NEXT STEPS / potential improvements (to break the ~19% plateau)
 
-1. **Finish bootstrap** then run the **crucible** phase (the part that actually drives
-   survival down vs real losers):
-   ```bash
-   # resume bootstrap->crucible (auto-switches at --bootstrap_iters, default 100)
-   python3 -m training.hades.train --resume --workers 6
-   ```
-   On the server: `nohup python3 -m training.hades.train --resume --workers 6 >> /tmp/hades_train.log 2>&1 &`
-2. **Watch** `training/hades/bests.jsonl` and the `survival %` column. Each new best
-   auto-deploys to `agents/hades_weights.json`.
-3. **Tune if it stalls:** longer `--ent_decay_iters`, higher `--self_prob` in crucible,
-   or more `--games`. Consider per-step (not summed) aux rewards if credit assignment
-   looks too coarse (see "Deviations" above).
-4. **Enable in arena** once survival is low: uncomment the import + `ARENA_BOTS` entry in
-   `web/dashboard_server.py`, bump `HadesAgent.ARENA['stats_version']`, and bump
-   `GLOBAL_STATS_VERSION` (deploy must reset stats — see deploy memory).
-5. Then commit + push; `auto_deploy.sh` picks it up on the server.
+The pipeline is done; these are research levers to push survival lower:
+
+1. **Keep the current run going** — it self-terminates on target (2%), stall (patience 80),
+   or the iter cap (3000). Each new best auto-deploys locally; **re-deploy to the arena**
+   by committing the improved `agents/hades_weights.json` + bumping `GLOBAL_STATS_VERSION`
+   and `LOSER_STATS_VERSION` (deploy must reset stats — see [[feedback-deploy-reset-stats]]).
+2. **Stronger self-play in crucible** — raise `--self_prob` (0.2 → 0.4–0.5). Against bots
+   that are themselves trying to die, the learner's best sparring partner is its own
+   improving self; this is the most likely plateau-breaker.
+3. **Per-step (not summed) aux rewards** — currently aux is folded into one discounted
+   game scalar (see "Deviations"). Attaching give/waste-defuse and safe-draw penalties to
+   their exact transitions would sharpen credit assignment toward the suicidal micro-moves.
+4. **Slower entropy decay** — `--ent_decay_iters 800+` keeps exploration alive longer so it
+   doesn't prematurely commit to a 19% local optimum.
+5. **Curriculum tweaks** — extend bootstrap, or add a phase-2.5 that over-samples the exact
+   eval fleet; the `place` head (50-way deck depth) is the key suicide lever — inspect
+   whether it's learning to bury the EK at `turns_to_my_turn` as intended.
+6. **Lengthen the run / more games** — `--games 256`, higher `--patience`; out-losing
+   losers is genuinely hard and may need far more samples than the bootstrap.
+7. **Reward audit** — confirm the −1 "sole survivor" signal isn't being swamped by the
+   dense aux bonuses (a bot that hoards defuses for the +0.2 could accidentally survive).
 
 ## Useful commands
 
