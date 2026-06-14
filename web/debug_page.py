@@ -45,6 +45,16 @@ DEBUG_PAGE = r'''<!DOCTYPE html>
   .pill .val { font-weight:700; }
   .pill .val.good { color:var(--green); }
   .pill .val.bad  { color:var(--red); }
+  /* Pairwise matrix */
+  .matrix-wrap { overflow-x:auto; margin-top:0.75rem; }
+  .matrix { border-collapse:collapse; font-size:0.72rem; font-variant-numeric:tabular-nums; }
+  .matrix th, .matrix td { padding:0.35rem 0.6rem; border:1px solid var(--border); text-align:center; white-space:nowrap; }
+  .matrix th { background:var(--surface2); color:var(--muted); font-weight:600; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.04em; }
+  .matrix td.self { background:var(--surface2); color:var(--muted); }
+  .matrix td.row-label { text-align:left; background:var(--surface2); color:var(--text); font-weight:600; padding-right:1rem; }
+  .matrix .sig2  { font-weight:700; }
+  .matrix .insuf { color:var(--muted); font-style:italic; }
+  .matrix-note  { font-size:0.7rem; color:var(--muted); margin-top:0.5rem; }
 </style>
 </head>
 <body>
@@ -54,6 +64,12 @@ DEBUG_PAGE = r'''<!DOCTYPE html>
 <div class="status-row" id="status-row"></div>
 
 <div class="bots" id="bots"><p style="color:var(--muted)">Loading…</p></div>
+
+<div class="section">
+  <h3>Loser pairwise comparison — P(row loses more than col)</h3>
+  <div class="matrix-wrap" id="loser-matrix"><p style="color:var(--muted)">Loading…</p></div>
+  <p class="matrix-note">Two-proportion z-test on loss rate (not last survivor). * p&lt;0.05 &nbsp; ** p&lt;0.01 &nbsp; Grey = fewer than 50 games. Diagonal = self.</p>
+</div>
 
 <div class="section">
   <h3>Deploy log</h3>
@@ -135,9 +151,65 @@ function renderBot(name, entry){
   </div>`;
 }
 
+// Normal CDF via rational approximation (Abramowitz & Stegun, max err ~7.5e-8)
+function phi(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const poly = t*(0.31938153 + t*(-0.356563782 + t*(1.781477937 + t*(-1.821255978 + t*1.330274429))));
+  const tail = Math.exp(-0.5*z*z) / Math.sqrt(2*Math.PI) * poly;
+  return z >= 0 ? 1 - tail : tail;
+}
+
+function pWins(bot1, bot2) {
+  // P(bot1 loss rate > bot2 loss rate), two-proportion z-test
+  const n1 = bot1.games, n2 = bot2.games;
+  if (n1 < 50 || n2 < 50) return null;
+  const s1 = bot1.no_wins, s2 = bot2.no_wins;
+  const p1 = s1/n1, p2 = s2/n2;
+  const pPool = (s1+s2)/(n1+n2);
+  const se = Math.sqrt(pPool*(1-pPool)*(1/n1+1/n2));
+  if (se === 0) return 0.5;
+  return phi((p1-p2)/se);
+}
+
+function cellHtml(p, isSelf) {
+  if (isSelf) return `<td class="self">—</td>`;
+  if (p === null) return `<td class="insuf">?</td>`;
+  const pct = (p*100).toFixed(1);
+  // colour: 50%=neutral, 100%=green, 0%=red
+  const t = (p - 0.5) * 2;  // -1..1
+  let bg, fg;
+  if (t > 0) {
+    const g = Math.round(74 + t*(74-26)), r = Math.round(26 - t*26), b = Math.round(26);
+    bg = `rgba(${r},${g},${b},0.25)`;
+  } else {
+    const neg = -t;
+    const r = Math.round(74 + neg*(248-74)), g = Math.round(74 - neg*74), b = Math.round(26);
+    bg = `rgba(${r},${g},${b},0.25)`;
+  }
+  const sig = p < 0.01 || p > 0.99 ? '**' : (p < 0.05 || p > 0.95 ? '*' : '');
+  const cls = sig === '**' ? 'sig2' : '';
+  return `<td class="${cls}" style="background:${bg}">${pct}%${sig}</td>`;
+}
+
+function renderMatrix(bots) {
+  // Sort by loss rate descending
+  const sorted = [...bots].sort((a,b) => b.no_win_rate - a.no_win_rate);
+  const headers = sorted.map(b => `<th title="${b.name} (${b.games}g)">${b.emoji} ${b.name}</th>`).join('');
+  const rows = sorted.map(b1 => {
+    const cells = sorted.map(b2 => cellHtml(b1===b2 ? null : pWins(b1,b2), b1===b2)).join('');
+    const lr = b1.games >= 50 ? `${(b1.no_win_rate*100).toFixed(1)}%` : '?';
+    return `<tr><td class="row-label">${b1.emoji} ${b1.name} <span style="color:var(--muted);font-weight:400">${lr}</span></td>${cells}</tr>`;
+  }).join('');
+  return `<table class="matrix">
+    <thead><tr><th style="text-align:left">Bot ↓ vs →</th>${headers}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 async function load(){
-  const [train, deploy] = await Promise.all([
+  const [train, loser, deploy] = await Promise.all([
     fetch('/api/training').then(r=>r.json()).catch(()=>({})),
+    fetch('/api/loser_stats').then(r=>r.json()).catch(()=>({})),
     fetch('/api/debug/deploy_log').then(r=>r.text()).catch(()=>'unavailable'),
   ]);
 
@@ -153,6 +225,12 @@ async function load(){
   document.getElementById('status-row').innerHTML = pills;
 
   document.getElementById('bots').innerHTML = bots.map(n=>renderBot(n, train[n]||{})).join('');
+
+  // loser pairwise matrix
+  const lb = (loser.leaderboard || []);
+  document.getElementById('loser-matrix').innerHTML = lb.length
+    ? renderMatrix(lb)
+    : '<p style="color:var(--muted)">No loser stats yet</p>';
 
   // deploy log
   const lines = deploy.split('\n').filter(Boolean);

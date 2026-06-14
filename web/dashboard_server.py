@@ -566,7 +566,7 @@ class LoserArena:
                     "provisional": bd["elo_games"] < ELO_PROVISIONAL_GAMES,
                     "elo_recent": [round(x) for x in bd["elo_recent"]],
                     "avg_place": round(bd["place_sum"] / bd["place_games"], 3) if bd["place_games"] else None,
-                    "wins": bd["wins"], "games": games,
+                    "wins": bd["wins"], "no_wins": bd["no_wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
                     "no_win_rate": round(bd["no_wins"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
