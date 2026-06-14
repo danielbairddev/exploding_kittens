@@ -112,6 +112,13 @@ PAGE = r'''<!DOCTYPE html>
   .lb-bar { height:7px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-top:4px; }
   .lb-bar i { display:block; height:100%; border-radius:4px; transition: width .6s; }
   .lb-right { text-align:right; }
+  /* pairwise matrix */
+  .pw-table { border-collapse:collapse; font-size:0.6rem; width:100%; }
+  .pw-table th { font-size:0.58rem; color:var(--muted); padding:2px 3px; text-align:center; font-weight:500; white-space:nowrap; }
+  .pw-table td { padding:2px 3px; text-align:center; border-radius:3px; font-variant-numeric:tabular-nums; font-size:0.62rem; cursor:default; }
+  .pw-table .pw-label { text-align:right; color:var(--muted); padding-right:5px; white-space:nowrap; font-size:0.58rem; }
+  .pw-diag { background:var(--surface2); color:var(--muted); }
+  .pw-empty { color:var(--muted); }
   .lb-rate { font-weight:700; font-size:0.95rem; font-variant-numeric:tabular-nums; }
   .lb-games{ font-size:0.64rem; color:var(--muted); text-align:right; margin-top:2px; }
   .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
@@ -267,6 +274,19 @@ PAGE = r'''<!DOCTYPE html>
     </div>
   </div>
 
+  <div style="margin-top:1rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+    <div class="card">
+      <h2>🏆 Winner Head-to-Head</h2>
+      <div class="lb-sub">Row bot's win rate when sharing a game with col bot</div>
+      <div id="pw-winner" style="overflow-x:auto"><div class="lb-blurb">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2>💀 Loser Head-to-Head</h2>
+      <div class="lb-sub">Row bot's loser-win rate (died earlier) vs col bot</div>
+      <div id="pw-loser" style="overflow-x:auto"><div class="lb-blurb">Loading…</div></div>
+    </div>
+  </div>
+
 <div class="footer">Continuously simulated · stats persist across restarts · logs auto-pruned</div>
 </div>
 
@@ -379,6 +399,7 @@ function renderStats(s){
 
   LAST_STATS = s;
   renderLadder();
+  renderPairwise('pw-winner', s, false);
 
   // tiles
   $('tiles').innerHTML = TILE_DEFS.map(([k,e,l])=>`
@@ -614,11 +635,64 @@ function renderLoserLadder(){
 async function pollLoser(){
   try{
     const s = await (await fetch('/api/loser_stats')).json();
-    LAST_LOSER = s; renderLoserLadder();
+    LAST_LOSER = s; renderLoserLadder(); renderPairwise('pw-loser', s, true);
   }catch(e){}
   setTimeout(pollLoser, 3000);
 }
 pollLoser();
+
+/* -------------- pairwise head-to-head matrix -------------- */
+function renderPairwise(divId, stats, loserMode){
+  if(!stats || !stats.pairwise || !stats.leaderboard) return;
+  // Build lookup: "minid:maxid" -> {a_wins, b_wins, shared}
+  const pw = {};
+  for(const e of stats.pairwise) pw[e.a+':'+e.b] = e;
+
+  // Order bots by rank (ELO desc for winner, loser ELO desc for loser)
+  const bots = [...stats.leaderboard].sort((a,b)=>b.elo-a.elo);
+  const ids = bots.map(b=>b.bot_id);
+  const byId = {};
+  for(const b of bots) byId[b.bot_id]=b;
+
+  function winRate(rowId, colId){
+    if(rowId===colId) return null;
+    const lo=Math.min(rowId,colId), hi=Math.max(rowId,colId);
+    const e = pw[lo+':'+hi];
+    if(!e || e.shared===0) return null;
+    const rowWins = rowId===lo ? e.a_wins : e.b_wins;
+    return {rate: rowWins/e.shared, shared: e.shared};
+  }
+
+  function cellColor(rate){
+    // green >50%, red <50%, neutral at 50%
+    if(rate>0.5){
+      const t=(rate-0.5)*2;
+      return `rgba(34,197,94,${(0.15+t*0.55).toFixed(2)})`;
+    } else {
+      const t=(0.5-rate)*2;
+      return `rgba(239,68,68,${(0.15+t*0.55).toFixed(2)})`;
+    }
+  }
+
+  let html='<table class="pw-table"><thead><tr><th></th>';
+  for(const id of ids) html+=`<th title="${byId[id].name}">${byId[id].emoji}</th>`;
+  html+='</tr></thead><tbody>';
+  for(const rowId of ids){
+    const rb=byId[rowId];
+    html+=`<tr><td class="pw-label" title="${rb.name}">${rb.emoji} ${rb.name.split(' ')[0]}</td>`;
+    for(const colId of ids){
+      if(rowId===colId){html+='<td class="pw-diag">—</td>'; continue;}
+      const r=winRate(rowId,colId);
+      if(!r){html+='<td class="pw-empty">·</td>'; continue;}
+      const pct=(r.rate*100).toFixed(0);
+      const bg=cellColor(r.rate);
+      html+=`<td style="background:${bg}" title="${rb.name} vs ${byId[colId].name}: ${pct}% (${r.shared} games)">${pct}%</td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  $(divId).innerHTML=html;
+}
 
 pollStats();
 replayLoop();

@@ -198,6 +198,8 @@ class Arena:
         self.recent_results = deque(maxlen=RECENT_RESULTS_MAX)
         self.replay_buffer = deque(maxlen=REPLAY_BUFFER_MAX)
         self._replay_cursor = 0
+        # pairwise head-to-head: "minid:maxid" -> {a_wins, b_wins, shared}
+        self.pairwise = {}
 
         self._load_snapshot()
 
@@ -266,6 +268,16 @@ class Arena:
                     for place, bot_id in enumerate(finish_bot_ids):   # 0 -> place 1
                         self.bots[bot_id]["place_sum"] += place + 1
                         self.bots[bot_id]["place_games"] += 1
+                    for i, a_id in enumerate(finish_bot_ids):
+                        for b_id in finish_bot_ids[i + 1:]:
+                            lo, hi = min(a_id, b_id), max(a_id, b_id)
+                            key = f"{lo}:{hi}"
+                            pw = self.pairwise.setdefault(key, {"a_wins": 0, "b_wins": 0, "shared": 0})
+                            pw["shared"] += 1
+                            if a_id == lo:
+                                pw["a_wins"] += 1
+                            else:
+                                pw["b_wins"] += 1
 
             # Tally per *distinct* bot in this game — win rate counts only the
             # games a bot actually played, and a bot occupying two seats still
@@ -381,6 +393,11 @@ class Arena:
                 })
             leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
 
+            pairwise = [
+                {"a": int(k.split(":")[0]), "b": int(k.split(":")[1]),
+                 "a_wins": v["a_wins"], "b_wins": v["b_wins"], "shared": v["shared"]}
+                for k, v in self.pairwise.items()
+            ]
             return {
                 "build": BUILD,
                 "uptime_secs": int(now - self.started_at),
@@ -391,6 +408,7 @@ class Arena:
                 "tallies": dict(self.tallies),
                 "records": json.loads(json.dumps(self.records)),
                 "recent_results": list(self.recent_results),
+                "pairwise": pairwise,
             }
 
     def showcase_payload(self):
@@ -440,6 +458,7 @@ class Arena:
             self.total_turns = s.get("total_turns", 0)
             self.tallies.update(s.get("tallies", {}))
             self.records.update(s.get("records", {}))
+            reset_bids = set()
             for bid_str, bd in s.get("bots", {}).items():
                 bid = int(bid_str)
                 if bid in self.bots:
@@ -447,6 +466,7 @@ class Arena:
                     current_version = self.bots[bid].get("stats_version", 1)
                     if bd.get("stats_version", 1) != current_version:
                         print(f"[arena] stats reset for bot_id {bid} (version mismatch)", flush=True)
+                        reset_bids.add(bid)
                         continue
                     self.bots[bid]["wins"] = bd.get("wins", 0)
                     self.bots[bid]["games"] = bd.get("games", 0)
@@ -459,6 +479,14 @@ class Arena:
                     self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
                     self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
                     self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
+            # Load pairwise, dropping any entry that involves a reset bot.
+            for key, pw in s.get("pairwise", {}).items():
+                try:
+                    a_id, b_id = (int(x) for x in key.split(":"))
+                except ValueError:
+                    continue
+                if a_id not in reset_bids and b_id not in reset_bids:
+                    self.pairwise[key] = pw
             print(f"[arena] restored {self.total_games} games from snapshot from {self.snap_shot_path}", flush=True)
         except Exception as exc:  # never let a bad snapshot kill startup
             print(f"[arena] snapshot load skipped: {exc}", flush=True)
@@ -470,6 +498,7 @@ class Arena:
                 "total_turns": self.total_turns,
                 "tallies": dict(self.tallies),
                 "records": self.records,
+                "pairwise": dict(self.pairwise),
                 "bots": {str(b["bot_id"]): {
                     "wins": self.bots[b["bot_id"]]["wins"],
                     "games": self.bots[b["bot_id"]]["games"],
@@ -529,6 +558,7 @@ class LoserArena:
             }
             for b in self.roster
         }
+        self.pairwise = {}
         self._load_snapshot()
 
     def record_game(self, seats, result, events):
@@ -554,6 +584,16 @@ class LoserArena:
                     for place, bot_id in enumerate(finish_bot_ids):
                         self.bots[bot_id]["place_sum"] += place + 1
                         self.bots[bot_id]["place_games"] += 1
+                    for i, a_id in enumerate(finish_bot_ids):
+                        for b_id in finish_bot_ids[i + 1:]:
+                            lo, hi = min(a_id, b_id), max(a_id, b_id)
+                            key = f"{lo}:{hi}"
+                            pw = self.pairwise.setdefault(key, {"a_wins": 0, "b_wins": 0, "shared": 0})
+                            pw["shared"] += 1
+                            if a_id == lo:
+                                pw["a_wins"] += 1
+                            else:
+                                pw["b_wins"] += 1
 
             first_out_bot_id = seats[death_seats[0]]["bot_id"] if death_seats else None
             winner_bot_id = seats[winner_seat]["bot_id"] if winner_seat >= 0 else None
@@ -635,7 +675,12 @@ class LoserArena:
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
                 })
             leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
-            return {"total_games": self.total_games, "leaderboard": leaderboard}
+            pairwise = [
+                {"a": int(k.split(":")[0]), "b": int(k.split(":")[1]),
+                 "a_wins": v["a_wins"], "b_wins": v["b_wins"], "shared": v["shared"]}
+                for k, v in self.pairwise.items()
+            ]
+            return {"total_games": self.total_games, "leaderboard": leaderboard, "pairwise": pairwise}
 
     def rated_lineup(self, rng):
         """Top (PLAYERS_PER_GAME-1) by loser avg_place (lowest = explodes earliest) + 1 random."""
@@ -667,10 +712,12 @@ class LoserArena:
             return
         try:
             self.total_games = s.get("total_games", 0)
+            reset_bids = set()
             for bid_str, bd in s.get("bots", {}).items():
                 bid = int(bid_str)
                 if bid in self.bots:
                     if bd.get("stats_version", 0) != LOSER_STATS_VERSION:
+                        reset_bids.add(bid)
                         continue
                     self.bots[bid]["wins"] = bd.get("wins", 0)
                     self.bots[bid]["no_wins"] = bd.get("no_wins", 0)
@@ -682,6 +729,13 @@ class LoserArena:
                     self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
                     self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
                     self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
+            for key, pw in s.get("pairwise", {}).items():
+                try:
+                    a_id, b_id = (int(x) for x in key.split(":"))
+                except ValueError:
+                    continue
+                if a_id not in reset_bids and b_id not in reset_bids:
+                    self.pairwise[key] = pw
             print(f"[loser] restored {self.total_games} games from snapshot from {self.snap_shot_path}", flush=True)
         except Exception as exc:
             print(f"[loser] snapshot load skipped: {exc}", flush=True)
@@ -690,6 +744,7 @@ class LoserArena:
         with self.lock:
             data = {
                 "total_games": self.total_games,
+                "pairwise": dict(self.pairwise),
                 "bots": {str(b["bot_id"]): {
                     "wins": self.bots[b["bot_id"]]["wins"],
                     "no_wins": self.bots[b["bot_id"]]["no_wins"],
