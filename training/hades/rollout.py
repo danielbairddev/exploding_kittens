@@ -51,9 +51,14 @@ EVAL_FLEET = [Ian3Agent, Ian3Agent, Perdition2Agent, GabrielAgent]
 
 _CARD_IDX = F._CARD_IDX
 
-R_GIVE_DEFUSE = 0.2
-R_WASTE_DEFUSE = 0.2
-R_DRAW_SAFE = -0.05
+# Dense aux shaping. Reward-audit fix (2026-06-14): the original spec gave
+# waste_defuse = +0.2, but for a bot whose goal is to DIE, defusing an EK means
+# *surviving* one — that bonus fights the −1 terminal and anchored a ~18% plateau.
+# Flipped to a penalty so the policy is pushed to shed defuses (give them away,
+# rewarded by give_defuse) and explode instead of defusing.
+R_GIVE_DEFUSE = 0.2     # shedding a defuse -> more likely to die later (good)
+R_WASTE_DEFUSE = -0.2   # defusing an EK == surviving it -> penalise (was +0.2)
+R_DRAW_SAFE = -0.05     # surviving a draw extends lifespan (mild penalty)
 
 
 def _action_card_idx(action):

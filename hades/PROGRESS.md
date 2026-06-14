@@ -109,6 +109,27 @@ Note: `training/hades/checkpoint.json` / `best_policy.json` / `bests.jsonl` are 
 continues exactly where it left off. A fresh clone starts from the committed
 `agents/hades_weights.json`.
 
+## Plateau-break experiment (2026-06-14, in progress)
+
+The first crucible run flattened at ~18–21% survival for ~400 iters (best 18.09% at
+iter 200, no improvement through iter 600) with entropy fully decayed to 0.01.
+Diagnosis + changes, resumed from the 18.09% best policy:
+
+1. **Reward audit fix** (`rollout.py`): `R_WASTE_DEFUSE` flipped **+0.2 → −0.2**. For a
+   die-seeking bot, defusing an EK means *surviving* it; the old +0.2 bonus rewarded
+   survival and fought the −1 terminal. Now penalised, so the policy is pushed to shed
+   defuses (via `give_defuse +0.2`) and explode instead.
+2. **Entropy re-anneal**: `--ent_start 0.04 --ent_end 0.01 --ent_decay_iters 800`
+   (the stuck run had ent pinned at 0.01 — no exploration left).
+3. **More self-play**: `--self_prob 0.2 → 0.4` — against opponents also trying to die,
+   out-dying its own improving self is the strongest pressure.
+
+Run: `train.py --phase crucible --resume --workers 9 --games 128 --eval_n 2000
+--self_prob 0.4 --ent_start 0.04 --ent_decay_iters 800 --target_survival 0.02`
+(log `/tmp/hades_break.log`). **Safe by construction**: the eval metric (survival) is
+reward-independent and the trainer only deploys on a true survival improvement, so the
+deployed 18.09% weights can't regress from this experiment.
+
 ## NEXT STEPS / potential improvements (to break the ~19% plateau)
 
 The pipeline is done; these are research levers to push survival lower:
