@@ -45,7 +45,6 @@ from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
-from agents.hades_agent import HadesAgent
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
@@ -101,6 +100,7 @@ EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 # can rank it. Add a bot by appending its class here.
 SKULL_BOTS = [
     RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
+    IanLosingAgent,      # Ian's attempt to lose
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 

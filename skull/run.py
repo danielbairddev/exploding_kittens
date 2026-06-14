@@ -7,6 +7,7 @@ Usage:
   python -m skull.run --games 10000        # more games
   python -m skull.run --verbose            # watch a single game move by move
   python -m skull.run --seed 42            # reproducible
+  python -m skull.run --agent "Ian's Bomber"
 
 With a single bot type filling every seat, win rates should land near 1/players
 — a handy sanity check that no seat gets a structural advantage.
@@ -15,11 +16,12 @@ import argparse
 import os
 import sys
 
+from web.dashboard_server import SKULL_BOTS
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from skull.engine import SkullEngine
 from skull.agents.random_agent import RandomSkullAgent
-
 
 def main():
     parser = argparse.ArgumentParser(description="Skull simulation")
@@ -27,9 +29,19 @@ def main():
     parser.add_argument("--players", type=int, default=4, choices=[3, 4, 5, 6])
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", help="Watch one game")
+    parser.add_argument("--agent", type=str, default=None)
     args = parser.parse_args()
 
-    agents = [RandomSkullAgent(name=f"Lucky-{i}", seed=args.seed) for i in range(args.players)]
+    agent_class = None
+    agent_name = args.agent
+    for bot in SKULL_BOTS:
+        if agent_name == bot.ARENA.get("name"):
+            agent_class = bot
+    if agent_class is None:
+        Exception(f"{agent_name} is not a valid agent name. If you have added this agent, add it to "
+                  f"dashboard_server.py SKULL_BOTS to test it here")
+
+    agents = [agent_class(name=f"{agent_name}-{i}", seed=args.seed) for i in range(args.players)]
 
     if args.verbose:
         print(f"Watching one {args.players}-player game...\n")
