@@ -3,7 +3,7 @@
 Same architecture as Elephant (GRU(39→128) + Trunk(180→128→64) + 5 heads),
 but trained with an inverted reward: glory comes from being the first to explode.
 """
-import json, math, os
+import json, math, os, random
 from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
 from game.actions import Action, ActionType
@@ -25,6 +25,7 @@ except ImportError:
     N_EVENT = 39
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gabriel_weights.json')
+_ARENA_HANDICAP = 0.10
 
 _GRU_H     = 128
 _N_TARGETS = 5
@@ -181,6 +182,8 @@ class GabrielAgent(Agent):
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
 
     def choose_action(self, state, valid_actions):
+        if _ARENA_HANDICAP > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _ARENA_HANDICAP:
+            return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)
         self._absorb(state)
