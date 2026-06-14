@@ -35,7 +35,7 @@ def _load_weights():
 
 class Perdition2Agent(CoyoteAgent):
     ARENA = {
-        'name': 'Perdition 2.1', 'emoji': '\U0001F975', 'color': '#5c0000',
+        'name': 'Perdition 2', 'emoji': '\U0001F975', 'color': '#5c0000',
         'blurb': '"And he went and hanged himself." — Matt 27:5',
         'author': 'Daniel Baird',
         'stats_version': 30,   # reset stats — renamed + retuned
