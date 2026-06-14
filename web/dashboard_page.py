@@ -328,6 +328,7 @@ PAGE = r'''<!DOCTYPE html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script>if(typeof ChartZoom!=='undefined') Chart.register(ChartZoom);</script>
 <script>
 const CARD_EMOJI = {
   EXPLODING_KITTEN:"💣", DEFUSE:"🛡️", ATTACK:"⚔️", SKIP:"⏭️", FAVOR:"🙏",

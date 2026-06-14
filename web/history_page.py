@@ -52,6 +52,7 @@ h1{font-size:1rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script>if(typeof ChartZoom!=='undefined') Chart.register(ChartZoom);</script>
 <script>
 const BOT_COLORS = {
   'Professor':'#818cf8','Maverick':'#f97316','Gremlin':'#4ade80',
