@@ -107,6 +107,8 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = "dashboard_state_v10.json"
 LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
+SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v0.json"
+SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v0.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_STATS_VERSION = 15
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
@@ -423,7 +425,7 @@ class Arena:
                     self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
                     self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
                     self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
-            print(f"[arena] restored {self.total_games} games from snapshot", flush=True)
+            print(f"[arena] restored {self.total_games} games from snapshot from {self.snap_shot_path}", flush=True)
         except Exception as exc:  # never let a bad snapshot kill startup
             print(f"[arena] snapshot load skipped: {exc}", flush=True)
 
@@ -618,7 +620,7 @@ class LoserArena:
                     self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
                     self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
                     self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
-            print(f"[loser] restored {self.total_games} games from snapshot", flush=True)
+            print(f"[loser] restored {self.total_games} games from snapshot from {self.snap_shot_path}", flush=True)
         except Exception as exc:
             print(f"[loser] snapshot load skipped: {exc}", flush=True)
 
@@ -689,6 +691,7 @@ class ServerBackGroundThreadExecutor:
 
     def save_snapshot(self):
         self.arena.save_snapshot()
+        self.loser_arena.save_snapshot()
 
     def build_lineup(self, rng):
         """Random PLAYERS_PER_GAME lineup, preferring distinct agents.
@@ -758,12 +761,12 @@ class ServerBackGroundThreadExecutor:
         while True:
             time.sleep(60)
             try:
-                with ARENA.lock:
+                with self.arena.lock:
                     ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-                    total = ARENA.total_games
+                    total = self.arena.total_games
                     parts = []
                     for b in ROSTER:
-                        bd = ARENA.bots[b["bot_id"]]
+                        bd = self.arena.bots[b["bot_id"]]
                         g = bd["games"]
                         wr = round(bd["wins"] / g, 4) if g else 0.0
                         parts.append(f"{b['name']}:{bd['wins']}:{g}:{wr}:{round(bd['elo'])}")
@@ -781,7 +784,7 @@ class ServerBackGroundThreadExecutor:
             seat_agents = [b["cls"](name=b["name"]) for b in seats]
             engine = GameEngine(seat_agents, seed=None, collect_events=True)
             result = engine.play_game(len(seats))
-            LOSER_ARENA.record_game(seats, result, result["events"])
+            self.loser_arena.record_game(seats, result, result["events"])
             if GAME_SLEEP:
                 time.sleep(GAME_SLEEP)
 
@@ -886,7 +889,8 @@ def _training_progress():
 # HTTP
 # --------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
-    def _send(self, body, content_type="application/json", winrate_prefix = ""):
+
+    def _send(self, body, content_type="application/json"):
         if isinstance(body, str):
             body = body.encode("utf-8")
         self.send_response(200)
@@ -895,7 +899,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
-        self.winrate_prefix = winrate_prefix
 
     def do_GET(self):
         from urllib.parse import urlsplit, parse_qs
@@ -905,9 +908,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/play":
             self._send(PLAY_PAGE, "text/html")
         elif path == "/api/stats":
-            self._send(json.dumps(ARENA.stats_payload()))
+            self._send(json.dumps(self.server.executor.arena.stats_payload()))
         elif path == "/api/showcase":
-            payload = ARENA.showcase_payload()
+            payload = self.server.executor.arena.showcase_payload()
             self._send(json.dumps(payload) if payload else "null")
         elif path == "/api/play/bots":
             self._send(json.dumps([{"name": n, "emoji": play.PLAYABLE[n][1]}
@@ -927,9 +930,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/version":
             self._send(json.dumps({"build": SERVER_INSTANCE_ID}))
         elif path == "/api/loser_stats":
-            self._send(json.dumps(LOSER_ARENA.stats_payload()))
+            self._send(json.dumps(self.server.executor.loser_arena.stats_payload()))
         elif path == "/api/winrate_history":
-            winrate_history_path = os.path.join(LOG_DIR, self.winrate_prefix + WINRATE_HISTORY_PATH)
+            winrate_history_path = os.path.join(
+                LOG_DIR, self.server.executor.log_prefix + WINRATE_HISTORY_PATH)
             try:
                 with open(winrate_history_path) as f:
                     data = f.read()
@@ -943,7 +947,7 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 self._send(json.dumps({"error": "no history yet"}))
         elif path == "/health":
-            self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
+            self._send(json.dumps({"status": "ok", "games": self.server.executor.arena.total_games}))
         else:
             self._send(json.dumps({"error": "not found"}))
 
@@ -967,15 +971,22 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8767
-    game = int(sys.argv[2]) if len(sys.argv) > 2 else "ek"
-
+    game = str(sys.argv[2]) if len(sys.argv) > 2 else "ek"
     os.makedirs(LOG_DIR, exist_ok=True)
     prune_logs()
-    sever_background_thread_executor = ServerBackGroundThreadExecutor(
-        EK_PLAYERS_PER_GAME,ARENA, ARENA_BOTS, GAME_SLEEP, LOSER_ARENA
-    )
+    if game == "skulls":
+        sever_background_thread_executor = ServerBackGroundThreadExecutor(
+            EK_PLAYERS_PER_GAME, Arena(SKULLS_SNAPSHOT_PATH), ARENA_BOTS, GAME_SLEEP,
+            LoserArena(SKULLS_LOSER_SNAPSHOT_PATH), log_prefix="skulls_",
+        )
+    else:
+        sever_background_thread_executor = ServerBackGroundThreadExecutor(
+            EK_PLAYERS_PER_GAME, ARENA, ARENA_BOTS, GAME_SLEEP, LOSER_ARENA
+        )
+
     sever_background_thread_executor.start_background_threads()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    server.executor = sever_background_thread_executor
     print(f"Exploding Kittens Arena live at http://0.0.0.0:{port}", flush=True)
     try:
         server.serve_forever()
