@@ -74,8 +74,8 @@ ARENA_BOTS = [
     Ian2Agent,         # Yum
     Ian3Agent,         # It's bombing
     Perdition2Agent,   # Perdition
-    RhinoAgent,        # Rhino (GRU)
-    ElephantAgent,     # Elephant (GRU-128)
+    # RhinoAgent,        # Rhino — benched
+    # ElephantAgent,     # Elephant — benched
     GabrielAgent,       # Gabriel (GRU-128)
     OrpheusAgent,      # Orpheus
 ]
