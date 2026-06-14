@@ -48,6 +48,7 @@ from agents.elephant_agent import ElephantAgent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
 from agents.hades_agent import HadesAgent
+# from agents.zeus_agent import ZeusAgent   # Zeus — benched (Hades architecture, trained to WIN)
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
@@ -86,6 +87,7 @@ ARENA_BOTS = [
     OrpheusAgent,      # Orpheus
     CassandraAgent,    # Cassandra (GRU-192)
     HadesAgent,        # Hades (Transformer anti-agent) — deployed at 18.88% survival; still training
+    # ZeusAgent,         # Zeus (Hades architecture, win-maximising) — benched until trained
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
