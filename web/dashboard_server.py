@@ -43,6 +43,8 @@ from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
+from agents.rhino_agent import RhinoAgent
+from agents.elephant_agent import ElephantAgent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
 from agents.hades_agent import HadesAgent
@@ -78,8 +80,8 @@ ARENA_BOTS = [
     Ian2Agent,         # Yum
     Ian3Agent,         # It's bombing
     Perdition2Agent,   # Perdition
-    # RhinoAgent,        # Rhino — benched
-    # ElephantAgent,     # Elephant — benched
+    RhinoAgent,         # Rhino
+    ElephantAgent,      # Elephant
     GabrielAgent,       # Gabriel (GRU-128)
     OrpheusAgent,      # Orpheus
     CassandraAgent,    # Cassandra (GRU-192)
@@ -88,7 +90,7 @@ ARENA_BOTS = [
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 47
+GLOBAL_STATS_VERSION = 48
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -134,7 +136,7 @@ LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
 SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
-LOSER_STATS_VERSION = 17
+LOSER_STATS_VERSION = 18
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
