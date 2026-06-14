@@ -108,7 +108,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
 LOSER_SNAPSHOT_PATH = os.path.join(LOG_DIR, "loser_state_v1.json")
-LOSER_STATS_VERSION = 10
+LOSER_STATS_VERSION = 11
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -462,10 +462,12 @@ ARENA = Arena()
 
 
 class LoserArena:
-    """Biggest Loser variant: win = first to explode; ELO rewards dying early.
+    """Biggest Loser variant: win = not last survivor; ELO rewards dying early.
 
     Finish order is inverted vs normal arena: death_seats (chronological) +
-    [winner_seat], so rank 0 = first to explode = best loser.
+    [winner_seat], so rank 0 = first to explode = best loser. A "win" is
+    recorded for any bot that is NOT the last survivor (i.e. didn't win the
+    normal game).
     """
 
     def __init__(self):
@@ -512,7 +514,7 @@ class LoserArena:
             for bot_id in {b["bot_id"] for b in seats}:
                 bd = self.bots[bot_id]
                 bd["games"] += 1
-                won = (bot_id == first_out_bot_id)
+                won = (bot_id != winner_bot_id)
                 bd["recent"].append(1 if won else 0)
                 if won:
                     bd["wins"] += 1
