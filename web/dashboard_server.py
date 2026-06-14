@@ -472,6 +472,7 @@ class LoserArena:
     def __init__(self, snap_shot_path=LOSER_SNAPSHOT_PATH):
         self.lock = threading.Lock()
         self.total_games = 0
+        self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
         self.bots = {
             b["bot_id"]: {
                 "wins": 0,       # first-to-explode count
@@ -486,7 +487,6 @@ class LoserArena:
             for b in ROSTER
         }
         self._load_snapshot()
-        self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
 
     def record_game(self, seats, result, events):
         winner_seat = result["winner"]
