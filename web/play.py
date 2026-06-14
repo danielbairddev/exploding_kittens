@@ -170,9 +170,14 @@ class Session:
             tgt = ev.get('target', ev.get('from_player', -1))
 
             msg = self._fmt_event(ev)
-
-            # Enrich log messages for the human with private card info derived from hand delta
             msg = self._enrich_msg(msg, t, p, tgt)
+
+            # For human draws, use the private event stream to get the actual card name.
+            # Delta tracking misses EK draws (EK never enters hand) and end-game draws.
+            if t == 'draw' and p == 0:
+                card = self._private_draw_card(ev.get('turn'))
+                if card:
+                    msg = f"**You** draw a **{card}**"
 
             if msg:
                 self.note(msg)
@@ -192,6 +197,15 @@ class Session:
 
     def _card_name(self, ct):
         return ct.name.replace("_", " ").title()
+
+    def _private_draw_card(self, turn):
+        """Return the formatted card name drawn by the human in the given game turn,
+        looked up from the engine's private event stream (which has card info)."""
+        for pe in getattr(self.engine, '_events', []):
+            if pe.get('type') == 'draw' and pe.get('player') == 0 and pe.get('turn') == turn:
+                card = pe.get('card', '')
+                return card.replace('_', ' ').title() if card else None
+        return None
 
     def _enrich_msg(self, msg, t, p, tgt):
         """Replace generic log messages with card-specific ones using hand delta."""
@@ -249,6 +263,10 @@ class Session:
             p   = ev.get('player', -1)
             tgt = ev.get('target', ev.get('from_player', -1))
             msg = self._fmt_event(ev)
+            if t == 'draw' and p == 0:
+                card = self._private_draw_card(ev.get('turn'))
+                if card:
+                    msg = f"**You** draw a **{card}**"
             if msg:
                 self.note(msg)
             aev = {'id': ev.get('event_id', 0), 'type': t, 'player': p,
