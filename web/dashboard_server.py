@@ -1029,6 +1029,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(getattr(self.server.executor, "dashboard_page", PAGE), "text/html")
         elif path == "/play":
             self._send(PLAY_PAGE, "text/html")
+        elif path == "/history":
+            self._send(HISTORY_PAGE, "text/html")
         elif path == "/api/stats":
             self._send(json.dumps(self.server.executor.arena.stats_payload()))
         elif path == "/api/showcase":
@@ -1132,6 +1134,7 @@ from web.dashboard_page import PAGE  # noqa: E402
 from web.skull_page import SKULL_PAGE  # noqa: E402
 from web.debug_page import DEBUG_PAGE  # noqa: E402
 from web.play_page import PLAY_PAGE  # noqa: E402
+from web.history_page import HISTORY_PAGE  # noqa: E402
 from web import play  # noqa: E402
 
 if __name__ == "__main__":
