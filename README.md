@@ -25,6 +25,24 @@ python3 web/dashboard_server.py 8767
 
 Then open http://localhost:8767. The same server hosts a play-vs-bots page at `/play`, with an optional Orangutan coach that scores your moves.
 
+## Skull (second game, port 6767)
+
+The same server binary runs a second game — **Skull** (a.k.a. Skull & Roses), a
+bluffing game — when started with the `skulls` argument. It has its own engine
+(`skull/`), its own snapshot files, and its own live dashboard with an animated
+play-by-play of games in progress. The roster currently holds a single baseline
+bot — `RandomSkullAgent` (random legal moves) — for newcomers to beat; add a bot
+by appending its class to `SKULL_BOTS` in `web/dashboard_server.py`.
+
+```bash
+python3 web/dashboard_server.py 6767 skulls   # Skull arena on its own port
+python3 -m skull.run --players 4 --games 5000  # headless simulation + stats
+python3 -m skull.run --verbose                 # watch a single game
+```
+
+In production both games run side by side: `scripts/arena_restart.sh` launches
+Exploding Kittens on `PORT` (8767) and Skull on `PORT2` (6767).
+
 ## Adding a bot
 
 The golden rule: **add a new bot, don't edit an old one** — keeping the old bot proves the new one is actually better. See `AGENTS.md` for the full guide and the lineage of every bot in the arena, from `Lucky` (pure random) to `Rhino` (GRU over the public event log).
@@ -42,11 +60,12 @@ The protocol (endpoints, state schema, valid actions) is documented in `AGENT_PR
 ## Repository layout
 
 ```
-game/        Core engine: cards, actions, observable state, rules
-agents/      All bots + their trained weights, agent HTTP server
+game/        Core EK engine: cards, actions, observable state, rules
+agents/      All EK bots + their trained weights, agent HTTP server
+skull/       Skull engine (discs, state, actions, engine) + Skull bots
 simulation/  In-process runner and multi-process controller
 protocol/    JSON schema for the remote-agent protocol
-web/         Arena dashboard, play page, protocol docs server
+web/         Arena dashboards (EK + Skull), play page, protocol docs server
 training/    NN training pipelines (gorilla, rhino, perdition, ...)
 scripts/     Deploy and restart scripts for the arena server
 main.py      CLI simulation runner

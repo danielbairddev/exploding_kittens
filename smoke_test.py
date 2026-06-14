@@ -23,6 +23,18 @@ def main():
         sys.exit(1)
     print(f"smoke ok: winner={result['winner']} turns={result['turns']}")
 
+    # Skull (port 6767) shares the binary — validate its engine + roster too.
+    from skull.engine import SkullEngine
+    from web.dashboard_server import SKULL_BOTS, SKULL_PLAYERS_PER_GAME
+
+    n = SKULL_PLAYERS_PER_GAME
+    skull_agents = [SKULL_BOTS[i % len(SKULL_BOTS)](seed=0) for i in range(n)]
+    sresult = SkullEngine(skull_agents, seed=0).play_game(n)
+    if sresult.get("winner") is None or sresult["winner"] < 0:
+        print("smoke: skull no winner", file=sys.stderr)
+        sys.exit(1)
+    print(f"smoke ok (skull): winner={sresult['winner']} rounds={sresult['turns']}")
+
 
 if __name__ == "__main__":
     main()

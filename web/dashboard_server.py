@@ -47,6 +47,10 @@ from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
 from game.engine import GameEngine
 
+# Skull — the second game, served on the alternate port (6767).
+from skull.engine import SkullEngine
+from skull.agents.random_agent import RandomSkullAgent
+
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
 # PLAYERS_PER_GAME of them into random seats, so no bot gets a permanent
@@ -90,6 +94,20 @@ ROSTER = [
 ]
 EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
+# Skull roster — its own pool of bots, served on the alternate port. Mirrors the
+# ROSTER shape (bot_id + the bot's ARENA metadata) so the same Arena machinery
+# can rank it. Add a bot by appending its class here.
+SKULL_BOTS = [
+    RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
+]
+SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
+
+SKULL_ROSTER = [
+    {"bot_id": i, "cls": cls, **cls.ARENA,
+     "stats_version": max(cls.ARENA.get("stats_version", 0), GLOBAL_STATS_VERSION)}
+    for i, cls in enumerate(SKULL_BOTS)
+]
+
 # Deploy identity (set by deploy_dashboard.sh) so the site shows who shipped what
 # — handy when several people deploy at once.
 BUILD = {
@@ -107,8 +125,10 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = "dashboard_state_v10.json"
 LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
-SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v0.json"
-SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v0.json"
+# Bump the version suffix to reset Skull stats when the roster or rules change.
+# v2: standard Skull rules + random-only baseline roster.
+SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
+SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_STATS_VERSION = 16
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
@@ -134,7 +154,8 @@ ELO_PROVISIONAL_GAMES = 10
 class Arena:
     """Holds all shared state. Guarded by a single lock."""
 
-    def __init__(self, snap_shot_path: str = SNAPSHOT_PATH):
+    def __init__(self, snap_shot_path: str = SNAPSHOT_PATH, roster=None,
+                 players_per_game: int = EK_PLAYERS_PER_GAME):
         self.lock = threading.Lock()
         self.started_at = time.time()
         self.total_games = 0
@@ -142,6 +163,8 @@ class Arena:
         self.games_per_sec = 0.0
         self._rate_sample = (self.started_at, 0)        # (time, total_games)
         self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
+        self.roster = roster if roster is not None else ROSTER
+        self.players_per_game = players_per_game
 
         # per-bot aggregate, keyed by bot_id
         self.bots = {
@@ -155,7 +178,7 @@ class Arena:
                 "elo_recent": deque(maxlen=ELO_TREND_MAX),  # rating after each game
                 "stats_version": b.get("stats_version", 1),
             }
-            for b in ROSTER
+            for b in self.roster
         }
 
         self.tallies = {k: 0 for k in (
@@ -213,10 +236,14 @@ class Arena:
             if t != "nope":
                 nope_run = 0
 
-        # Full finishing order (best -> worst): winner, then last-to-die ...
-        # first-to-die. death_seats is chronological (from explode events).
+        # Full finishing order (best -> worst). Prefer an explicit order from the
+        # engine (Skull rates every seat each game); otherwise derive it from the
+        # death order (EK: winner, then last-to-die ... first-to-die).
         finish_seats = None
-        if winner_seat >= 0 and len(death_seats) == len(seats) - 1:
+        fo = result.get("finish_order")
+        if fo and len(fo) == len(seats) and len(set(fo)) == len(seats):
+            finish_seats = list(fo)
+        elif winner_seat >= 0 and len(death_seats) == len(seats) - 1:
             finish_seats = [winner_seat] + list(reversed(death_seats))
 
         with self.lock:
@@ -331,7 +358,7 @@ class Arena:
             gps = self.games_per_sec
 
             leaderboard = []
-            for b in ROSTER:
+            for b in self.roster:
                 bd = self.bots[b["bot_id"]]
                 games = bd["games"]
                 leaderboard.append({
@@ -379,18 +406,21 @@ class Arena:
             bd = self.bots[b["bot_id"]]
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
-            ordered = sorted(ROSTER, key=avg_place)   # ascending: best place first
-        n_top = min(EK_PLAYERS_PER_GAME - 1, len(ordered))
+            ordered = sorted(self.roster, key=avg_place)   # ascending: best place first
+        n_top = min(self.players_per_game - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
         lineup = list(top)
         if rest:
             lineup.append(rng.choice(rest))
         # If the pool is smaller than the ring, top up with distinct extras.
-        pool = [b for b in ROSTER if b not in lineup]
+        pool = [b for b in self.roster if b not in lineup]
         rng.shuffle(pool)
-        while len(lineup) < EK_PLAYERS_PER_GAME and pool:
+        while len(lineup) < self.players_per_game and pool:
             lineup.append(pool.pop())
+        # Still short (roster smaller than the ring)? Repeat bots to fill seats.
+        while len(lineup) < self.players_per_game:
+            lineup.append(rng.choice(self.roster))
         rng.shuffle(lineup)
         return lineup
 
@@ -449,7 +479,7 @@ class Arena:
                     "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
                     "elo_recent": list(self.bots[b["bot_id"]]["elo_recent"]),
                     "stats_version": self.bots[b["bot_id"]].get("stats_version", 1),
-                } for b in ROSTER},
+                } for b in self.roster},
             }
         tmp = self.snap_shot_path + ".tmp"
         try:
@@ -473,10 +503,15 @@ class LoserArena:
     normal game).
     """
 
-    def __init__(self, snap_shot_path=LOSER_SNAPSHOT_PATH):
+    def __init__(self, snap_shot_path=LOSER_SNAPSHOT_PATH, roster=None,
+                 players_per_game: int = EK_PLAYERS_PER_GAME):
         self.lock = threading.Lock()
         self.total_games = 0
         self.snap_shot_path = os.path.join(LOG_DIR, snap_shot_path)
+        self.roster = roster if roster is not None else ROSTER
+        self.players_per_game = players_per_game
+        self.replay_buffer = deque(maxlen=REPLAY_BUFFER_MAX)
+        self._replay_cursor = 0
         self.bots = {
             b["bot_id"]: {
                 "wins": 0,       # first-to-explode count
@@ -488,7 +523,7 @@ class LoserArena:
                 "elo": BASE_ELO, "elo_games": 0, "elo_peak": BASE_ELO,
                 "elo_recent": deque(maxlen=ELO_TREND_MAX),
             }
-            for b in ROSTER
+            for b in self.roster
         }
         self._load_snapshot()
 
@@ -496,9 +531,13 @@ class LoserArena:
         winner_seat = result["winner"]
         death_seats = [e["player"] for e in events if e["type"] == "explode"]
 
-        # Inverted finish order: first-to-die is rank 0 (best loser)
+        # Inverted finish order: worst finisher is rank 0 (best loser). Prefer the
+        # engine's explicit order (reversed) when present.
         finish_seats = None
-        if winner_seat >= 0 and len(death_seats) == len(seats) - 1:
+        fo = result.get("finish_order")
+        if fo and len(fo) == len(seats) and len(set(fo)) == len(seats):
+            finish_seats = list(reversed(fo))
+        elif winner_seat >= 0 and len(death_seats) == len(seats) - 1:
             finish_seats = death_seats + [winner_seat]
 
         with self.lock:
@@ -529,6 +568,23 @@ class LoserArena:
                 if bot_id != winner_bot_id:
                     bd["no_wins"] += 1
 
+            self._replay_cursor += 1
+            self.replay_buffer.append({
+                "game_id": self._replay_cursor,
+                "turns": result["turns"],
+                "winner_seat": winner_seat,
+                "seats": [{"seat": i, "bot_id": b["bot_id"], "name": b["name"],
+                           "emoji": b["emoji"], "color": b["color"],
+                           "type": b["cls"].__name__} for i, b in enumerate(seats)],
+                "events": events,
+            })
+
+    def showcase_payload(self):
+        with self.lock:
+            if not self.replay_buffer:
+                return None
+            return self.replay_buffer[random.randrange(len(self.replay_buffer))]
+
     def _update_elo(self, order):
         n = len(order)
         if n < 2:
@@ -556,7 +612,7 @@ class LoserArena:
     def stats_payload(self):
         with self.lock:
             leaderboard = []
-            for b in ROSTER:
+            for b in self.roster:
                 bd = self.bots[b["bot_id"]]
                 games = bd["games"]
                 leaderboard.append({
@@ -583,17 +639,19 @@ class LoserArena:
             bd = self.bots[b["bot_id"]]
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
-            ordered = sorted(ROSTER, key=avg_place)
-        n_top = min(EK_PLAYERS_PER_GAME - 1, len(ordered))
+            ordered = sorted(self.roster, key=avg_place)
+        n_top = min(self.players_per_game - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
         lineup = list(top)
         if rest:
             lineup.append(rng.choice(rest))
-        pool = [b for b in ROSTER if b not in lineup]
+        pool = [b for b in self.roster if b not in lineup]
         rng.shuffle(pool)
-        while len(lineup) < EK_PLAYERS_PER_GAME and pool:
+        while len(lineup) < self.players_per_game and pool:
             lineup.append(pool.pop())
+        while len(lineup) < self.players_per_game:   # repeat bots if roster < ring
+            lineup.append(rng.choice(self.roster))
         rng.shuffle(lineup)
         return lineup
 
@@ -640,7 +698,7 @@ class LoserArena:
                     "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
                     "elo_recent": list(self.bots[b["bot_id"]]["elo_recent"]),
                     "stats_version": LOSER_STATS_VERSION,
-                } for b in ROSTER},
+                } for b in self.roster},
             }
         tmp = self.snap_shot_path + ".tmp"
         try:
@@ -669,13 +727,14 @@ class ServerBackGroundThreadExecutor:
     General server class used to hold the logic that runs various Agents and Engines
     """
     def __init__(self, players_per_game: int, arena, arena_bots, game_sleep: float,
-                 loser_arena, log_prefix: str = ""):
+                 loser_arena, log_prefix: str = "", engine_cls=GameEngine):
         self.players_per_game: int = players_per_game
         self.arena = arena
         self.arena_bots = arena_bots
         self.game_sleep = game_sleep
         self.loser_arena = loser_arena
         self.log_prefix = log_prefix
+        self.engine_cls = engine_cls
 
     def _get_rooster(self):
         return [
@@ -718,7 +777,7 @@ class ServerBackGroundThreadExecutor:
             # Fresh agent instance per seat so a repeated agent never shares state
             # across two seats in the same game.
             seat_agents = [b["cls"](name=b["name"]) for b in seats]
-            engine = GameEngine(seat_agents, seed=None, collect_events=True)
+            engine = self.engine_cls(seat_agents, seed=None, collect_events=True)
             result = engine.play_game(len(seats))
             self.arena.record_game(seats, result, result["events"])
             if GAME_SLEEP:
@@ -765,7 +824,7 @@ class ServerBackGroundThreadExecutor:
                     ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
                     total = self.arena.total_games
                     parts = []
-                    for b in ROSTER:
+                    for b in self.arena.roster:
                         bd = self.arena.bots[b["bot_id"]]
                         g = bd["games"]
                         wr = round(bd["wins"] / g, 4) if g else 0.0
@@ -782,7 +841,7 @@ class ServerBackGroundThreadExecutor:
         while True:
             seats = self.loser_arena.rated_lineup(rng)
             seat_agents = [b["cls"](name=b["name"]) for b in seats]
-            engine = GameEngine(seat_agents, seed=None, collect_events=True)
+            engine = self.engine_cls(seat_agents, seed=None, collect_events=True)
             result = engine.play_game(len(seats))
             self.loser_arena.record_game(seats, result, result["events"])
             if GAME_SLEEP:
@@ -904,13 +963,16 @@ class Handler(BaseHTTPRequestHandler):
         from urllib.parse import urlsplit, parse_qs
         u = urlsplit(self.path); path = u.path; q = parse_qs(u.query)
         if path == "/" or path == "/index.html":
-            self._send(PAGE, "text/html")
+            self._send(getattr(self.server.executor, "dashboard_page", PAGE), "text/html")
         elif path == "/play":
             self._send(PLAY_PAGE, "text/html")
         elif path == "/api/stats":
             self._send(json.dumps(self.server.executor.arena.stats_payload()))
         elif path == "/api/showcase":
             payload = self.server.executor.arena.showcase_payload()
+            self._send(json.dumps(payload) if payload else "null")
+        elif path == "/api/loser_showcase":
+            payload = self.server.executor.loser_arena.showcase_payload()
             self._send(json.dumps(payload) if payload else "null")
         elif path == "/api/play/bots":
             self._send(json.dumps([{"name": n, "emoji": play.PLAYABLE[n][1]}
@@ -976,18 +1038,25 @@ def main():
     prune_logs()
     if game == "skulls":
         sever_background_thread_executor = ServerBackGroundThreadExecutor(
-            EK_PLAYERS_PER_GAME, Arena(SKULLS_SNAPSHOT_PATH), ARENA_BOTS, GAME_SLEEP,
-            LoserArena(SKULLS_LOSER_SNAPSHOT_PATH), log_prefix="skulls_",
+            SKULL_PLAYERS_PER_GAME,
+            Arena(SKULLS_SNAPSHOT_PATH, roster=SKULL_ROSTER,
+                  players_per_game=SKULL_PLAYERS_PER_GAME),
+            SKULL_BOTS, GAME_SLEEP,
+            LoserArena(SKULLS_LOSER_SNAPSHOT_PATH, roster=SKULL_ROSTER,
+                       players_per_game=SKULL_PLAYERS_PER_GAME),
+            log_prefix="skulls_", engine_cls=SkullEngine,
         )
     else:
         sever_background_thread_executor = ServerBackGroundThreadExecutor(
             EK_PLAYERS_PER_GAME, ARENA, ARENA_BOTS, GAME_SLEEP, LOSER_ARENA
         )
 
+    sever_background_thread_executor.dashboard_page = SKULL_PAGE if game == "skulls" else PAGE
     sever_background_thread_executor.start_background_threads()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     server.executor = sever_background_thread_executor
-    print(f"Exploding Kittens Arena live at http://0.0.0.0:{port}", flush=True)
+    label = "Skull" if game == "skulls" else "Exploding Kittens"
+    print(f"{label} Arena live at http://0.0.0.0:{port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -997,6 +1066,7 @@ def main():
 
 # PAGE is defined in dashboard_page.py to keep this file readable.
 from web.dashboard_page import PAGE  # noqa: E402
+from web.skull_page import SKULL_PAGE  # noqa: E402
 from web.debug_page import DEBUG_PAGE  # noqa: E402
 from web.play_page import PLAY_PAGE  # noqa: E402
 from web import play  # noqa: E402
