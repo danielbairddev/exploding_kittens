@@ -21,8 +21,9 @@ h1{font-size:1rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
 .leg-item:hover{border-color:#334155}
 .leg-item.off{opacity:0.3}
 .leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-.chart-wrap{position:relative;width:100%;height:420px;background:#0f172a}
-.status{font-size:0.75rem;color:#64748b;margin-top:.75rem}
+.chart-wrap{position:relative;width:100%;height:420px}
+.hint{font-size:0.68rem;color:#475569;margin-top:.5rem}
+.status{font-size:0.75rem;color:#64748b;margin-top:.5rem}
 </style>
 </head>
 <body>
@@ -40,12 +41,16 @@ h1{font-size:1rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
     <button class="btn on" id="btn-all" onclick="toggleAll(true)">All</button>
     <button class="btn" id="btn-none" onclick="toggleAll(false)">None</button>
   </div>
+  <button class="btn" style="margin-left:auto" onclick="resetZoom()">Reset zoom</button>
 </div>
 <div class="legend" id="legend"></div>
 <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Line chart of bot win rates over time"></canvas></div>
+<div class="hint">Scroll to zoom · drag to pan</div>
 <div class="status" id="status">Loading…</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
 const BOT_COLORS = {
   'Professor':'#818cf8','Maverick':'#f97316','Gremlin':'#4ade80',
@@ -136,15 +141,21 @@ function buildChart(){
           backgroundColor:'#1e293b',borderColor:'#334155',borderWidth:1,
           titleColor:'#94a3b8',bodyColor:'#e2e8f0',
           callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(metric==='wr'?1:0)??'—'}${metric==='wr'?'%':''}`}
+        },
+        zoom:{
+          pan:{enabled:true,mode:'x'},
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'},
         }
       },
       scales:{
-        x:{ticks:{color:'#475569',maxTicksLimit:12,font:{size:11}},grid:{color:'#1e293b'}},
-        y:{ticks:{color:'#475569',font:{size:11},callback:v=>metric==='wr'?v+'%':v},grid:{color:'#1e293b'}}
+        x:{ticks:{color:'#475569',maxTicksLimit:12,font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#475569',font:{size:11},callback:v=>metric==='wr'?v+'%':v},grid:{color:'rgba(255,255,255,0.04)'}}
       }
     }
   });
 }
+
+function resetZoom(){ chart?.resetZoom(); }
 
 function setMetric(m){
   metric=m;
