@@ -16,18 +16,12 @@ For distributed (agents as separate processes / other languages):
 import argparse
 import sys
 import os
-from ast import Dict
 from typing import Any
 
-from agents.ian1_agent import Ian1Agent
 from web.dashboard_server import ARENA_BOTS
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from agents.random_agent import RandomAgent
-from agents.heuristic_agent import HeuristicAgent
-from agents.aggressive_agent import AggressiveAgent
-from agents.chaos_agent import ChaosAgent
 from simulation.runner import run_simulation, print_stats
 from game.engine import GameEngine
 

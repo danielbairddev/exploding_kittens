@@ -27,6 +27,8 @@ from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from agents.ian3_agent import Ian3Agent
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agents.random_agent import RandomAgent
@@ -69,6 +71,7 @@ ARENA_BOTS = [
     # Orangutan2Agent,   # Orangutan2 — benched
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
+    Ian3Agent,         # It's bombing
     Perdition2Agent,   # Perdition
     RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
