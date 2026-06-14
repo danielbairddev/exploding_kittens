@@ -138,6 +138,7 @@ LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
 SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
+LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
 LOSER_STATS_VERSION = 18
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
@@ -868,18 +869,20 @@ class ServerBackGroundThreadExecutor:
         """Append a tab-separated snapshot of per-bot win rates every 60 seconds.
 
         Each row: timestamp<TAB>total_games<TAB>bot_name:wins:games:win_rate:elo ...
+        Also writes a loser history file with no_win_rate instead of win_rate.
         Rows are append-only so resets / roster changes don't erase history.
         """
         os.makedirs(LOG_DIR, exist_ok=True)
         win_rate_history_path = os.path.join(LOG_DIR, self.log_prefix + WINRATE_HISTORY_PATH)
+        loser_history_path = os.path.join(LOG_DIR, self.log_prefix + LOSER_WINRATE_HISTORY_PATH)
 
-        # Write header on first run if the file is new.
-        if not os.path.exists(win_rate_history_path):
-            try:
-                with open(win_rate_history_path, "w") as f:
-                    f.write("timestamp\ttotal_games\tbots\n")
-            except OSError:
-                pass
+        for path in (win_rate_history_path, loser_history_path):
+            if not os.path.exists(path):
+                try:
+                    with open(path, "w") as f:
+                        f.write("timestamp\ttotal_games\tbots\n")
+                except OSError:
+                    pass
         while True:
             time.sleep(60)
             try:
@@ -897,6 +900,21 @@ class ServerBackGroundThreadExecutor:
                     f.write(row)
             except Exception as exc:
                 print(f"[winrate] snapshot failed: {exc}", flush=True)
+            try:
+                with self.loser_arena.lock:
+                    lts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                    ltotal = self.loser_arena.total_games
+                    lparts = []
+                    for b in self.loser_arena.roster:
+                        bd = self.loser_arena.bots[b["bot_id"]]
+                        g = bd["games"]
+                        nwr = round(bd["no_wins"] / g, 4) if g else 0.0
+                        lparts.append(f"{b['name']}:{bd['no_wins']}:{g}:{nwr}:{round(bd['elo'])}")
+                lrow = lts + "\t" + str(ltotal) + "\t" + "|".join(lparts) + "\n"
+                with open(loser_history_path, "a") as f:
+                    f.write(lrow)
+            except Exception as exc:
+                print(f"[loser_winrate] snapshot failed: {exc}", flush=True)
 
 
     def loser_simulation_loop(self):
@@ -1073,6 +1091,21 @@ class Handler(BaseHTTPRequestHandler):
                 return
             except OSError:
                 self._send(json.dumps({"error": "no history yet"}))
+        elif path == "/api/loser_winrate_history":
+            loser_history_path = os.path.join(
+                LOG_DIR, self.server.executor.log_prefix + LOSER_WINRATE_HISTORY_PATH)
+            try:
+                with open(loser_history_path) as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/tab-separated-values; charset=utf-8")
+                self.send_header("Content-Length", str(len(data.encode())))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(data.encode())
+                return
+            except OSError:
+                self._send(json.dumps({"error": "no loser history yet"}))
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": self.server.executor.arena.total_games}))
         else:

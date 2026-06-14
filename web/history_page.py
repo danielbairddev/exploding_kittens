@@ -34,6 +34,7 @@ h1{font-size:1rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   <span class="ctrl-label">Metric</span>
   <div class="btn-group">
     <button class="btn on" id="btn-wr" onclick="setMetric('wr')">Win rate %</button>
+    <button class="btn" id="btn-nwr" onclick="setMetric('nwr')">No-Win %</button>
     <button class="btn" id="btn-elo" onclick="setMetric('elo')">ELO</button>
   </div>
   <span class="ctrl-label" style="margin-left:.5rem">Show</span>
@@ -73,38 +74,54 @@ function norm(name){
 }
 
 async function load(){
-  const res = await fetch('/api/winrate_history');
-  const text = await res.text();
-  const lines = text.trim().split('\\n').slice(1);
-  const rows = [];
-  for(let i=0;i<lines.length;i+=3){
-    const parts = lines[i].split('\\t');
-    if(parts.length<3) continue;
-    const ts = parts[0].replace('T',' ').replace('Z','').slice(5,16);
-    const bots={};
-    for(const b of parts[2].split('|')){
-      const p=b.split(':');
-      if(p.length<4) continue;
-      const name=norm(p[0]);
-      bots[name]={wr:parseFloat(p[3])*100, elo:parseFloat(p[4]||1200)};
+  const [winRes, loseRes] = await Promise.all([
+    fetch('/api/winrate_history'),
+    fetch('/api/loser_winrate_history').catch(()=>null),
+  ]);
+  const winText = await winRes.text();
+  const loseText = loseRes ? await loseRes.text().catch(()=>'') : '';
+
+  function parseTsv(text){
+    const lines = text.trim().split('\\n').slice(1);
+    const rows = [];
+    for(let i=0;i<lines.length;i+=3){
+      const parts = lines[i].split('\\t');
+      if(parts.length<3) continue;
+      const ts = parts[0].replace('T',' ').replace('Z','').slice(5,16);
+      const bots={};
+      for(const b of parts[2].split('|')){
+        const p=b.split(':'); if(p.length<4) continue;
+        bots[norm(p[0])]={rate:parseFloat(p[3])*100, elo:parseFloat(p[4]||1200)};
+      }
+      rows.push({ts,bots});
     }
-    rows.push({ts,bots});
+    return rows;
   }
 
+  const winRows = parseTsv(winText);
+  const loseRows = parseTsv(loseText);
+  // build loser lookup by timestamp for merging
+  const loseByTs = {};
+  for(const r of loseRows) loseByTs[r.ts] = r.bots;
+
   const allNames=new Set();
-  for(const r of rows) for(const n of Object.keys(r.bots)) allNames.add(n);
+  for(const r of winRows) for(const n of Object.keys(r.bots)) allNames.add(n);
 
   const datasets=[];
   for(const name of [...allNames].sort()){
     const color=BOT_COLORS[name]||'#888';
-    const data=rows.map(r=>r.bots[name]??null);
-    datasets.push({label:name,color,wr:data.map(d=>d?Math.round(d.wr*100)/100:null),elo:data.map(d=>d?Math.round(d.elo):null)});
+    datasets.push({
+      label:name, color,
+      wr:  winRows.map(r=>r.bots[name]?Math.round(r.bots[name].rate*100)/100:null),
+      elo: winRows.map(r=>r.bots[name]?Math.round(r.bots[name].elo):null),
+      nwr: winRows.map(r=>{const lb=loseByTs[r.ts]; return lb&&lb[name]?Math.round(lb[name].rate*100)/100:null;}),
+    });
   }
 
-  parsed={labels:rows.map(r=>r.ts),datasets};
+  parsed={labels:winRows.map(r=>r.ts),datasets};
   buildLegend();
   buildChart();
-  document.getElementById('status').textContent=`${rows.length} snapshots · last updated ${rows[rows.length-1]?.ts||''}`;
+  document.getElementById('status').textContent=`${winRows.length} snapshots · last updated ${winRows[winRows.length-1]?.ts||''}`;
 }
 
 function buildLegend(){
@@ -120,7 +137,7 @@ function buildChart(){
   if(chart) chart.destroy();
   const ds=parsed.datasets.filter(d=>!hidden.has(d.label)).map(d=>({
     label:d.label,
-    data:metric==='wr'?d.wr:d.elo,
+    data:metric==='wr'?d.wr:metric==='nwr'?d.nwr:d.elo,
     borderColor:d.color,
     backgroundColor:'transparent',
     borderWidth:1.5,
@@ -140,7 +157,7 @@ function buildChart(){
         tooltip:{
           backgroundColor:'#1e293b',borderColor:'#334155',borderWidth:1,
           titleColor:'#94a3b8',bodyColor:'#e2e8f0',
-          callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(metric==='wr'?1:0)??'—'}${metric==='wr'?'%':''}`}
+          callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(metric==='elo'?0:1)??'—'}${metric!=='elo'?'%':''}`}
         },
         zoom:{
           pan:{enabled:true,mode:'x'},
@@ -149,7 +166,7 @@ function buildChart(){
       },
       scales:{
         x:{ticks:{color:'#475569',maxTicksLimit:12,font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{ticks:{color:'#475569',font:{size:11},callback:v=>metric==='wr'?v+'%':v},grid:{color:'rgba(255,255,255,0.04)'}}
+        y:{ticks:{color:'#475569',font:{size:11},callback:v=>metric!=='elo'?v+'%':v},grid:{color:'rgba(255,255,255,0.04)'}}
       }
     }
   });
@@ -159,8 +176,7 @@ function resetZoom(){ chart?.resetZoom(); }
 
 function setMetric(m){
   metric=m;
-  document.getElementById('btn-wr').classList.toggle('on',m==='wr');
-  document.getElementById('btn-elo').classList.toggle('on',m==='elo');
+  ['wr','nwr','elo'].forEach(k=>document.getElementById('btn-'+k)?.classList.toggle('on',m===k));
   if(parsed) buildChart();
 }
 

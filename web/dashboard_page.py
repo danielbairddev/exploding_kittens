@@ -119,6 +119,14 @@ PAGE = r'''<!DOCTYPE html>
   .pw-table .pw-label { text-align:right; color:var(--muted); padding-right:5px; white-space:nowrap; font-size:0.58rem; }
   .pw-diag { background:var(--surface2); color:var(--muted); }
   .pw-empty { color:var(--muted); }
+  /* history charts */
+  .hist-legend{display:flex;flex-wrap:wrap;gap:3px 10px;margin-bottom:6px}
+  .hist-leg-item{display:flex;align-items:center;gap:4px;font-size:0.62rem;color:var(--muted);cursor:pointer;user-select:none;padding:2px 4px;border-radius:3px;border:1px solid transparent}
+  .hist-leg-item:hover{border-color:var(--border)}
+  .hist-leg-item.off{opacity:0.3}
+  .hist-leg-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+  .hist-ctrl{font-size:0.68rem;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+  .hist-ctrl.on{background:var(--surface2);color:var(--text);border-color:#475569}
   .lb-rate { font-weight:700; font-size:0.95rem; font-variant-numeric:tabular-nums; }
   .lb-games{ font-size:0.64rem; color:var(--muted); text-align:right; margin-top:2px; }
   .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
@@ -287,9 +295,39 @@ PAGE = r'''<!DOCTYPE html>
     </div>
   </div>
 
+<div style="margin-top:1rem">
+  <div class="card">
+    <h2>📈 Win Rate History
+      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="hist-ctrl on" id="hist-btn-wr" onclick="setHistMetric('wr')">Win %</button>
+        <button class="hist-ctrl" id="hist-btn-nwr" onclick="setHistMetric('nwr')">No-Win %</button>
+        <button class="hist-ctrl" id="hist-btn-elo" onclick="setHistMetric('elo')">ELO</button>
+        <button class="hist-ctrl" style="margin-left:4px" onclick="resetHistZoom()">Reset zoom</button>
+      </span>
+    </h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start">
+      <div>
+        <div style="font-size:0.63rem;color:var(--muted);margin-bottom:5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase">🏆 Winner Arena</div>
+        <div class="hist-legend" id="hist-leg-win"></div>
+        <div style="position:relative;height:240px"><canvas id="hist-chart-win" role="img" aria-label="Winner win rate history"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:0.63rem;color:var(--muted);margin-bottom:5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase">💀 Loser Arena</div>
+        <div class="hist-legend" id="hist-leg-lose"></div>
+        <div style="position:relative;height:240px"><canvas id="hist-chart-lose" role="img" aria-label="Loser no-win rate history"></canvas></div>
+      </div>
+    </div>
+    <div style="font-size:0.62rem;color:#475569;margin-top:6px">Scroll to zoom · drag to pan &nbsp;·&nbsp; click legend to toggle bots &nbsp;·&nbsp; <a href="/history" style="color:#475569">open full-screen →</a></div>
+    <div style="font-size:0.62rem;color:#475569;margin-top:2px" id="hist-status"></div>
+  </div>
+</div>
+
 <div class="footer">Continuously simulated · stats persist across restarts · logs auto-pruned</div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
 const CARD_EMOJI = {
   EXPLODING_KITTEN:"💣", DEFUSE:"🛡️", ATTACK:"⚔️", SKIP:"⏭️", FAVOR:"🙏",
@@ -694,6 +732,143 @@ function renderPairwise(divId, stats, loserMode){
   html+='</tbody></table>';
   $(divId).innerHTML=html;
 }
+
+/* -------- history charts -------- */
+const HIST_BOT_COLORS = {
+  'Professor':'#818cf8','Maverick':'#f97316','Gremlin':'#4ade80',
+  'Sly':'#22d3ee','Lucky':'#a78bfa','Sly2':'#38bdf8','Coyote':'#fb923c',
+  'Orangutan':'#f59e0b','Ian1':'#e879f9','Ian2':'#34d399',
+  'Ian The Bomb':'#f43f5e','Perdition 2':'#ef4444',
+  'Rhino':'#60a5fa','Elephant':'#a3e635',
+  'Gabriel':'#d4af37','Orpheus':'#c084fc','Cassandra':'#fb7185',
+  'Hades':'#94a3b8','Abaddon':'#f472b6',
+};
+let histMetric = 'wr';
+let histChartWin = null, histChartLose = null;
+let histHiddenWin = new Set(), histHiddenLose = new Set();
+let histDataWin = null, histDataLose = null;
+
+function histNorm(n){ return n==='Perdition2'||n==='Perdition 2.1'?'Perdition 2':n; }
+
+async function parseTsvHist(url, field){
+  // field 3 = the main rate, field 4 = elo (same format for both files)
+  const res = await fetch(url);
+  const text = await res.text();
+  const lines = text.trim().split('\n').slice(1);
+  const rows = [];
+  for(let i=0;i<lines.length;i+=3){
+    const parts = lines[i].split('\t');
+    if(parts.length<3) continue;
+    const ts = parts[0].replace('T',' ').replace('Z','').slice(5,16);
+    const bots={};
+    for(const b of parts[2].split('|')){
+      const p=b.split(':'); if(p.length<4) continue;
+      bots[histNorm(p[0])]={rate:parseFloat(p[3])*100, elo:parseFloat(p[4]||1200)};
+    }
+    rows.push({ts,bots});
+  }
+  const allNames=new Set();
+  for(const r of rows) for(const n of Object.keys(r.bots)) allNames.add(n);
+  const datasets=[];
+  for(const name of [...allNames].sort()){
+    const color=HIST_BOT_COLORS[name]||'#888';
+    datasets.push({
+      label:name, color,
+      rate: rows.map(r=>r.bots[name]?Math.round(r.bots[name].rate*100)/100:null),
+      elo:  rows.map(r=>r.bots[name]?Math.round(r.bots[name].elo):null),
+    });
+  }
+  return {labels:rows.map(r=>r.ts), datasets};
+}
+
+function buildHistChartInst(canvasId, data, hidden, isLoser){
+  const isElo = histMetric==='elo';
+  const isNwr = histMetric==='nwr';
+  const ds = data.datasets.filter(d=>!hidden.has(d.label)).map(d=>({
+    label:d.label, data:isElo?d.elo:d.rate,
+    borderColor:d.color, backgroundColor:'transparent',
+    borderWidth:1.5, pointRadius:0, spanGaps:true, tension:0.2,
+  }));
+  return new Chart(document.getElementById(canvasId),{
+    type:'line',
+    data:{labels:data.labels,datasets:ds},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1e293b',borderColor:'#334155',borderWidth:1,
+          titleColor:'#94a3b8',bodyColor:'#e2e8f0',
+          callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(isElo?0:1)??'—'}${isElo?'':'%'}`}
+        },
+        zoom:{pan:{enabled:true,mode:'x'},zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'}},
+      },
+      scales:{
+        x:{ticks:{color:'#475569',maxTicksLimit:10,font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#475569',font:{size:10},callback:v=>isElo?v:v+'%'},grid:{color:'rgba(255,255,255,0.04)'}},
+      }
+    }
+  });
+}
+
+function buildHistLegend(legId, data, hidden){
+  const el=document.getElementById(legId); if(!el) return;
+  el.innerHTML=data.datasets.map(d=>`
+    <div class="hist-leg-item${hidden.has(d.label)?' off':''}" id="hleg-${CSS.escape(legId+'-'+d.label)}"
+         onclick="toggleHistBot('${legId}','${d.label.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+      <span class="hist-leg-dot" style="background:${d.color}"></span><span>${d.label}</span>
+    </div>`).join('');
+}
+
+function toggleHistBot(legId, name){
+  const isWin=legId.includes('-win');
+  const hidden=isWin?histHiddenWin:histHiddenLose;
+  if(hidden.has(name)) hidden.delete(name); else hidden.add(name);
+  const item=document.getElementById('hleg-'+CSS.escape(legId+'-'+name));
+  if(item) item.classList.toggle('off',hidden.has(name));
+  rebuildHistChart(isWin?'win':'lose');
+}
+
+function rebuildHistChart(which){
+  if(which==='win'&&histDataWin){
+    if(histChartWin) histChartWin.destroy();
+    histChartWin=buildHistChartInst('hist-chart-win',histDataWin,histHiddenWin,false);
+  }
+  if(which==='lose'&&histDataLose){
+    if(histChartLose) histChartLose.destroy();
+    histChartLose=buildHistChartInst('hist-chart-lose',histDataLose,histHiddenLose,true);
+  }
+}
+
+function setHistMetric(m){
+  histMetric=m;
+  ['wr','nwr','elo'].forEach(k=>document.getElementById('hist-btn-'+k)?.classList.toggle('on',m===k));
+  rebuildHistChart('win'); rebuildHistChart('lose');
+}
+
+function resetHistZoom(){ histChartWin?.resetZoom(); histChartLose?.resetZoom(); }
+
+async function loadHistCharts(){
+  try{
+    const [win, lose] = await Promise.all([
+      parseTsvHist('/api/winrate_history'),
+      parseTsvHist('/api/loser_winrate_history'),
+    ]);
+    histDataWin=win; histDataLose=lose;
+    buildHistLegend('hist-leg-win',win,histHiddenWin);
+    buildHistLegend('hist-leg-lose',lose,histHiddenLose);
+    if(histChartWin) histChartWin.destroy();
+    if(histChartLose) histChartLose.destroy();
+    histChartWin=buildHistChartInst('hist-chart-win',win,histHiddenWin,false);
+    histChartLose=buildHistChartInst('hist-chart-lose',lose,histHiddenLose,true);
+    const el=$('hist-status');
+    if(el) el.textContent=`${win.labels.length} win snapshots · ${lose.labels.length} loser snapshots · last ${win.labels[win.labels.length-1]||''}`;
+  }catch(e){
+    const el=$('hist-status'); if(el) el.textContent='History not yet available — data accumulates over time';
+  }
+}
+loadHistCharts();
 
 pollStats();
 replayLoop();
