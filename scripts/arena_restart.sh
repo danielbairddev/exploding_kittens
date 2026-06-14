@@ -25,10 +25,10 @@ deployed_ek=false
 deployed_skulls=false
 for i in $(seq 1 60); do
   sleep 1
-  if ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
+  if ! $deployed_ek || ss -tlnp "sport = :$PORT" 2>/dev/null | grep -q "$PORT"; then
     echo "Live Exploding Arena up at http://0.0.0.0:$PORT ($EK_DEPLOY_SHA by $EK_DEPLOY_BY)"
     deployed_ek=true
-  elif ss -tlnp "sport = :$PORT2" 2>/dev/null | grep -q "$PORT2"; then
+  elif ! $deployed_skulls || ss -tlnp "sport = :$PORT2" 2>/dev/null | grep -q "$PORT2"; then
     echo "Live Skulls Arena up at http://0.0.0.0:$PORT2 ($EK_DEPLOY_SHA by $EK_DEPLOY_BY)"
     deployed_skulls=true
   elif $deployed_ek && $deployed_skulls; then
