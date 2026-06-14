@@ -5,7 +5,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/ek-arena}"
 PORT="${PORT:-8767}"
-PORT2="${PORT:-6767}"
+PORT2="${PORT2:-6767}"
 
 
 pkill -f "dashboard_server.py" 2>/dev/null || true
