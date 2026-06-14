@@ -230,6 +230,8 @@ def main():
     ap.add_argument('--eval_n',    type=int,   default=2000)
     ap.add_argument('--eval_every', type=int,  default=20)
     ap.add_argument('--patience',  type=int,   default=500)
+    ap.add_argument('--target_survival', type=float, default=0.0,
+                    help='stop once greedy survival <= this (e.g. 0.02). 0 disables.')
     ap.add_argument('--resume',    action='store_true')
     args = ap.parse_args()
 
@@ -292,6 +294,10 @@ def main():
                   f'ent {ent:.3f}  |  greedy survival {surv*100:5.2f}%  (best {best*100:.2f}%)  '
                   f'{time.time()-t0:.1f}s/it  [roll={t_upd-t_roll:.1f}s upd={t_done-t_upd:.1f}s]{tag}',
                   flush=True)
+            if args.target_survival > 0 and surv <= args.target_survival:
+                print(f'TARGET REACHED: survival {surv*100:.2f}% <= '
+                      f'{args.target_survival*100:.2f}%. stopping.', flush=True)
+                break
             if no_improve >= args.patience:
                 print(f'stalled: no improvement in {no_improve} evals. stopping.', flush=True)
                 break
