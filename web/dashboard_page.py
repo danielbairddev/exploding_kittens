@@ -243,6 +243,30 @@ PAGE = r'''<!DOCTYPE html>
     </div>
   </div>
 
+  <div style="margin-top:1rem;display:grid;grid-template-columns:2fr 1fr;gap:1rem;align-items:start;">
+    <div class="card">
+      <h2>💀 Biggest Loser Arena
+        <span class="ladtabs" id="loser-tabs">
+          <button data-lm="first_out" class="on">First Out %</button>
+          <button data-lm="no_win">No-Win %</button>
+          <button data-lm="elo">ELO</button>
+        </span>
+      </h2>
+      <div class="lb-sub" id="loser-lb-sub"></div>
+      <div id="loser-leaderboard"><div class="lb-blurb">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2>How it works</h2>
+      <div style="font-size:0.82rem;color:var(--muted);line-height:1.9;">
+        <p>The goal is to <b style="color:var(--text)">explode first</b> — bots race to be eliminated as fast as possible.</p>
+        <p style="margin-top:0.5rem"><b style="color:var(--text)">First Out %</b> — fraction of games where this bot was first to explode.</p>
+        <p style="margin-top:0.5rem"><b style="color:var(--text)">No-Win %</b> — fraction of games where this bot was not the last survivor.</p>
+        <p style="margin-top:0.5rem"><b style="color:var(--text)">ELO</b> — rated skill at dying early; finish order is inverted vs the main arena.</p>
+        <p style="margin-top:0.5rem;font-size:0.7rem">Lineup: top 4 biggest losers + 1 random challenger each game.</p>
+      </div>
+    </div>
+  </div>
+
 <div class="footer">Continuously simulated · stats persist across restarts · logs auto-pruned</div>
 </div>
 
@@ -534,6 +558,67 @@ async function replayLoop(){
     await new Promise(r=>setTimeout(r,400));
   }
 }
+
+/* ---------------- biggest loser arena ---------------- */
+let LAST_LOSER = null;
+let LOSER_MODE = 'first_out';
+const LOSER_DESC = {
+  first_out: 'first out rate · fraction of games where this bot exploded first',
+  no_win:    'no-win rate · fraction of games where this bot was not last survivor',
+  elo:       'rated ELO · skill at exploding early (inverted finish order)',
+};
+document.querySelectorAll('#loser-tabs button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('#loser-tabs button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); LOSER_MODE = btn.dataset.lm; renderLoserLadder();
+  };
+});
+function renderLoserLadder(){
+  if(!LAST_LOSER) return;
+  const m = LOSER_MODE, rows = [...LAST_LOSER.leaderboard];
+  if(m==='elo')       rows.sort((a,b)=>b.elo-a.elo);
+  else if(m==='first_out') rows.sort((a,b)=>b.win_rate-a.win_rate);
+  else                rows.sort((a,b)=>b.no_win_rate-a.no_win_rate);
+  $('loser-lb-sub').textContent = LOSER_DESC[m];
+
+  const vals = rows.map(x=> m==='elo'?x.elo : m==='first_out'?x.win_rate : x.no_win_rate);
+  const vmin=Math.min(...vals), vmax=Math.max(...vals), vspan=(vmax-vmin)||1;
+  const barOf = b => {
+    const v = m==='elo'?b.elo : m==='first_out'?b.win_rate : b.no_win_rate;
+    return m==='elo' ? 8+(v-vmin)/vspan*92 : 8+(v/Math.max(0.001,vmax))*92;
+  };
+  const big = b => {
+    const prov = b.provisional ? `<span class="lb-prov" title="provisional (<10 games)">?</span>` : '';
+    if(m==='elo') return `<div class="lb-elo" style="color:${b.color}">${b.elo}${prov}<span class="lb-unit">ELO</span></div>
+      <div class="lb-wr">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% FIRST OUT</span></div>`;
+    if(m==='first_out') return `<div class="lb-elo" style="color:${b.color}">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% FIRST OUT</span></div>
+      <div class="lb-wr">${b.elo}<span class="lb-unit">ELO · ${(b.no_win_rate*100).toFixed(1)}% NO-WIN</span></div>`;
+    return `<div class="lb-elo" style="color:${b.color}">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN</span></div>
+      <div class="lb-wr">${b.elo}<span class="lb-unit">ELO · ${(b.win_rate*100).toFixed(1)}% FIRST OUT</span></div>`;
+  };
+  $('loser-leaderboard').innerHTML = rows.map((b,i)=>{
+    const streak = b.streak>=2 ? `<span class="streak">💀${b.streak}</span>` : '';
+    const gl = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
+    return `<div class="lb-row">
+      <div class="lb-rank">${i+1}</div>
+      <div class="lb-av">${b.emoji}</div>
+      <div class="lb-main">
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
+        <div class="lb-blurb" title="${b.blurb}">${b.blurb}</div>
+        <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
+      </div>
+      <div class="lb-right">${big(b)}<div class="lb-games">${gl} games</div></div>
+    </div>`;
+  }).join('');
+}
+async function pollLoser(){
+  try{
+    const s = await (await fetch('/api/loser_stats')).json();
+    LAST_LOSER = s; renderLoserLadder();
+  }catch(e){}
+  setTimeout(pollLoser, 3000);
+}
+pollLoser();
 
 pollStats();
 replayLoop();

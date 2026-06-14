@@ -41,6 +41,7 @@ from agents.orangutan2_agent import Orangutan2Agent
 from agents.rhino_agent import RhinoAgent
 from agents.elephant_agent import ElephantAgent
 from agents.gabriel_agent import GabrielAgent
+from agents.orpheus_agent import OrpheusAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.perdition2_agent import Perdition2Agent
@@ -73,6 +74,7 @@ ARENA_BOTS = [
     RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
     # GabrielAgent,      # Gabriel — benched (let them think they have a chance)
+    # OrpheusAgent,      # Orpheus — benched (training vs Gabriel/Perdition losing-fleet)
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
@@ -102,6 +104,8 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
+LOSER_SNAPSHOT_PATH = os.path.join(LOG_DIR, "loser_state_v1.json")
+LOSER_STATS_VERSION = 1
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -454,6 +458,194 @@ class Arena:
 ARENA = Arena()
 
 
+class LoserArena:
+    """Biggest Loser variant: win = first to explode; ELO rewards dying early.
+
+    Finish order is inverted vs normal arena: death_seats (chronological) +
+    [winner_seat], so rank 0 = first to explode = best loser.
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.total_games = 0
+        self.bots = {
+            b["bot_id"]: {
+                "wins": 0,       # first-to-explode count
+                "no_wins": 0,    # games where bot was NOT last survivor
+                "games": 0,
+                "recent": deque(maxlen=SPARKLINE_MAX),
+                "streak": 0, "best_streak": 0,
+                "place_sum": 0, "place_games": 0,
+                "elo": BASE_ELO, "elo_games": 0, "elo_peak": BASE_ELO,
+                "elo_recent": deque(maxlen=ELO_TREND_MAX),
+            }
+            for b in ROSTER
+        }
+        self._load_snapshot()
+
+    def record_game(self, seats, result, events):
+        winner_seat = result["winner"]
+        death_seats = [e["player"] for e in events if e["type"] == "explode"]
+
+        # Inverted finish order: first-to-die is rank 0 (best loser)
+        finish_seats = None
+        if winner_seat >= 0 and len(death_seats) == len(seats) - 1:
+            finish_seats = death_seats + [winner_seat]
+
+        with self.lock:
+            self.total_games += 1
+
+            if finish_seats is not None:
+                finish_bot_ids = [seats[s]["bot_id"] for s in finish_seats]
+                if len(set(finish_bot_ids)) == len(finish_bot_ids):
+                    self._update_elo(finish_bot_ids)
+                    for place, bot_id in enumerate(finish_bot_ids):
+                        self.bots[bot_id]["place_sum"] += place + 1
+                        self.bots[bot_id]["place_games"] += 1
+
+            first_out_bot_id = seats[death_seats[0]]["bot_id"] if death_seats else None
+            winner_bot_id = seats[winner_seat]["bot_id"] if winner_seat >= 0 else None
+
+            for bot_id in {b["bot_id"] for b in seats}:
+                bd = self.bots[bot_id]
+                bd["games"] += 1
+                won = (bot_id == first_out_bot_id)
+                bd["recent"].append(1 if won else 0)
+                if won:
+                    bd["wins"] += 1
+                    bd["streak"] += 1
+                    bd["best_streak"] = max(bd["best_streak"], bd["streak"])
+                else:
+                    bd["streak"] = 0
+                if bot_id != winner_bot_id:
+                    bd["no_wins"] += 1
+
+    def _update_elo(self, order):
+        n = len(order)
+        if n < 2:
+            return
+        pre = {bid: self.bots[bid]["elo"] for bid in order}
+        place = {bid: i for i, bid in enumerate(order)}
+        deltas = {}
+        for a in order:
+            expected = actual = 0.0
+            for b in order:
+                if a == b:
+                    continue
+                expected += 1.0 / (1.0 + 10 ** ((pre[b] - pre[a]) / 400.0))
+                actual += 1.0 if place[a] < place[b] else 0.0
+            k = (ELO_K_PROVISIONAL if self.bots[a]["elo_games"] < ELO_PROVISIONAL_GAMES
+                 else ELO_K_ESTABLISHED)
+            deltas[a] = k * (actual - expected) / (n - 1)
+        for bid in order:
+            bd = self.bots[bid]
+            bd["elo"] += deltas[bid]
+            bd["elo_games"] += 1
+            bd["elo_peak"] = max(bd["elo_peak"], bd["elo"])
+            bd["elo_recent"].append(round(bd["elo"], 1))
+
+    def stats_payload(self):
+        with self.lock:
+            leaderboard = []
+            for b in ROSTER:
+                bd = self.bots[b["bot_id"]]
+                games = bd["games"]
+                leaderboard.append({
+                    "bot_id": b["bot_id"], "name": b["name"], "emoji": b["emoji"],
+                    "color": b["color"], "blurb": b["blurb"],
+                    "author": b.get("author", "—"),
+                    "elo": round(bd["elo"]), "elo_peak": round(bd["elo_peak"]),
+                    "elo_games": bd["elo_games"],
+                    "provisional": bd["elo_games"] < ELO_PROVISIONAL_GAMES,
+                    "elo_recent": [round(x) for x in bd["elo_recent"]],
+                    "avg_place": round(bd["place_sum"] / bd["place_games"], 3) if bd["place_games"] else None,
+                    "wins": bd["wins"], "games": games,
+                    "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
+                    "no_win_rate": round(bd["no_wins"] / games, 4) if games else 0.0,
+                    "recent": list(bd["recent"]),
+                    "streak": bd["streak"], "best_streak": bd["best_streak"],
+                })
+            leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
+            return {"total_games": self.total_games, "leaderboard": leaderboard}
+
+    def rated_lineup(self, rng):
+        """Top (PLAYERS_PER_GAME-1) by loser avg_place (lowest = explodes earliest) + 1 random."""
+        def avg_place(b):
+            bd = self.bots[b["bot_id"]]
+            return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
+        with self.lock:
+            ordered = sorted(ROSTER, key=avg_place)
+        n_top = min(PLAYERS_PER_GAME - 1, len(ordered))
+        top = ordered[:n_top]
+        rest = ordered[n_top:]
+        lineup = list(top)
+        if rest:
+            lineup.append(rng.choice(rest))
+        pool = [b for b in ROSTER if b not in lineup]
+        rng.shuffle(pool)
+        while len(lineup) < PLAYERS_PER_GAME and pool:
+            lineup.append(pool.pop())
+        rng.shuffle(lineup)
+        return lineup
+
+    def _load_snapshot(self):
+        try:
+            with open(LOSER_SNAPSHOT_PATH) as f:
+                s = json.load(f)
+        except (OSError, ValueError):
+            return
+        try:
+            self.total_games = s.get("total_games", 0)
+            for bid_str, bd in s.get("bots", {}).items():
+                bid = int(bid_str)
+                if bid in self.bots:
+                    if bd.get("stats_version", 0) != LOSER_STATS_VERSION:
+                        continue
+                    self.bots[bid]["wins"] = bd.get("wins", 0)
+                    self.bots[bid]["no_wins"] = bd.get("no_wins", 0)
+                    self.bots[bid]["games"] = bd.get("games", 0)
+                    self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
+                    self.bots[bid]["place_sum"] = bd.get("place_sum", 0)
+                    self.bots[bid]["place_games"] = bd.get("place_games", 0)
+                    self.bots[bid]["elo"] = bd.get("elo", BASE_ELO)
+                    self.bots[bid]["elo_games"] = bd.get("elo_games", 0)
+                    self.bots[bid]["elo_peak"] = bd.get("elo_peak", BASE_ELO)
+                    self.bots[bid]["elo_recent"].extend(bd.get("elo_recent", []))
+            print(f"[loser] restored {self.total_games} games from snapshot", flush=True)
+        except Exception as exc:
+            print(f"[loser] snapshot load skipped: {exc}", flush=True)
+
+    def save_snapshot(self):
+        with self.lock:
+            data = {
+                "total_games": self.total_games,
+                "bots": {str(b["bot_id"]): {
+                    "wins": self.bots[b["bot_id"]]["wins"],
+                    "no_wins": self.bots[b["bot_id"]]["no_wins"],
+                    "games": self.bots[b["bot_id"]]["games"],
+                    "best_streak": self.bots[b["bot_id"]]["best_streak"],
+                    "place_sum": self.bots[b["bot_id"]]["place_sum"],
+                    "place_games": self.bots[b["bot_id"]]["place_games"],
+                    "elo": self.bots[b["bot_id"]]["elo"],
+                    "elo_games": self.bots[b["bot_id"]]["elo_games"],
+                    "elo_peak": self.bots[b["bot_id"]]["elo_peak"],
+                    "elo_recent": list(self.bots[b["bot_id"]]["elo_recent"]),
+                    "stats_version": LOSER_STATS_VERSION,
+                } for b in ROSTER},
+            }
+        tmp = LOSER_SNAPSHOT_PATH + ".tmp"
+        try:
+            os.makedirs(LOG_DIR, exist_ok=True)
+            with open(tmp, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp, LOSER_SNAPSHOT_PATH)
+        except OSError as exc:
+            print(f"[loser] snapshot save failed: {exc}", flush=True)
+
+
+LOSER_ARENA = LoserArena()
+
+
 # --------------------------------------------------------------------------
 # Background workers
 # --------------------------------------------------------------------------
@@ -548,6 +740,24 @@ def winrate_snapshot_loop():
                 f.write(row)
         except Exception as exc:
             print(f"[winrate] snapshot failed: {exc}", flush=True)
+
+
+def loser_simulation_loop():
+    rng = random.Random()
+    while True:
+        seats = LOSER_ARENA.rated_lineup(rng)
+        seat_agents = [b["cls"](name=b["name"]) for b in seats]
+        engine = GameEngine(seat_agents, seed=None, collect_events=True)
+        result = engine.play_game(len(seats))
+        LOSER_ARENA.record_game(seats, result, result["events"])
+        if GAME_SLEEP:
+            time.sleep(GAME_SLEEP)
+
+
+def loser_snapshot_loop():
+    while True:
+        time.sleep(30)
+        LOSER_ARENA.save_snapshot()
 
 
 def prune_logs():
@@ -683,6 +893,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send("log not found", "text/plain")
         elif path == "/api/version":
             self._send(json.dumps({"build": SERVER_INSTANCE_ID}))
+        elif path == "/api/loser_stats":
+            self._send(json.dumps(LOSER_ARENA.stats_payload()))
         elif path == "/api/winrate_history":
             try:
                 with open(WINRATE_HISTORY_PATH) as f:
@@ -723,7 +935,8 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8767
     os.makedirs(LOG_DIR, exist_ok=True)
     prune_logs()
-    for fn in (simulation_loop, rate_loop, snapshot_loop, prune_loop, winrate_snapshot_loop):
+    for fn in (simulation_loop, rate_loop, snapshot_loop, prune_loop, winrate_snapshot_loop,
+               loser_simulation_loop, loser_snapshot_loop):
         threading.Thread(target=fn, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Exploding Kittens Arena live at http://0.0.0.0:{port}", flush=True)
