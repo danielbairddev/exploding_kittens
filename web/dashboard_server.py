@@ -45,11 +45,13 @@ from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
+from agents.hades_agent import HadesAgent
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
 from skull.engine import SkullEngine
 from skull.agents.random_agent import RandomSkullAgent
+from skull.agents.ian_losing_agent import IanLosingAgent
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
