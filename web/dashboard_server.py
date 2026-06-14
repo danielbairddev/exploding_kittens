@@ -38,9 +38,6 @@ from agents.survival_agent import SurvivalAgent
 from agents.survival_agent_v2 import SurvivalAgentV2
 from agents.coyote_agent import CoyoteAgent
 from agents.orangutan_agent import OrangutanAgent
-from agents.orangutan2_agent import Orangutan2Agent
-from agents.rhino_agent import RhinoAgent
-from agents.elephant_agent import ElephantAgent
 from agents.gabriel_agent import GabrielAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
@@ -89,7 +86,7 @@ ROSTER = [
      "stats_version": max(cls.ARENA.get("stats_version", 0), GLOBAL_STATS_VERSION)}
     for i, cls in enumerate(ARENA_BOTS)
 ]
-PLAYERS_PER_GAME = 5             # full Exploding Kittens table
+EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 
 # Deploy identity (set by deploy_dashboard.sh) so the site shows who shipped what
 # — handy when several people deploy at once.
@@ -108,6 +105,8 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
 LOSER_SNAPSHOT_PATH = os.path.join(LOG_DIR, "loser_state_v1.json")
+WINRATE_HISTORY_RAW_PATH = "winrate_history.tsv"
+WINRATE_HISTORY_PATH = os.path.join(LOG_DIR, WINRATE_HISTORY_RAW_PATH)
 LOSER_STATS_VERSION = 13
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
@@ -377,7 +376,7 @@ class Arena:
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
             ordered = sorted(ROSTER, key=avg_place)   # ascending: best place first
-        n_top = min(PLAYERS_PER_GAME - 1, len(ordered))
+        n_top = min(EK_PLAYERS_PER_GAME - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
         lineup = list(top)
@@ -386,7 +385,7 @@ class Arena:
         # If the pool is smaller than the ring, top up with distinct extras.
         pool = [b for b in ROSTER if b not in lineup]
         rng.shuffle(pool)
-        while len(lineup) < PLAYERS_PER_GAME and pool:
+        while len(lineup) < EK_PLAYERS_PER_GAME and pool:
             lineup.append(pool.pop())
         rng.shuffle(lineup)
         return lineup
@@ -580,7 +579,7 @@ class LoserArena:
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
             ordered = sorted(ROSTER, key=avg_place)
-        n_top = min(PLAYERS_PER_GAME - 1, len(ordered))
+        n_top = min(EK_PLAYERS_PER_GAME - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
         lineup = list(top)
@@ -588,7 +587,7 @@ class LoserArena:
             lineup.append(rng.choice(rest))
         pool = [b for b in ROSTER if b not in lineup]
         rng.shuffle(pool)
-        while len(lineup) < PLAYERS_PER_GAME and pool:
+        while len(lineup) < EK_PLAYERS_PER_GAME and pool:
             lineup.append(pool.pop())
         rng.shuffle(lineup)
         return lineup
@@ -660,109 +659,134 @@ LOSER_ARENA = LoserArena()
 # limiter is shared CPU, not this number. Override with EK_SLEEP; 0 = flat out.
 GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.001"))   # more aggressive (was 0.004)
 
-
-def build_lineup(rng):
-    """Random PLAYERS_PER_GAME lineup, preferring distinct agents.
-
-    Fills the ring with distinct agents first (a random subset, randomly
-    seated); only repeats an agent if the pool is smaller than the ring. With
-    a 5-agent pool and a 5-seat ring every game uses each agent exactly once.
+class ServerBackGroundThreadExecutor:
     """
-    lineup, bag = [], []
-    while len(lineup) < PLAYERS_PER_GAME:
-        if not bag:                              # refill only when we run out of distinct agents
-            bag = list(ROSTER)
-            rng.shuffle(bag)
-        lineup.append(bag.pop())
-    rng.shuffle(lineup)                          # randomize seat order
-    return lineup
-
-
-def simulation_loop():
-    rng = random.Random()
-    while True:
-        # Rated ladder: top bots by ELO + a random challenger each game.
-        seats = ARENA.rated_lineup(rng)
-        # Fresh agent instance per seat so a repeated agent never shares state
-        # across two seats in the same game.
-        seat_agents = [b["cls"](name=b["name"]) for b in seats]
-        engine = GameEngine(seat_agents, seed=None, collect_events=True)
-        result = engine.play_game(len(seats))
-        ARENA.record_game(seats, result, result["events"])
-        if GAME_SLEEP:
-            time.sleep(GAME_SLEEP)
-
-
-def rate_loop():
-    while True:
-        time.sleep(2)
-        ARENA.sample_rate()
-
-
-def snapshot_loop():
-    while True:
-        time.sleep(30)
-        ARENA.save_snapshot()
-
-
-def prune_loop():
-    while True:
-        time.sleep(300)
-        prune_logs()
-
-
-WINRATE_HISTORY_PATH = os.path.join(LOG_DIR, "winrate_history.tsv")
-
-
-def winrate_snapshot_loop():
-    """Append a tab-separated snapshot of per-bot win rates every 60 seconds.
-
-    Each row: timestamp<TAB>total_games<TAB>bot_name:wins:games:win_rate:elo ...
-    Rows are append-only so resets / roster changes don't erase history.
+    General server class used to hold the logic that runs various Agents and Engines
     """
-    os.makedirs(LOG_DIR, exist_ok=True)
-    # Write header on first run if the file is new.
-    if not os.path.exists(WINRATE_HISTORY_PATH):
-        try:
-            with open(WINRATE_HISTORY_PATH, "w") as f:
-                f.write("timestamp\ttotal_games\tbots\n")
-        except OSError:
-            pass
-    while True:
-        time.sleep(60)
-        try:
-            with ARENA.lock:
-                ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-                total = ARENA.total_games
-                parts = []
-                for b in ROSTER:
-                    bd = ARENA.bots[b["bot_id"]]
-                    g = bd["games"]
-                    wr = round(bd["wins"] / g, 4) if g else 0.0
-                    parts.append(f"{b['name']}:{bd['wins']}:{g}:{wr}:{round(bd['elo'])}")
-            row = ts + "\t" + str(total) + "\t" + "|".join(parts) + "\n"
-            with open(WINRATE_HISTORY_PATH, "a") as f:
-                f.write(row)
-        except Exception as exc:
-            print(f"[winrate] snapshot failed: {exc}", flush=True)
+    def __init__(self, players_per_game: int, arena, arena_bots, game_sleep: float,
+                 loser_arena, log_prefix: str = ""):
+        self.players_per_game: int = players_per_game
+        self.arena = arena
+        self.arena_bots = arena_bots
+        self.game_sleep = game_sleep
+        self.loser_arena = loser_arena
+        self.log_prefix = log_prefix
+
+    def _get_rooster(self):
+        return [
+            {"bot_id": i, "cls": cls, **cls.ARENA,
+             "stats_version": max(cls.ARENA.get("stats_version", 0), GLOBAL_STATS_VERSION)}
+            for i, cls in enumerate(self.arena_bots)
+        ]
+
+    def start_background_threads(self):
+        for fn in (self.simulation_loop, self.rate_loop, self.snapshot_loop, self.prune_loop,
+                   self.winrate_snapshot_loop, self.loser_simulation_loop, self.loser_snapshot_loop):
+            threading.Thread(target=fn, daemon=True).start()
+
+    def save_snapshot(self):
+        self.arena.save_snapshot()
+
+    def build_lineup(self, rng):
+        """Random PLAYERS_PER_GAME lineup, preferring distinct agents.
+
+        Fills the ring with distinct agents first (a random subset, randomly
+        seated); only repeats an agent if the pool is smaller than the ring. With
+        a 5-agent pool and a 5-seat ring every game uses each agent exactly once.
+        """
+        lineup, bag = [], []
+        while len(lineup) < self.players_per_game:
+            if not bag:                              # refill only when we run out of distinct agents
+                bag = list(self._get_rooster())
+                rng.shuffle(bag)
+            lineup.append(bag.pop())
+        rng.shuffle(lineup)                          # randomize seat order
+        return lineup
 
 
-def loser_simulation_loop():
-    rng = random.Random()
-    while True:
-        seats = LOSER_ARENA.rated_lineup(rng)
-        seat_agents = [b["cls"](name=b["name"]) for b in seats]
-        engine = GameEngine(seat_agents, seed=None, collect_events=True)
-        result = engine.play_game(len(seats))
-        LOSER_ARENA.record_game(seats, result, result["events"])
-        if GAME_SLEEP:
-            time.sleep(GAME_SLEEP)
+    def simulation_loop(self):
+        rng = random.Random()
+        while True:
+            # Rated ladder: top bots by ELO + a random challenger each game.
+            seats = self.arena.rated_lineup(rng)
+            # Fresh agent instance per seat so a repeated agent never shares state
+            # across two seats in the same game.
+            seat_agents = [b["cls"](name=b["name"]) for b in seats]
+            engine = GameEngine(seat_agents, seed=None, collect_events=True)
+            result = engine.play_game(len(seats))
+            self.arena.record_game(seats, result, result["events"])
+            if GAME_SLEEP:
+                time.sleep(GAME_SLEEP)
 
 
-def loser_snapshot_loop():
-    while True:
-        time.sleep(30)
-        LOSER_ARENA.save_snapshot()
+    def rate_loop(self):
+        while True:
+            time.sleep(2)
+            self.arena.sample_rate()
+
+
+    def snapshot_loop(self):
+        while True:
+            time.sleep(30)
+            self.arena.save_snapshot()
+
+
+    def prune_loop(self):
+        while True:
+            time.sleep(300)
+            prune_logs()
+
+    def winrate_snapshot_loop(self):
+        """Append a tab-separated snapshot of per-bot win rates every 60 seconds.
+
+        Each row: timestamp<TAB>total_games<TAB>bot_name:wins:games:win_rate:elo ...
+        Rows are append-only so resets / roster changes don't erase history.
+        """
+        os.makedirs(LOG_DIR, exist_ok=True)
+        win_rate_history_path = os.path.join(LOG_DIR, self.log_prefix + WINRATE_HISTORY_PATH)
+
+        # Write header on first run if the file is new.
+        if not os.path.exists(win_rate_history_path):
+            try:
+                with open(win_rate_history_path, "w") as f:
+                    f.write("timestamp\ttotal_games\tbots\n")
+            except OSError:
+                pass
+        while True:
+            time.sleep(60)
+            try:
+                with ARENA.lock:
+                    ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                    total = ARENA.total_games
+                    parts = []
+                    for b in ROSTER:
+                        bd = ARENA.bots[b["bot_id"]]
+                        g = bd["games"]
+                        wr = round(bd["wins"] / g, 4) if g else 0.0
+                        parts.append(f"{b['name']}:{bd['wins']}:{g}:{wr}:{round(bd['elo'])}")
+                row = ts + "\t" + str(total) + "\t" + "|".join(parts) + "\n"
+                with open(win_rate_history_path, "a") as f:
+                    f.write(row)
+            except Exception as exc:
+                print(f"[winrate] snapshot failed: {exc}", flush=True)
+
+
+    def loser_simulation_loop(self):
+        rng = random.Random()
+        while True:
+            seats = self.loser_arena.rated_lineup(rng)
+            seat_agents = [b["cls"](name=b["name"]) for b in seats]
+            engine = GameEngine(seat_agents, seed=None, collect_events=True)
+            result = engine.play_game(len(seats))
+            LOSER_ARENA.record_game(seats, result, result["events"])
+            if GAME_SLEEP:
+                time.sleep(GAME_SLEEP)
+
+
+    def loser_snapshot_loop(self):
+        while True:
+            time.sleep(30)
+            self.loser_arena.save_snapshot()
 
 
 def prune_logs():
@@ -938,17 +962,20 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8767
+    game = int(sys.argv[2]) if len(sys.argv) > 2 else "ek"
+
     os.makedirs(LOG_DIR, exist_ok=True)
     prune_logs()
-    for fn in (simulation_loop, rate_loop, snapshot_loop, prune_loop, winrate_snapshot_loop,
-               loser_simulation_loop, loser_snapshot_loop):
-        threading.Thread(target=fn, daemon=True).start()
+    sever_background_thread_executor = ServerBackGroundThreadExecutor(
+        EK_PLAYERS_PER_GAME,ARENA, ARENA_BOTS, GAME_SLEEP, LOSER_ARENA
+    )
+    sever_background_thread_executor.start_background_threads()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Exploding Kittens Arena live at http://0.0.0.0:{port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        ARENA.save_snapshot()
+        sever_background_thread_executor.save_snapshot()
         print("\nbye", flush=True)
 
 
