@@ -1,8 +1,9 @@
 """Rollout workers for Orpheus training.
 
 Orpheus is trained to NOT WIN — reward is +1 for any loss (any finishing position
-except 1st). Fleet is the current Biggest Loser leaderboard top bots (handicap off),
-so Orpheus must beat the actual best losers in the live arena.
+except 1st). Uses a mixed fleet: losers pool (bots trying to lose) + winners pool
+(bots trying to win). Each game draws 2 opponents from each pool, so Orpheus must
+learn to avoid winning even against genuinely competitive players.
 """
 import numpy as np
 
@@ -11,6 +12,9 @@ from agents.perdition2_agent import Perdition2Agent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import Ian2Agent
 from agents.ian3_agent import Ian3Agent
+from agents.coyote_agent import CoyoteAgent
+from agents.elephant_agent import ElephantAgent
+from agents.rhino_agent import RhinoAgent
 from agents.orangutan_features import encode as snap_encode, ACTIONS, N_ACTIONS
 from training.rhino.event_encode import encode_event, N_EVENT, CARD_NAMES, _CARD_IDX
 from training.elephant.net import (GRU_H, N_TARGETS, N_CARD_TYPES, N_BUCKETS, BUCKET_FRACS,
@@ -22,12 +26,19 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 NEG = -1e9
 
-# Live arena top losers (by win%, handicap off): Perdition2 14.5%, Ian3 14.8%, Gabriel 16.5%
-# Weighted towards the hardest competition.
-FLEET = [Perdition2Agent, Perdition2Agent, Perdition2Agent,
-         Ian3Agent, Ian3Agent, Ian3Agent,
-         GabrielAgent, GabrielAgent,
-         Ian1Agent, Ian2Agent]
+# Bots trying to LOSE (loser arena top performers, handicap off)
+LOSER_FLEET = [Perdition2Agent, Perdition2Agent, Perdition2Agent,
+               Ian3Agent, Ian3Agent, Ian3Agent,
+               GabrielAgent, GabrielAgent,
+               Ian1Agent, Ian2Agent]
+
+# Bots trying to WIN (best main arena players, handicap off)
+WINNER_FLEET = [RhinoAgent, RhinoAgent, RhinoAgent,
+                ElephantAgent, ElephantAgent,
+                CoyoteAgent]
+
+# Used for evaluation: measure loss-rate against the loser fleet only
+FLEET = LOSER_FLEET
 
 
 def _np(w):
@@ -261,7 +272,7 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
         NOPE_LOG = nope_log; GIVE_LOG = give_log; PLACE_LOG = place_log
 
     opponents = []
-    for _ in range(4):
+    for i in range(4):
         if pool and rng.random() < self_prob:
             pp = rng.choice(pool)
             class Frozen(_LearnerAgent):
@@ -270,8 +281,10 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
                 NOPE_LOG  = None; GIVE_LOG = None; PLACE_LOG = None
             opponents.append(Frozen(name='self'))
         else:
-            opp = rng.choice(FLEET)(name='fleet')
-            opp._play_mode = True  # disable arena explore-rate handicap during training
+            # First 2 slots: loser fleet; last 2 slots: winner fleet
+            src = LOSER_FLEET if i < 2 else WINNER_FLEET
+            opp = rng.choice(src)(name='fleet')
+            opp._play_mode = True  # disable arena handicap during training
             opponents.append(opp)
 
     agents = [Learner(name='Orpheus')] + opponents

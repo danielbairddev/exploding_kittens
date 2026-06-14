@@ -278,7 +278,9 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.5):
                 NOPE_LOG  = None; GIVE_LOG = None; PLACE_LOG = None
             opponents.append(Frozen(name='self'))
         else:
-            opponents.append(rng.choice(FLEET)(name='fleet'))
+            opp = rng.choice(FLEET)(name='fleet')
+            opp._play_mode = True  # disable arena handicap during training
+            opponents.append(opp)
 
     agents = [Learner(name='Rhino')] + opponents
     order = list(range(5)); rng.shuffle(order)
@@ -324,6 +326,7 @@ def evaluate(policy_w, n=2000, seed=99):
     for _ in range(n):
         me = Greedy(name='Rhino')
         opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
+        for opp in opps: opp._play_mode = True  # disable arena handicap during training
         agents = [me] + opps
         order = list(range(5)); rng.shuffle(order); seat = order.index(0)
         r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)
