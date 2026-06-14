@@ -28,3 +28,6 @@ training/abaddon/best_policy_a.json
 training/gabriel/checkpoint.json
 training/gabriel/best_policy.json
 training/gabriel/*.tmp
+training/cassandra/checkpoint.json
+training/cassandra/best_policy.json
+training/cassandra/*.tmp
