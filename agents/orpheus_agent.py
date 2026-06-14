@@ -134,7 +134,7 @@ def _nope_prob(a2, currently_noped, w):
 class OrpheusAgent(Agent):
     ARENA = {
         'name': 'Orpheus', 'emoji': '🪕', 'color': '#4a0e8f',
-        'blurb': 'Descended into Hades to negotiate for his wife\'s soul — must lose even among the lost.',
+        'blurb': 'Descended into Hades to negotiate for his wife\'s soul.',
         'stats_version': 1,
     }
 
