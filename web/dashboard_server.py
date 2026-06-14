@@ -81,7 +81,7 @@ ARENA_BOTS = [
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 36
+GLOBAL_STATS_VERSION = 37
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -107,7 +107,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # (keyed by bot_id) don't carry over into a different lineup.
 SNAPSHOT_PATH = os.path.join(LOG_DIR, "dashboard_state_v10.json")
 LOSER_SNAPSHOT_PATH = os.path.join(LOG_DIR, "loser_state_v1.json")
-LOSER_STATS_VERSION = 7
+LOSER_STATS_VERSION = 8
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot

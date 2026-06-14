@@ -25,7 +25,7 @@ except ImportError:
     N_EVENT = 39
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gabriel_weights.json')
-_ARENA_HANDICAP = 0.10
+_ARENA_HANDICAP = 0.05
 
 _GRU_H     = 128
 _N_TARGETS = 5
