@@ -41,7 +41,6 @@ from agents.orangutan2_agent import Orangutan2Agent
 from agents.rhino_agent import RhinoAgent
 from agents.elephant_agent import ElephantAgent
 from agents.gabriel_agent import GabrielAgent
-from agents.orpheus_agent import OrpheusAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.perdition2_agent import Perdition2Agent
