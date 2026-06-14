@@ -648,8 +648,8 @@ function renderPairwise(divId, stats, loserMode){
   const pw = {};
   for(const e of stats.pairwise) pw[e.a+':'+e.b] = e;
 
-  // Order bots by rank (ELO desc for winner, loser ELO desc for loser)
-  const bots = [...stats.leaderboard].sort((a,b)=>b.elo-a.elo);
+  // Fixed order by bot_id (roster order) so the matrix doesn't thrash.
+  const bots = [...stats.leaderboard].sort((a,b)=>a.bot_id-b.bot_id);
   const ids = bots.map(b=>b.bot_id);
   const byId = {};
   for(const b of bots) byId[b.bot_id]=b;
