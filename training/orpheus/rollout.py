@@ -26,11 +26,12 @@ from game.cards import CardType
 DEF = CardType.DEFUSE
 NEG = -1e9
 
-# Bots trying to LOSE (loser arena top performers, handicap off)
-LOSER_FLEET = [Perdition2Agent, Perdition2Agent, Perdition2Agent,
-               Ian3Agent, Ian3Agent, Ian3Agent,
-               GabrielAgent, GabrielAgent,
-               Ian1Agent, Ian2Agent]
+# Bots trying to LOSE — Ian-heavy since he leads the loser arena
+LOSER_FLEET = [Ian1Agent, Ian1Agent, Ian1Agent,
+               Ian2Agent, Ian2Agent, Ian2Agent,
+               Ian3Agent, Ian3Agent,
+               Perdition2Agent, Perdition2Agent,
+               GabrielAgent]
 
 # Bots trying to WIN (best main arena players, handicap off)
 WINNER_FLEET = [RhinoAgent, RhinoAgent, RhinoAgent,
@@ -39,6 +40,9 @@ WINNER_FLEET = [RhinoAgent, RhinoAgent, RhinoAgent,
 
 # Used for evaluation: measure loss-rate against the loser fleet only
 FLEET = LOSER_FLEET
+
+# 70% pure-loser games, 30% mixed (2 losers + 2 winners)
+MIXED_PROB = 0.30
 
 
 def _np(w):
@@ -272,6 +276,7 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
         NOPE_LOG = nope_log; GIVE_LOG = give_log; PLACE_LOG = place_log
 
     opponents = []
+    mixed_game = rng.random() < MIXED_PROB  # 30% mixed, 70% pure-loser
     for i in range(4):
         if pool and rng.random() < self_prob:
             pp = rng.choice(pool)
@@ -281,8 +286,8 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
                 NOPE_LOG  = None; GIVE_LOG = None; PLACE_LOG = None
             opponents.append(Frozen(name='self'))
         else:
-            # First 2 slots: loser fleet; last 2 slots: winner fleet
-            src = LOSER_FLEET if i < 2 else WINNER_FLEET
+            # Mixed game: slots 2-3 are winners; pure-loser game: all from loser fleet
+            src = WINNER_FLEET if (mixed_game and i >= 2) else LOSER_FLEET
             opp = rng.choice(src)(name='fleet')
             opp._play_mode = True  # disable arena handicap during training
             opponents.append(opp)
