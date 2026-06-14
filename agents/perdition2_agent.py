@@ -17,7 +17,7 @@ DEF = CardType.DEFUSE
 # Fraction of turns replaced with a random action.
 # At 0% the trained policy is ~57% first-out; Ian1 sits at ~41%.
 # At 62% the trained policy barely edges Ian1 (~+1-2pp).
-_ARENA_HANDICAP = 0.60
+_ARENA_HANDICAP = 0.15
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perdition2_weights.json")
 
