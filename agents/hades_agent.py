@@ -89,7 +89,7 @@ class HadesAgent(Agent):
         'name': 'Hades',
         'emoji': '💀',
         'color': '#1e293b',
-        'blurb': 'Lord of the underworld — a Transformer that races to die.',
+        'blurb': 'Lord of the underworld',
         'author': 'Daniel Baird',
         'llm_assisted': True,
         'stats_version': 1,
