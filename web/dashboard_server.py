@@ -27,7 +27,6 @@ from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from agents.ian3_agent import Ian3Agent
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -45,6 +44,7 @@ from agents.elephant_agent import ElephantAgent
 from agents.gabriel_agent import GabrielAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
+from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
 from game.engine import GameEngine
 
