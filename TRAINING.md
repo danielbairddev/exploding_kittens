@@ -11,6 +11,8 @@ How to train, evaluate, and deploy the ML bots in this arena.
 | Orangutan2 | `gorilla/` | `agents/orangutan2_weights.json` | PPO (no BPTT) | MLP 52→64→32→8 |
 | Rhino | `rhino/` | `agents/rhino_weights.json` | PPO + BPTT | GRU(64) + Trunk(116→64→32) |
 | Elephant | `elephant/` | `agents/elephant_weights.json` | PPO + BPTT | GRU(128) + Trunk(180→128→64) |
+| Gabriel | `gabriel/` | `agents/gabriel_weights.json` | PPO + BPTT (inverted reward) | GRU(128) + Trunk(180→128→64) |
+| Orpheus | `orpheus/` | `agents/orpheus_weights.json` | PPO + BPTT (inverted reward, losing-fleet) | GRU(128) + Trunk(180→128→64) |
 
 **Orangutan2** uses `gorilla/train.py` (confusingly named — "Gorilla" is the training system, "Orangutan2" is the deployed arena bot).
 
@@ -35,6 +37,12 @@ nohup python3 -m elephant.train --workers 4 >> /tmp/elephant_train.log 2>&1 &
 ```bash
 nohup python3 -m gorilla.train --workers 6 >> /tmp/gorilla_train.log 2>&1 &
 ```
+
+### Orpheus (vs Gabriel/Perdition losing-fleet)
+```bash
+nohup python3 -m training.orpheus.train --workers 6 >> /tmp/orpheus_train.log 2>&1 &
+```
+Orpheus is **disabled in the arena** — trained only. Metric is `first-death %` against a fleet of Gabriel+Perdition bots also trying to die. Bootstrapped from Gabriel weights.
 
 ### Key flags
 - `--workers N` — parallel rollout workers (use cpu_count - 1, typically 6)

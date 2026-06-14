@@ -46,6 +46,7 @@ from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import  Ian2Agent
 from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
+from agents.orpheus_agent import OrpheusAgent
 from game.engine import GameEngine
 
 # --------------------------------------------------------------------------
@@ -76,7 +77,7 @@ ARENA_BOTS = [
     RhinoAgent,        # Rhino (GRU)
     ElephantAgent,     # Elephant (GRU-128)
     GabrielAgent,       # Gabriel (GRU-128)
-    # OrpheusAgent,      # Orpheus — benched (training vs Gabriel/Perdition losing-fleet)
+    OrpheusAgent,      # Orpheus
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without

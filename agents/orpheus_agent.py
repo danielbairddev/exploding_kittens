@@ -1,9 +1,12 @@
-"""Elephant — GRU-based fully-ML agent (larger architecture than Rhino).
+"""Orpheus — GRU-128 bot trained to avoid winning against a pool of bots also trying to lose.
 
-GRU(39→128) + Trunk(180→128→64) + 5 heads (~130K params).
-Uses numpy for fast inference when available, falls back to pure Python otherwise.
+Same architecture as Gabriel/Elephant (GRU(39→128) + Trunk(180→128→64) + 5 heads).
+Reward: +1 for any non-win, 0 for being the last survivor.
+Trained against Gabriel and Perdition opponents who are all also trying to lose.
+
+Disabled in the arena — see dashboard_server.py (ARENA_BOTS).
 """
-import json, math, os, random
+import json, math, os
 from agents.base import Agent
 from agents.orangutan_features import encode as snap_encode, ACTIONS
 from game.actions import Action, ActionType
@@ -24,11 +27,7 @@ except ImportError:
                   'EXPLODING_KITTEN']
     N_EVENT = 39
 
-# ---- Arena handicap — intentional sandbag to make other bots look stronger on the website ----
-# Disabled during training (_play_mode = True). Pure arena cosmetic.
-_ARENA_HANDICAP = 0.30  # fraction of turns replaced with a random action
-
-_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'elephant_weights.json')
+_WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'orpheus_weights.json')
 
 _GRU_H     = 128
 _N_TARGETS = 5
@@ -53,8 +52,6 @@ def _load():
     except (OSError, ValueError):
         return None
 
-
-# ---- numpy inference (fast path) ----
 
 def _np_sigmoid(x):
     return 1.0 / (1.0 + _np.exp(-_np.clip(x, -20.0, 20.0)))
@@ -85,8 +82,6 @@ def _np_masked_argmax(scores, mask):
     idx = int(_np.argmax(masked))
     return idx if mask[idx] else None
 
-
-# ---- pure-Python fallback ----
 
 def _mv(W, v):
     return [sum(w * vi for w, vi in zip(row, v)) for row in W]
@@ -136,15 +131,16 @@ def _nope_prob(a2, currently_noped, w):
     return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
-class ElephantAgent(Agent):
+class OrpheusAgent(Agent):
     ARENA = {
-        'name': 'Elephant', 'emoji': '🐘', 'color': '#7c3aed',
-        'blurb': 'Bigger memory. Longer thinking.',
+        'name': 'Orpheus', 'emoji': '🪕', 'color': '#4a0e8f',
+        'blurb': 'Descended into Hades to negotiate for his wife\'s soul — must lose even among the lost.',
+        'stats_version': 1,
     }
 
     _WEIGHTS = _load()
 
-    def __init__(self, name='Elephant', seed=None):
+    def __init__(self, name='Orpheus', seed=None):
         self.name = name
         self._h = [0.0] * _GRU_H
         self._last_eid = -1
@@ -189,8 +185,6 @@ class ElephantAgent(Agent):
         return _trunk(self._h, self._snap(state), self._WEIGHTS)
 
     def choose_action(self, state, valid_actions):
-        if _ARENA_HANDICAP > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _ARENA_HANDICAP:
-            return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)
         self._absorb(state)

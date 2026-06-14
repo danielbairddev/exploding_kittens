@@ -37,6 +37,22 @@ These bots encode a hand-crafted feature snapshot of the current game state and 
 |-----|-----------|-------------|---------|--------|
 | Orangutan2 | 🦧 Orangutan2 | Same MLP arch as Orangutan. | **Gorilla PPO** on server (6 workers). Trainer: `training/gorilla/`. Best: 37.83% at iter 30. | **Benched** — underperforms Orangutan1 in arena so far. Re-enable in `dashboard_server.py` once it beats Orangutan1. |
 
+## ML — GRU (adversarial / inverted reward)
+
+These bots use the GRU-128 architecture but are trained with inverted or constrained rewards.
+
+### Disabled (training only — never in arena)
+
+| Bot | Arena name | Architecture | Training | Status |
+|-----|-----------|-------------|---------|--------|
+| Orpheus | 🪕 Orpheus | GRU(39→128) + Trunk(180→128→64) + 5 heads | **PPO + BPTT** vs Gabriel/Perdition losing-fleet. Trainer: `training/orpheus/`. Bootstrapped from Gabriel weights. | **Disabled** — trained to die first against bots also trying to die. Must out-lose the losers. |
+
+### Benched (awaiting competitive weights)
+
+| Bot | Arena name | Architecture | Training | Status |
+|-----|-----------|-------------|---------|--------|
+| Gabriel | 🪬 Gabriel | GRU(39→128) + Trunk(180→128→64) + 5 heads | **PPO + BPTT** inverted reward (+1 for dying first) vs standard fleet. Trainer: `training/gabriel/`. | **Benched** — re-enable in `dashboard_server.py` when desired. |
+
 ## ML — GRU (recurrent, remembers game history)
 
 These bots process the full event stream through a GRU to maintain a hidden state across the game. They can remember what happened on earlier turns, giving them genuine sequential reasoning.
@@ -55,6 +71,8 @@ Feature encoding: `training/rhino/event_encode.py` (39-dim event vectors, shared
 | `training/gorilla/` | `best_policy.json` | `agents/orangutan2_weights.json` |
 | `training/rhino/` | `best_policy.json` | `agents/rhino_weights.json` |
 | `training/elephant/` | `best_policy.json` | `agents/elephant_weights.json` |
+| `training/gabriel/` | `best_policy.json` | `agents/gabriel_weights.json` |
+| `training/orpheus/` | `best_policy.json` | `agents/orpheus_weights.json` |
 
 ## Progression
 

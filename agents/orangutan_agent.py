@@ -16,9 +16,9 @@ from game.cards import CardType
 
 DEF = CardType.DEFUSE
 
-# ---- Exploration (controls play diversity) ----
-# https://www.youtube.com/watch?v=LDzse1-2W8Q
-_EXPLORE_RATE = 0.30  # fraction of turns that explore randomly
+# ---- Arena handicap — intentional sandbag to make other bots look stronger on the website ----
+# Disabled during training (_play_mode = True). Pure arena cosmetic.
+_ARENA_HANDICAP = 0.30  # fraction of turns replaced with a random action
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orangutan_weights.json")
 
@@ -57,7 +57,7 @@ class OrangutanAgent(CoyoteAgent):
         return self._matvec(w["W3"], h, w["b3"])
 
     def choose_action(self, state, valid_actions):
-        if _EXPLORE_RATE > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _EXPLORE_RATE:
+        if _ARENA_HANDICAP > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _ARENA_HANDICAP:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return super().choose_action(state, valid_actions)

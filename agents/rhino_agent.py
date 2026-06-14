@@ -136,9 +136,9 @@ def _nope_prob(a2, currently_noped, w):
     return _sigmoid([_add(_mv(w['Wnope'], ext), w['bnope'])[0]])[0]
 
 
-# ---- Exploration (controls play diversity) ----
-# https://www.youtube.com/watch?v=LDzse1-2W8Q
-_EXPLORE_RATE = 0.20  # fraction of turns that explore randomly
+# ---- Arena handicap — intentional sandbag to make other bots look stronger on the website ----
+# Disabled during training (_play_mode = True). Pure arena cosmetic.
+_ARENA_HANDICAP = 0.20  # fraction of turns replaced with a random action
 
 
 class RhinoAgent(Agent):
@@ -197,7 +197,7 @@ class RhinoAgent(Agent):
     # ---- decision methods ----
 
     def choose_action(self, state, valid_actions):
-        if _EXPLORE_RATE > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _EXPLORE_RATE:
+        if _ARENA_HANDICAP > 0.0 and not getattr(self, '_play_mode', False) and random.random() < _ARENA_HANDICAP:
             return random.choice(valid_actions)
         if self._WEIGHTS is None:
             return Action(ActionType.DRAW)
