@@ -3,11 +3,18 @@ import random
 from skull.agents.base import SkullAgent
 from skull.discs import DiscType
 from skull.state import ObservableState, Phase
-from skull.actions import Action
+from skull.actions import Action, ActionType
 
 
+
+"""
+Always place skull. Always place max bet
+
+Test with:
+ 
+python -m skull.run --agent "Ian's Bomber"
+"""
 class IanLosingAgent(SkullAgent):
-    """Always place skull. Always place max bet"""
 
     ARENA = {"name": "Ian's Bomber", "emoji": "💣", "color": "#8E27F5",
              "blurb": "I'm trying to die", "author": "Ian Brobin"}
@@ -26,6 +33,9 @@ class IanLosingAgent(SkullAgent):
         return valid_actions[0]
 
     def _get_placing_action(self, state: ObservableState, valid_actions: list[Action]):
+        for action in valid_actions:
+            if action.action_type == ActionType.BID:
+                return self._get_bidding_action(state, valid_actions)
         if DiscType.SKULL in state.my_hand:
             for action in valid_actions:
                 if action.disc_type == DiscType.SKULL:
