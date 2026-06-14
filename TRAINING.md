@@ -13,6 +13,7 @@ How to train, evaluate, and deploy the ML bots in this arena.
 | Elephant | `elephant/` | `agents/elephant_weights.json` | PPO + BPTT | GRU(128) + Trunk(180→128→64) |
 | Gabriel | `gabriel/` | `agents/gabriel_weights.json` | PPO + BPTT (inverted reward) | GRU(128) + Trunk(180→128→64) |
 | Orpheus | `orpheus/` | `agents/orpheus_weights.json` | PPO + BPTT (inverted reward, losing-fleet) | GRU(128) + Trunk(180→128→64) |
+| Hades | `hades/` | `agents/hades_weights.json` | PPO (inverted reward + dense aux, curriculum) | Transformer(3L×4H, d=128) + Trunk(390→256→128) |
 
 **Orangutan2** uses `gorilla/train.py` (confusingly named — "Gorilla" is the training system, "Orangutan2" is the deployed arena bot).
 
@@ -43,6 +44,20 @@ nohup python3 -m gorilla.train --workers 6 >> /tmp/gorilla_train.log 2>&1 &
 nohup python3 -m training.orpheus.train --workers 6 >> /tmp/orpheus_train.log 2>&1 &
 ```
 Orpheus is **disabled in the arena** — trained only. Metric is `first-death %` against a fleet of Gabriel+Perdition bots also trying to die. Bootstrapped from Gabriel weights.
+
+### Hades (Transformer anti-agent, vs the loser fleet)
+```bash
+# Phase 1 — bootstrap: learn to self-destruct vs winner bots
+nohup python3 -m training.hades.train --phase bootstrap --iters 100 --workers 6 >> /tmp/hades_train.log 2>&1 &
+# Phase 2 — crucible: out-lose the losers (auto-switches after --bootstrap_iters)
+nohup python3 -m training.hades.train --resume --workers 6 >> /tmp/hades_train.log 2>&1 &
+```
+Hades is **benched in the arena** (commented in `dashboard_server.py`). The metric is
+**survival rate** vs `[Ian3, Ian3, Perdition2, Gabriel]` — **lower is better** (target < 2%).
+Architecture/backprop are validated by `python3 -m training.hades.gradcheck` (must print
+`GRADCHECK PASSED`). Curriculum auto-switches bootstrap→crucible at `--bootstrap_iters`
+(default 100); force a single phase with `--phase bootstrap|crucible`. Entropy decays
+`--ent_start 0.05` → `--ent_end 0.01` over `--ent_decay_iters`.
 
 ### Key flags
 - `--workers N` — parallel rollout workers (use cpu_count - 1, typically 6)

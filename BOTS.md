@@ -64,6 +64,20 @@ Feature encoding: `training/rhino/event_encode.py` (39-dim event vectors, shared
 | Rhino | 🦏 Rhino | GRU(39→64) + Trunk(116→64→32) + 5 heads | ~35K | **PPO + BPTT** on server (6 workers). Trainer: `training/rhino/`. Best: 36.05% at iter 10. | **In arena** |
 | Elephant | 🐘 Elephant | GRU(39→128) + Trunk(180→128→64) + 5 heads | ~130K | **PPO + BPTT** on laptop (4 workers). Trainer: `training/elephant/`. Best: 17.35% at iter 10 (early). | **In arena** |
 
+## ML — Transformer (adversarial / inverted reward)
+
+The first bot to replace the GRU memory module with a Transformer encoder over the
+public event stream. Trained with inverted ("anti-agent") reward to intentionally lose.
+
+Feature encoding: `training/hades/event_encode.py` (64-dim events, N=128 window) and
+`training/hades/features.py` (134-dim snapshot + opponent tracker) — both Hades-specific.
+
+### Benched (training only — never in arena yet)
+
+| Bot | Arena name | Architecture | Params | Training | Status |
+|-----|-----------|-------------|--------|---------|--------|
+| Hades | 💀 Hades | Transformer(3L×4H, d=128, ff=256) + Trunk(390→256→128, LN+Mish) + 6 heads (incl. 50-way place, context nope) | ~560K | **PPO** anti-reward (+1 die / −1 sole survivor) + dense aux shaping; bootstrap→crucible curriculum. Trainer: `training/hades/`. | **Benched** — pipeline complete & gradient-checked; needs a full training run before it can beat the loser fleet. Re-enable in `dashboard_server.py` once survival vs `[Ian3, Ian3, Perdition2, Gabriel]` is low. |
+
 ## Trainer → weights mapping
 
 | Trainer dir | Produces | Deployed to |
@@ -73,6 +87,7 @@ Feature encoding: `training/rhino/event_encode.py` (39-dim event vectors, shared
 | `training/elephant/` | `best_policy.json` | `agents/elephant_weights.json` |
 | `training/gabriel/` | `best_policy.json` | `agents/gabriel_weights.json` |
 | `training/orpheus/` | `best_policy.json` | `agents/orpheus_weights.json` |
+| `training/hades/` | `best_policy.json` | `agents/hades_weights.json` |
 
 ## Progression
 

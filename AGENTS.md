@@ -41,6 +41,7 @@ Exceptions: bug fixes, crashes, protocol/compat changes that don't alter strateg
 - `PerditionAgent` (Perdition) — same MLP as Orangutan but trained with inverted reward to minimise win rate. Self-sabotage hooks hard-coded. Frozen at ~4.43% win rate.
 - `Perdition2Agent` (Perdition2) — continuation of Perdition training, fresh PPO run. Weights in `agents/perdition2_weights.json`.
 - `RhinoAgent` (Rhino) — GRU(39→64) processes the full public event log; hidden state concatenated with snapshot features (52) and fed to MLP (116→64→32→8). Trained with PPO + BPTT in `training/rhino/`. Weights auto-updated by `training/rhino/train.py`.
+- `HadesAgent` (Hades) — **benched.** First Transformer bot: a 3-layer/4-head encoder (d=128) over the last 128 public events replaces the GRU, pooled (mean ++ last) and concatenated with a 134-dim snapshot into a 390→256→128 trunk, feeding 6 heads (policy, value, target, context-aware nope, give, 50-way deck placement). An *anti-agent*: trained with inverted reward (+1 die / −1 sole survivor) plus dense self-sabotage shaping, on a bootstrap→crucible curriculum. Pure-numpy with manual backprop, gradient-checked (`training/hades/gradcheck.py`). Trainer: `training/hades/`. Weights in `agents/hades_weights.json`.
 
 ## Open follow-ups
 

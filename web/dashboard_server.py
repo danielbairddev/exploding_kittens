@@ -45,6 +45,7 @@ from agents.ian3_agent import Ian3Agent
 from agents.perdition2_agent import Perdition2Agent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
+# from agents.hades_agent import HadesAgent   # Hades — benched (Transformer anti-agent)
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
@@ -81,6 +82,7 @@ ARENA_BOTS = [
     GabrielAgent,       # Gabriel (GRU-128)
     OrpheusAgent,      # Orpheus
     CassandraAgent,    # Cassandra (GRU-192)
+    # HadesAgent,        # Hades (Transformer anti-agent) — benched until weights beat the loser fleet
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without

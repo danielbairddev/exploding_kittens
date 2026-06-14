@@ -31,3 +31,6 @@ training/gabriel/*.tmp
 training/cassandra/checkpoint.json
 training/cassandra/best_policy.json
 training/cassandra/*.tmp
+training/hades/checkpoint.json
+training/hades/best_policy.json
+training/hades/*.tmp
