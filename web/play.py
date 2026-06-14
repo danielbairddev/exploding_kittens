@@ -229,14 +229,46 @@ class Session:
                     # favor: human picks in give_card, note appended there
         return msg
 
+    def _flush_end_events(self):
+        """Flush any events that were emitted after the last ask_action/ask_pick call.
+
+        Covers two cases:
+        - Human drew an EK and exploded (game ended without another ask_action)
+        - Last bot(s) exploded to end the game (human wins without another ask_action)
+        """
+        _SKIP = {'turn_start', 'game_over'}
+        remaining = sorted(
+            [e for e in self.engine._public_events
+             if e.get('event_id', 0) > self._last_eid],
+            key=lambda e: e.get('event_id', 0),
+        )
+        for ev in remaining:
+            t = ev.get('type', '')
+            if t in _SKIP:
+                continue
+            p   = ev.get('player', -1)
+            tgt = ev.get('target', ev.get('from_player', -1))
+            msg = self._fmt_event(ev)
+            if msg:
+                self.note(msg)
+            aev = {'id': ev.get('event_id', 0), 'type': t, 'player': p,
+                   'target': tgt, 'log': msg}
+            self._anim_events.append(aev)
+            self._last_eid = ev.get('event_id', self._last_eid)
+
     def _run(self):
+        result = None
         try:
-            self.result = self.engine.play_game(self.n)
+            result = self.engine.play_game(self.n)
         except Exception as exc:
-            self.result = {"winner": -1, "error": repr(exc)}
-        w = self.result.get("winner", -1)
+            result = {"winner": -1, "error": repr(exc)}
+        # Flush draw/explode/defuse events that fired after the last ask_action,
+        # then set self.result so the frontend sees anim events before game-over state.
+        self._flush_end_events()
+        w = result.get("winner", -1)
         self.note("🎉 You win!" if w == 0 else
                   (f"💀 {self.names[w]} wins — better luck next time." if w >= 0 else "Game over."))
+        self.result = result
 
     def _fmt_event(self, ev):
         t = ev.get("type", "")
@@ -249,16 +281,17 @@ class Session:
         def _v(third):
             return third[:-1] if nm == "You" and third.endswith("s") else third
         b, bt = f"**{nm}**", f"**{tnm}**"
-        if t == "draw":        return f"{b} {_v('draws')} a card"
-        if t == "explode":     return f"💣 {b} exploded!"
-        if t == "defuse":      return f"🛡️ {b} defused the kitten!"
-        if t == "attack":      return f"⚔️ {b} {_v('attacks')} {bt}"
-        if t == "skip":        return f"⏭️ {b} {_v('skips')}"
-        if t == "favor":       return f"🙏 {b} {_v('favors')} {bt}"
-        if t == "shuffle":     return f"🔀 {b} {_v('shuffles')} the deck"
-        if t == "see_future":  return f"🔮 {b} {_v('sees')} the future"
-        if t == "nope":        return f"⛔ {b} {_v('nopes')}!"
-        if t == "cat_steal":   return f"🐱 {b} {_v('steals')} from {bt}"
+        if t == "draw":         return f"{b} {_v('draws')} a card"
+        if t == "explode":      return f"💣 {b} exploded!"
+        if t == "defuse":       return f"🛡️ {b} defused the kitten!"
+        if t == "action_noped": return f"🚫 {b}'s action was cancelled"
+        if t == "attack":       return f"⚔️ {b} {_v('attacks')} {bt}"
+        if t == "skip":         return f"⏭️ {b} {_v('skips')}"
+        if t == "favor":        return f"🙏 {b} {_v('favors')} {bt}"
+        if t == "shuffle":      return f"🔀 {b} {_v('shuffles')} the deck"
+        if t == "see_future":   return f"🔮 {b} {_v('sees')} the future"
+        if t == "nope":         return f"⛔ {b} {_v('nopes')}!"
+        if t == "cat_steal":    return f"🐱 {b} {_v('steals')} from {bt}"
         return None
 
     def note(self, msg):
@@ -347,7 +380,9 @@ class Session:
             given = opts[i]
             self.note(f"🙏 **You** gave away a **{given.name.replace('_', ' ').title()}**")
             return given
-        # place: arg = deck_size — human picks exact position via slider
+        # place: arg = deck_size — human picks exact position via slider.
+        # Flush draw + defuse events so they animate before the placement prompt.
+        self._flush_events(state)
         self.pending = {
             "kind": "place_exact",
             "state": self._state_view(state),

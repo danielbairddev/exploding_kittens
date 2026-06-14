@@ -189,10 +189,31 @@ button.ghost:hover{border-color:var(--accent2);}
 @keyframes flGreen {0%,100%{background:var(--surface2);}50%{background:rgba(74,222,128,.2);box-shadow:inset 0 0 20px rgba(74,222,128,.25);}}
 @keyframes flYellow{0%,100%{background:var(--surface2);}50%{background:rgba(251,191,36,.18);box-shadow:inset 0 0 20px rgba(251,191,36,.22);}}
 @keyframes flPurple{0%,100%{background:var(--surface2);}50%{background:rgba(192,132,252,.18);box-shadow:inset 0 0 20px rgba(192,132,252,.22);}}
-.fl-red   {animation:flRed    .75s ease-in-out !important;}
-.fl-green {animation:flGreen  .75s ease-in-out !important;}
-.fl-yellow{animation:flYellow .75s ease-in-out !important;}
-.fl-purple{animation:flPurple .75s ease-in-out !important;}
+/* Shake + red burst when YOU are the attack target */
+@keyframes flAttacked{
+  0%   {background:var(--surface2);transform:translateX(0);}
+  10%  {background:rgba(239,68,68,.45);box-shadow:0 0 28px -2px #ef4444,inset 0 0 24px rgba(239,68,68,.35);transform:translateX(-6px);}
+  20%  {transform:translateX(6px);}
+  30%  {transform:translateX(-5px);}
+  40%  {transform:translateX(5px);}
+  55%  {background:rgba(239,68,68,.3);transform:translateX(-3px);}
+  70%  {transform:translateX(3px);}
+  85%  {transform:translateX(-1px);}
+  100% {background:var(--surface2);transform:translateX(0);box-shadow:none;}
+}
+.fl-red      {animation:flRed      .75s ease-in-out !important;}
+.fl-green    {animation:flGreen    .75s ease-in-out !important;}
+.fl-yellow   {animation:flYellow   .75s ease-in-out !important;}
+.fl-purple   {animation:flPurple   .75s ease-in-out !important;}
+.fl-attacked {animation:flAttacked  .9s ease-in-out !important;}
+
+/* Big alarming pop when YOU are attacked */
+.player-pop.you-attacked{
+  background:#ef4444;color:#fff;
+  font-size:.9rem;padding:6px 14px;
+  border-color:#ef4444;
+  box-shadow:0 4px 18px rgba(239,68,68,.55);
+}
 
 /* Player action bubbles */
 .player-pop{
@@ -345,6 +366,30 @@ button.ghost:hover{border-color:var(--accent2);}
 .peek-emo{font-size:1.6rem;line-height:1;}
 .peek-name{font-size:.6rem;color:var(--muted);margin-top:.25rem;line-height:1.2;}
 
+/* ---- PRIVATE-INFO TOASTS ---- */
+#toast-container{
+  position:fixed;bottom:1.4rem;right:1.2rem;z-index:1001;
+  display:flex;flex-direction:column-reverse;gap:.5rem;
+  pointer-events:none;max-width:min(320px,90vw);
+}
+.toast{
+  background:var(--surface);border:1.5px solid var(--border);border-radius:12px;
+  padding:.65rem 1rem;font-size:.83rem;font-weight:600;color:var(--text);
+  box-shadow:0 4px 20px rgba(0,0,0,.45);
+  animation:toastIn .28s cubic-bezier(.17,.67,.36,1.2) forwards;
+  pointer-events:auto;border-left:3px solid var(--muted);
+  line-height:1.4;
+}
+.toast.out{animation:toastOut .22s forwards;}
+.toast b{color:var(--accent2);}
+.toast.t-draw  {border-left-color:var(--muted);}
+.toast.t-steal {border-left-color:var(--pink);}
+.toast.t-favor {border-left-color:#c084fc;}
+.toast.t-future{border-left-color:var(--accent2);}
+.toast.t-give  {border-left-color:var(--yellow);}
+@keyframes toastIn {from{opacity:0;transform:translateX(30px);}to{opacity:1;transform:none;}}
+@keyframes toastOut{from{opacity:1;transform:none;}to{opacity:0;transform:translateX(30px);}}
+
 /* ---- DEPLOY NOTIFICATION ---- */
 #deploy-banner{
   position:fixed;top:0;left:0;right:0;z-index:9999;
@@ -380,6 +425,7 @@ button.ghost:hover{border-color:var(--accent2);}
 </style>
 </head>
 <body>
+<div id="toast-container"></div>
 <div class="page">
   <header>
     <div>
@@ -787,19 +833,41 @@ function _showStageEvent(ev) {
     ${extraHtml}
   `;
 
+  // Move the turn indicator to whoever is acting (skip for nope — they're an interruptor)
+  if (_TURN_MOVER_EVENTS.has(ev.type) && ev.player >= 0) {
+    _setCurrentPlayerHighlight(ev.player);
+    _updateBannerForEvent(ev.player, ev.type);
+  }
+
   // Flash + popup actor
   if (cfg.flash && ev.player >= 0) _flashPlayer(ev.player, cfg.flash);
   if (cfg.popText && ev.player >= 0) _popAbovePlayer(ev.player, cfg.popText, null);
 
   // Flash + popup target after a beat
   if (cfg.tgt && ev.target >= 0) {
-    if (cfg.flashTgt) {
-      const t2 = setTimeout(() => _flashPlayer(ev.target, cfg.flashTgt), 200);
+    const youAttacked = ev.type === 'attack' && ev.target === 0;
+    const tgtFlash = youAttacked ? 'fl-attacked' : cfg.flashTgt;
+    const tgtPopText = youAttacked ? '⚔️ You\'re under attack!' : cfg.popTgt;
+    const tgtPopCls  = youAttacked ? 'you-attacked' : null;
+
+    if (tgtFlash) {
+      const t2 = setTimeout(() => _flashPlayer(ev.target, tgtFlash), 200);
       _animTimers.push(t2);
     }
-    if (cfg.popTgt) {
-      const t3 = setTimeout(() => _popAbovePlayer(ev.target, cfg.popTgt, 'var(--red)'), 200);
+    if (tgtPopText) {
+      const t3 = setTimeout(() => _popAbovePlayer(ev.target, tgtPopText, 'var(--red)', tgtPopCls), 200);
       _animTimers.push(t3);
+    }
+
+    // For attack on human: also flash the banner red for a moment
+    if (youAttacked) {
+      const t4 = setTimeout(() => {
+        $('turn-banner').className = 'prompt-turn';
+        $('banner-icon').textContent = '⚔️';
+        $('banner-who').textContent = 'You\'re under attack!';
+        $('banner-sub').textContent = `${nm} attacks you — draw twice`;
+      }, 200);
+      _animTimers.push(t4);
     }
   }
 
@@ -809,6 +877,45 @@ function _showStageEvent(ev) {
     const el = $('stage');
     if (el && !_animQueue.length) el.className = '';
   }, getSpeed() * 2.2);
+}
+
+// Events where ev.player IS the current player (not nope, which is an interruptor)
+const _TURN_MOVER_EVENTS = new Set([
+  'draw','attack','skip','favor','shuffle','see_future',
+  'cat_steal','defuse','explode','action_noped',
+]);
+
+function _setCurrentPlayerHighlight(idx) {
+  const players = $('players');
+  if (!players) return;
+  players.querySelectorAll('.player').forEach((c, i) => {
+    if (i === idx) {
+      if (!c.classList.contains('current')) c.classList.add('current');
+    } else {
+      c.classList.remove('current');
+    }
+  });
+}
+
+function _updateBannerForEvent(playerIdx, evType) {
+  const names = window._curNames || [];
+  const nm = names[playerIdx] || '';
+  if (evType === 'explode') {
+    $('turn-banner').className = 'bot-turn';
+    $('banner-icon').textContent = '💀';
+    $('banner-who').textContent = playerIdx === 0 ? 'You exploded!' : `${nm || 'Bot'} exploded!`;
+    $('banner-sub').textContent = '';
+  } else if (playerIdx === 0) {
+    $('turn-banner').className = 'your-turn';
+    $('banner-icon').textContent = '🧍';
+    $('banner-who').textContent = 'Your turn';
+    $('banner-sub').textContent = '';
+  } else {
+    $('turn-banner').className = 'bot-turn';
+    $('banner-icon').textContent = BOT_EMOJI(nm);
+    $('banner-who').textContent = nm ? `${nm}'s turn` : 'Bot turn';
+    $('banner-sub').textContent = '';
+  }
 }
 
 function _flashPlayer(idx, cls) {
@@ -823,7 +930,7 @@ function _flashPlayer(idx, cls) {
   _animTimers.push(t);
 }
 
-function _popAbovePlayer(idx, text, borderColor) {
+function _popAbovePlayer(idx, text, borderColor, extraCls) {
   const players = $('players');
   if (!players) return;
   const cards = players.querySelectorAll('.player');
@@ -833,9 +940,9 @@ function _popAbovePlayer(idx, text, borderColor) {
   if (old) old.remove();
   const dur = Math.max(getSpeed() * 2.5, 1400);
   const pop = document.createElement('div');
-  pop.className = 'player-pop';
+  pop.className = 'player-pop' + (extraCls ? ' ' + extraCls : '');
   pop.style.setProperty('--pop-dur', dur + 'ms');
-  if (borderColor) pop.style.borderColor = borderColor;
+  if (borderColor && !extraCls) pop.style.borderColor = borderColor;
   pop.textContent = text;
   cards[idx].appendChild(pop);
   const t = setTimeout(() => { if (pop.parentNode) pop.remove(); }, dur + 100);
@@ -1205,7 +1312,7 @@ function nopeDecide(i) {
 // Map event type → CSS class suffix (must match ll-* CSS above)
 const LOG_TYPE_CLS = {
   explode:'ll-explode', defuse:'ll-defuse', attack:'ll-attack',
-  nope:'ll-nope', favor:'ll-favor', cat_steal:'ll-cat',
+  nope:'ll-nope', action_noped:'ll-nope', favor:'ll-favor', cat_steal:'ll-cat',
   shuffle:'ll-shuffle', see_future:'ll-future', skip:'ll-skip', draw:'ll-draw',
 };
 
@@ -1218,23 +1325,66 @@ function _logLineEl(msg, evType) {
   return d;
 }
 
+// ---- Private-info toast notifications ----
+// Detect messages that reveal card info specifically to the human player.
+// Heuristic: message mentions "You" and has 2+ bold sections (You + a card name).
+function _isPrivateInfo(msg) {
+  if (!msg) return false;
+  const boldCount = (msg.match(/\*\*/g) || []).length;
+  return boldCount >= 4 && (msg.includes('**You**') || msg.includes('You peeked'));
+}
+
+function _toastClass(evType) {
+  if (!evType) return '';
+  if (evType === 'draw')       return 't-draw';
+  if (evType === 'cat_steal')  return 't-steal';
+  if (evType === 'favor')      return 't-favor';
+  if (evType === 'see_future') return 't-future';
+  return 't-give';
+}
+
+function _showToast(msg, evType) {
+  const container = $('toast-container');
+  if (!container) return;
+  const d = document.createElement('div');
+  d.className = 'toast ' + _toastClass(evType);
+  d.innerHTML = msg.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  container.appendChild(d);
+  // Auto-dismiss after 4s (6s for see_future — more to read)
+  const ms = evType === 'see_future' ? 6000 : 4000;
+  setTimeout(() => {
+    d.classList.add('out');
+    setTimeout(() => { if (d.parentNode) d.remove(); }, 250);
+  }, ms);
+}
+
+// ---- Log rendering with smart scroll ----
+// With flex-direction:column-reverse, scrollTop=0 = newest at visual top.
+// Only auto-snap to top if user is already there (within 30px tolerance).
+function _logAtTop(el) { return el.scrollTop <= 30; }
+
 let _lastLogLen = 0;
 function appendLogLine(msg, evType) {
   if (!msg) return;
   const el = $('log');
   if (!el) return;
+  const atTop = _logAtTop(el);
   el.appendChild(_logLineEl(msg, evType));
-  el.scrollTop = 0;
+  if (atTop) el.scrollTop = 0;
   _lastLogLen++;
+  if (_isPrivateInfo(msg)) _showToast(msg, evType);
 }
 function renderLog(lines) {
   if (!lines || !lines.length) return;
   const el = $('log');
+  const atTop = _logAtTop(el);
   const newLines = lines.slice(_lastLogLen);
   newLines.forEach(l => el.appendChild(_logLineEl(l)));
   if (newLines.length) {
     _lastLogLen = lines.length;
-    el.scrollTop = 0;
+    if (atTop) el.scrollTop = 0;
+    // Toast any private-info lines that weren't fired via appendLogLine
+    newLines.forEach(l => { if (_isPrivateInfo(l)) _showToast(l, null); });
   }
 }
 

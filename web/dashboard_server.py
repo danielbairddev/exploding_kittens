@@ -514,6 +514,42 @@ def prune_loop():
         prune_logs()
 
 
+WINRATE_HISTORY_PATH = os.path.join(LOG_DIR, "winrate_history.tsv")
+
+
+def winrate_snapshot_loop():
+    """Append a tab-separated snapshot of per-bot win rates every 60 seconds.
+
+    Each row: timestamp<TAB>total_games<TAB>bot_name:wins:games:win_rate:elo ...
+    Rows are append-only so resets / roster changes don't erase history.
+    """
+    os.makedirs(LOG_DIR, exist_ok=True)
+    # Write header on first run if the file is new.
+    if not os.path.exists(WINRATE_HISTORY_PATH):
+        try:
+            with open(WINRATE_HISTORY_PATH, "w") as f:
+                f.write("timestamp\ttotal_games\tbots\n")
+        except OSError:
+            pass
+    while True:
+        time.sleep(60)
+        try:
+            with ARENA.lock:
+                ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+                total = ARENA.total_games
+                parts = []
+                for b in ROSTER:
+                    bd = ARENA.bots[b["bot_id"]]
+                    g = bd["games"]
+                    wr = round(bd["wins"] / g, 4) if g else 0.0
+                    parts.append(f"{b['name']}:{bd['wins']}:{g}:{wr}:{round(bd['elo'])}")
+            row = ts + "\t" + str(total) + "\t" + "|".join(parts) + "\n"
+            with open(WINRATE_HISTORY_PATH, "a") as f:
+                f.write(row)
+        except Exception as exc:
+            print(f"[winrate] snapshot failed: {exc}", flush=True)
+
+
 def prune_logs():
     """Keep logs/ bounded: cap *.jsonl file count and total directory size."""
     try:
@@ -647,6 +683,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send("log not found", "text/plain")
         elif path == "/api/version":
             self._send(json.dumps({"build": SERVER_INSTANCE_ID}))
+        elif path == "/api/winrate_history":
+            try:
+                with open(WINRATE_HISTORY_PATH) as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/tab-separated-values; charset=utf-8")
+                self.send_header("Content-Length", str(len(data.encode())))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(data.encode())
+                return
+            except OSError:
+                self._send(json.dumps({"error": "no history yet"}))
         elif path == "/health":
             self._send(json.dumps({"status": "ok", "games": ARENA.total_games}))
         else:
@@ -674,7 +723,7 @@ def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8767
     os.makedirs(LOG_DIR, exist_ok=True)
     prune_logs()
-    for fn in (simulation_loop, rate_loop, snapshot_loop, prune_loop):
+    for fn in (simulation_loop, rate_loop, snapshot_loop, prune_loop, winrate_snapshot_loop):
         threading.Thread(target=fn, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     print(f"Exploding Kittens Arena live at http://0.0.0.0:{port}", flush=True)

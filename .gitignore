@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 logs/
+!logs/winrate_history.tsv
 *.jsonl
 .idea/
 
