@@ -292,7 +292,12 @@ class SkullEngine:
         in_hand = {d.disc_type for d in cp.hand}
         valid = [Action(ActionType.DISCARD, disc_type=t)
                  for t in (DiscType.ROSE, DiscType.SKULL) if t in in_hand]
-        action = self._choose(state, challenger, valid)
+        prev_phase = state.phase
+        state.phase = Phase.DISCARD
+        try:
+            action = self._choose(state, challenger, valid)
+        finally:
+            state.phase = prev_phase
         for disc in cp.hand:
             if disc.disc_type == action.disc_type:
                 return disc

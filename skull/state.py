@@ -8,6 +8,7 @@ class Phase:
     PLACING = "placing"   # players lay discs face-down
     BIDDING = "bidding"   # players claim how many they can flip safely
     REVEAL = "reveal"     # the high bidder flips discs, hoping to avoid a skull
+    DISCARD = "discard"   # you flipped your own skull; pick which disc to give up
 
 
 @dataclass

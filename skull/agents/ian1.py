@@ -125,6 +125,8 @@ class Ian1(SkullAgent):
                 return self._get_bidding_action(state, valid_actions)
             case Phase.REVEAL:
                 return self._get_reveal_action(state, valid_actions)
+            case Phase.DISCARD:
+                return self._get_discard_action(state, valid_actions)
         return valid_actions[0]
 
     def _get_placing_action(self, state: ObservableState, valid_actions: list[Action]):
@@ -183,6 +185,14 @@ class Ian1(SkullAgent):
     def _get_reveal_action(self, state: ObservableState, valid_actions: list[Action]):
         for action in valid_actions:
             if action.target_player == state.my_id:
+                return action
+        return valid_actions[0]
+
+    def _get_discard_action(self, state: ObservableState, valid_actions: list[Action]):
+        # We flipped our own skull and must give up a disc. Keep the skull (it
+        # lets us threaten challengers next round); sacrifice a rose if we can.
+        for action in valid_actions:
+            if action.disc_type == DiscType.ROSE:
                 return action
         return valid_actions[0]
 
