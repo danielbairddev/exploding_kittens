@@ -25,6 +25,7 @@ import time
 import uuid
 from collections import deque
 from datetime import datetime
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -55,6 +56,7 @@ from game.engine import GameEngine
 from skull.engine import SkullEngine
 from skull.agents.random_agent import RandomSkullAgent
 from skull.agents.ian_losing_agent import IanLosingAgent
+from skull.agents.ian1 import Ian1
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
@@ -104,9 +106,19 @@ EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 # Skull roster — its own pool of bots, served on the alternate port. Mirrors the
 # ROSTER shape (bot_id + the bot's ARENA metadata) so the same Arena machinery
 # can rank it. Add a bot by appending its class here.
+
+Ian1Bots = []
+for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
+    bot = partial(Ian1, secret_meta_value1=secret_meta_value)
+    bot.ARENA = {"name": f"Ian1-{index}", "emoji": "🐼", "color": "#D9D9D9",
+             "blurb": "Ian's Fist Attempt", "author": "Ian Brobin"}
+    bot.__name__ = "Ian1"
+    Ian1Bots.append(bot)
+
 SKULL_BOTS = [
     RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
     IanLosingAgent,      # Ian's attempt to lose
+    *Ian1Bots,           # Fleet for Ian's First Attempt
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
