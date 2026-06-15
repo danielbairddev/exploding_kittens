@@ -38,7 +38,7 @@ def main():
         if agent_name == bot.ARENA.get("name"):
             agent_class = bot
     if agent_class is None:
-        Exception(f"{agent_name} is not a valid agent name. If you have added this agent, add it to "
+        raise Exception(f"{agent_name} is not a valid agent name. If you have added this agent, add it to "
                   f"dashboard_server.py SKULL_BOTS to test it here")
 
     agents = [agent_class(name=f"{agent_name}-{i}", seed=args.seed) for i in range(args.players)]

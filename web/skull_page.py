@@ -81,6 +81,16 @@ SKULL_PAGE = r'''<!DOCTYPE html>
   .player.winner { border-color:var(--yellow); box-shadow:0 0 24px -4px var(--yellow); }
   .player.winner::after{ content:"\1F451"; position:absolute; top:-16px; left:50%; transform:translateX(-50%); font-size:1.2rem; }
   .player .pop2 { position:absolute; top:-6px; right:-4px; font-size:1.1rem; animation:popUp .9s ease-out forwards; pointer-events:none;}
+  .player .bubble { position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%);
+    background:#f8fafc; color:#0b0f17; font-size:0.72rem; font-weight:600; line-height:1.3;
+    padding:5px 9px; border-radius:11px; max-width:150px; text-align:center;
+    box-shadow:0 5px 16px rgba(0,0,0,.45); z-index:6; pointer-events:none;
+    animation:bubbleIn .25s ease-out; }
+  .player .bubble::after { content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top-color:#f8fafc; }
+  .player .bubble.out { animation:bubbleOut .35s ease-in forwards; }
+  @keyframes bubbleIn { from{opacity:0; transform:translate(-50%,7px) scale(.8);} to{opacity:1; transform:translate(-50%,0) scale(1);} }
+  @keyframes bubbleOut { to{opacity:0; transform:translate(-50%,-7px) scale(.9);} }
 
   .ticker { margin-top:0.9rem; height:150px; overflow:hidden; border-top:1px solid var(--border); padding-top:0.6rem; }
   .ticker .line { font-size:0.8rem; color:var(--muted); padding:1px 0; opacity:0; animation:slideIn .3s forwards; }
@@ -373,6 +383,13 @@ function makeReplay(cfg){
     const s = document.createElement('div'); s.className='pop2'; s.textContent=emoji;
     el.appendChild(s); setTimeout(()=>s.remove(), 900);
   }
+  function say(seat, msg){
+    const el = E(cfg.players+'seat'+seat); if(!el) return;
+    const b = document.createElement('div'); b.className='bubble'; b.innerHTML = esc(msg);
+    el.appendChild(b);
+    setTimeout(()=>b.classList.add('out'), 1700);
+    setTimeout(()=>b.remove(), 2050);
+  }
   function setStage(big, msg, cls){
     E(cfg.big).textContent = big;
     E(cfg.msg).innerHTML = msg;
@@ -440,10 +457,8 @@ function makeReplay(cfg){
         break;
       }
       case 'chat': {
-        const msg = esc(e.message);
-        table.current=p; renderTable(); pop(p,'💬');
-        setStage('💬', `${nm(p)} says: <i>“${msg}”</i>`);
-        tick(`💬 ${nm(p)}: ${msg}`); await sleep(820); break;
+        say(p, e.message);
+        await sleep(820); break;
       }
       case 'success':
         table.seats[p].points=e.points; table.current=p; renderTable(); pop(p,'🏆');
