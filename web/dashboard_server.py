@@ -49,7 +49,7 @@ from agents.elephant_agent import ElephantAgent
 from agents.orpheus_agent import OrpheusAgent
 from agents.cassandra_agent import CassandraAgent
 from agents.hades_agent import HadesAgent
-# from agents.zeus_agent import ZeusAgent   # Zeus — benched (Hades architecture, trained to WIN)
+from agents.zeus_agent import ZeusAgent
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
@@ -89,12 +89,12 @@ ARENA_BOTS = [
     OrpheusAgent,      # Orpheus
     CassandraAgent,    # Cassandra (GRU-192)
     HadesAgent,        # Hades (Transformer anti-agent) — deployed at ~15.5% survival (plateau-break run)
-    # ZeusAgent,         # Zeus (Hades architecture, win-maximising) — benched until trained
+    ZeusAgent,         # Zeus (Hades architecture, win-maximising) — deployed ~41% win; still training to beat Elephant
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 51
+GLOBAL_STATS_VERSION = 52
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -151,7 +151,7 @@ SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 21
+LOSER_STATS_VERSION = 22
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
