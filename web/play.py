@@ -156,14 +156,37 @@ class Session:
         self.names = display_names
         self.engine = GameEngine(agents, collect_events=True)
         self.n = len(agents)
+        self._lock = threading.Lock()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
+        # Stream public events (esp. bot explosions) to the frontend live, so
+        # deaths animate during the bots' turns instead of only when it returns
+        # to the human's turn. The frontend polls /api/play/state every ~600ms.
+        self._streamer = threading.Thread(target=self._stream_loop, daemon=True)
+        self._streamer.start()
 
-    def _flush_events(self, state):
-        """Log any new events from state.recent_events since last flush."""
+    def _stream_loop(self):
+        while self.result is None:
+            try:
+                self._flush_events(streaming=True)
+            except Exception:
+                pass
+            time.sleep(0.15)
+
+    def _flush_events(self, state=None, streaming=False):
+        with self._lock:
+            self._flush_locked(streaming)
+
+    def _flush_locked(self, streaming=False):
+        """Flush new public events (from the engine log) to the anim queue + log.
+        Caller holds self._lock — used by both the human-prompt path and the
+        background streamer thread, so bot explosions reach the frontend live.
+
+        When streaming, stop at the human's own favor/cat-steal so the enriched
+        'you received X' message is produced by the prompt-path flush instead."""
         _SKIP = {'turn_start', 'game_over'}
         new = sorted(
-            [e for e in getattr(state, 'recent_events', [])
+            [e for e in self.engine._public_events
              if e.get('event_id', 0) > self._last_eid],
             key=lambda e: e.get('event_id', 0)
         )
@@ -171,6 +194,11 @@ class Session:
             t   = ev.get('type', '')
             p   = ev.get('player', -1)
             tgt = ev.get('target', ev.get('from_player', -1))
+
+            # Leave the human's own favor/cat-steal for the prompt-path flush,
+            # which enriches it with the specific card received.
+            if streaming and t in ('favor', 'cat_steal') and p == 0:
+                break
 
             msg = self._fmt_event(ev)
             msg = self._enrich_msg(msg, t, p, tgt)
@@ -253,35 +281,10 @@ class Session:
         return msg
 
     def _flush_end_events(self):
-        """Flush any events that were emitted after the last ask_action/ask_pick call.
-
-        Covers two cases:
-        - Human drew an EK and exploded (game ended without another ask_action)
-        - Last bot(s) exploded to end the game (human wins without another ask_action)
-        """
-        _SKIP = {'turn_start', 'game_over'}
-        remaining = sorted(
-            [e for e in self.engine._public_events
-             if e.get('event_id', 0) > self._last_eid],
-            key=lambda e: e.get('event_id', 0),
-        )
-        for ev in remaining:
-            t = ev.get('type', '')
-            if t in _SKIP:
-                continue
-            p   = ev.get('player', -1)
-            tgt = ev.get('target', ev.get('from_player', -1))
-            msg = self._fmt_event(ev)
-            if t == 'draw' and p == 0:
-                card = self._private_draw_card(ev.get('turn'))
-                if card:
-                    msg = f"**You** draw a **{card}**"
-            if msg:
-                self.note(msg)
-            aev = {'id': ev.get('event_id', 0), 'type': t, 'player': p,
-                   'target': tgt, 'log': msg}
-            self._anim_events.append(aev)
-            self._last_eid = ev.get('event_id', self._last_eid)
+        """Final flush of events emitted after the last prompt (e.g. the human's
+        fatal EK draw, or the last bot exploding to end the game). Lock-guarded
+        and idempotent via _last_eid, so it's safe alongside the streamer."""
+        self._flush_events()
 
     def _run(self):
         result = None

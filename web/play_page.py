@@ -816,6 +816,17 @@ function _showStageEvent(ev) {
   const nm  = names[ev.player] || (ev.player >= 0 ? `P${ev.player}` : '');
   const tnm = names[ev.target] || (ev.target  >= 0 ? `P${ev.target}` : '');
 
+  // Mark the seat dead the moment it explodes, so the death shows during the
+  // bots' turns instead of waiting for the next fresh alive-state on your turn.
+  if (ev.type === 'explode' && ev.player >= 0) {
+    const seat = $('players') && $('players').children[ev.player];
+    if (seat) {
+      seat.classList.add('dead');
+      const hsEl = seat.querySelector('.hs'); if (hsEl) hsEl.textContent = '💀';
+      const mhEl = seat.querySelector('.mini-hand'); if (mhEl) mhEl.innerHTML = '';
+    }
+  }
+
   stageEl.className = 'active' + (cfg.cls ? ' ' + cfg.cls : '');
 
   let extraHtml = '';
