@@ -109,7 +109,16 @@ Note: `training/hades/checkpoint.json` / `best_policy.json` / `bests.jsonl` are 
 continues exactly where it left off. A fresh clone starts from the committed
 `agents/hades_weights.json`.
 
-## Plateau-break experiment (2026-06-14, in progress)
+## Plateau-break experiment (2026-06-14) — SUCCEEDED ✅
+
+Broke the plateau: survival **18.09% → 15.15%** (best iter 2900; fresh independent
+eval seed 4242 n=3000 = 15.83%). Consistent downward trend (16.1 → 16.0 → 15.3 →
+15.15) across hundreds of iters, well outside eval noise. The `waste_defuse` reward
+flip was the decisive change. Deployed 2026-06-15 (stats v50/20).
+
+Original diagnosis + changes below.
+
+## Plateau-break experiment (2026-06-14, details)
 
 The first crucible run flattened at ~18–21% survival for ~400 iters (best 18.09% at
 iter 200, no improvement through iter 600) with entropy fully decayed to 0.01.
