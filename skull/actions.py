@@ -9,6 +9,7 @@ class ActionType(Enum):
     BID = auto()      # claim you can flip `amount` roses without hitting a skull
     PASS = auto()     # drop out of the bidding for this round
     FLIP = auto()     # during the reveal: flip the top disc of `target_player`
+    DISCARD = auto()  # after flipping your own skull: pick which disc to give up
 
 
 @dataclass

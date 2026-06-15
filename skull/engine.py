@@ -212,6 +212,7 @@ class SkullEngine:
 
         flipped = 0
         hit_skull = False
+        own_skull = False                            # was the skull the challenger's own?
         flipped_discs: list[tuple[int, Disc]] = []   # (owner_id, disc) to return later
 
         while flipped < bid:
@@ -236,6 +237,7 @@ class SkullEngine:
                               disc=disc.disc_type.name)
             if is_skull:
                 hit_skull = True
+                own_skull = source.player_id == challenger
                 break
 
         # return every flipped disc to its owner before resolving the outcome
@@ -252,11 +254,28 @@ class SkullEngine:
             self._public_event("success", player=challenger, points=cp.points)
             state.starting_player = challenger
         else:
-            self._fail(state, challenger)
+            self._fail(state, challenger, own_skull=own_skull)
 
-    def _fail(self, state: GameState, challenger: int) -> None:
+    def _choose_discard(self, state: GameState, challenger: int) -> Disc:
+        """Flipping your own skull lets you choose which disc to give up.
+        Offer one DISCARD per distinct disc type still in hand and return the
+        matching Disc to remove (defaulting to a random one if the pick is bad)."""
         cp = state.players[challenger]
-        lost = self.rng.choice(cp.hand)               # a disc is lost at random, face down
+        in_hand = {d.disc_type for d in cp.hand}
+        valid = [Action(ActionType.DISCARD, disc_type=t)
+                 for t in (DiscType.ROSE, DiscType.SKULL) if t in in_hand]
+        action = self._choose(state, challenger, valid)
+        for disc in cp.hand:
+            if disc.disc_type == action.disc_type:
+                return disc
+        return self.rng.choice(cp.hand)
+
+    def _fail(self, state: GameState, challenger: int, own_skull: bool = False) -> None:
+        cp = state.players[challenger]
+        if own_skull:
+            lost = self._choose_discard(state, challenger)   # your skull — you pick the loss
+        else:
+            lost = self.rng.choice(cp.hand)           # opponent's skull — lost at random
         cp.hand.remove(lost)
         self._log(f"  P{challenger} FAILS — loses a disc ({cp.disc_count} left)")
         self._event("fail", player=challenger, lost=lost.disc_type.name,
