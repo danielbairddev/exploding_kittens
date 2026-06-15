@@ -347,6 +347,7 @@ function makeReplay(cfg){
   });
   const sleep = ms => new Promise(r=>setTimeout(r, ms*SPEED));
   const nm = seat => table.seats[seat] ? `<b style="color:${table.seats[seat].color}">${table.seats[seat].name}</b>` : '?';
+  const esc = s => (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   function renderTable(highlightWinner=-1){
     E(cfg.players).innerHTML = table.seats.map((p,seat)=>{
@@ -437,6 +438,12 @@ function makeReplay(cfg){
           tick(`${nm(p)} flips 🌹 from ${nm(e.owner)}`); await sleep(740);
         }
         break;
+      }
+      case 'chat': {
+        const msg = esc(e.message);
+        table.current=p; renderTable(); pop(p,'💬');
+        setStage('💬', `${nm(p)} says: <i>“${msg}”</i>`);
+        tick(`💬 ${nm(p)}: ${msg}`); await sleep(820); break;
       }
       case 'success':
         table.seats[p].points=e.points; table.current=p; renderTable(); pop(p,'🏆');

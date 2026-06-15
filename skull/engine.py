@@ -6,6 +6,8 @@ from .actions import Action, ActionType
 
 POINTS_TO_WIN = 2          # two successful challenges wins the game
 MAX_ROUNDS = 300           # safety valve against a pathological game never ending
+MAX_CHAT_PER_TURN = 1      # chat messages a bot may post per decision point
+MAX_CHAT_LEN = 200         # chat messages are truncated to this many characters
 
 
 class SkullEngine:
@@ -98,12 +100,28 @@ class SkullEngine:
 
     # ----------------------------------------------------------- agent dispatch
     def _choose(self, state: GameState, pid: int, valid: list[Action]) -> Action:
-        obs = self._observable(state, pid)
-        action = self.agents[pid].choose_action(obs, valid)
         keys = {a.key() for a in valid}
-        if action is None or action.key() not in keys:
-            return valid[0]   # default to the first legal action
-        return action
+        chats = 0
+        while True:
+            # Recompute the view each pass so a bot sees its own chat appear in
+            # recent_events before it picks its real move.
+            obs = self._observable(state, pid)
+            action = self.agents[pid].choose_action(obs, valid)
+            if action is not None and action.action_type == ActionType.SAY:
+                if chats < MAX_CHAT_PER_TURN and action.message:
+                    self._say(pid, action.message)
+                    chats += 1
+                    continue
+                return valid[0]   # out of chat budget (or empty) -> just play
+            if action is None or action.key() not in keys:
+                return valid[0]   # default to the first legal action
+            return action
+
+    def _say(self, pid: int, message: str) -> None:
+        text = str(message)[:MAX_CHAT_LEN]
+        self._log(f"  P{pid} says: {text}")
+        self._event("chat", player=pid, message=text)
+        self._public_event("chat", player=pid, message=text)
 
     # ------------------------------------------------------------- valid moves
     def _placing_actions(self, player: PlayerState, can_bid: bool,
