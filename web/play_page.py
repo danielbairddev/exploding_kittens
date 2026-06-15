@@ -591,6 +591,10 @@ function enqueueEvents(events) {
   if (!events || !events.length) return;
   const novel = events.filter(e => e.id > _animCursor);
   if (!novel.length) return;
+  // Advance the cursor at ENQUEUE time (not just when processed): the live poll
+  // and the act() response can both deliver the same event before the (slow)
+  // anim queue drains it, which otherwise queues — and plays — it twice.
+  for (const e of novel) if (e.id !== undefined) _animCursor = Math.max(_animCursor, e.id);
   _animQueue.push(...novel);
   if (!_animRunning) _processQueue();
 }
