@@ -743,9 +743,12 @@ function _applyStateUpdate(ev) {
 const _TARGET_TYPES = new Set(['PLAY_FAVOR','PLAY_CAT_PAIR','PLAY_CAT_TRIPLE']);
 
 function renderActionGrid(opts) {
-  // Group by action type
+  // Group by action type — but cat pairs/triples also split by cat_type so each
+  // distinct cat (Beard, Taco, ...) gets its own target picker instead of all
+  // cat-pair targets merging into one list (which duplicated each opponent).
+  const gkey = o => o.type + (o.cat_type ? '|' + o.cat_type : '');
   const byType = {};
-  opts.forEach(o => (byType[o.type] = byType[o.type] || []).push(o));
+  opts.forEach(o => (byType[gkey(o)] = byType[gkey(o)] || []).push(o));
 
   const ids   = window._curIdentities || [];
   const names = window._curNames || [];
@@ -753,9 +756,10 @@ function renderActionGrid(opts) {
   let html = '';
   const seen = new Set();
   for (const o of opts) {
-    if (seen.has(o.type)) continue;
-    seen.add(o.type);
-    const group = byType[o.type];
+    const k = gkey(o);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const group = byType[k];
     const emo     = ACT_EMO[o.type] || '▶';
     const isDraw  = o.type === 'DRAW';
     const isDanger = ['PLAY_NOPE','NOPE'].includes(o.type);

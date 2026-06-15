@@ -112,8 +112,9 @@ class HumanAgent(Agent):
         return self.session.ask_pick(state, "place", deck_size)
 
     def see_future(self, state, top3):
-        names = [c.card_type.name.replace("_", " ").title() for c in top3]
-        self.session.note("🔮 **You** peeked: " + ", ".join(f"**{n}**" for n in names))
+        # Logged in _flush_events when the public see_future event is processed,
+        # so the peeked-cards line stays in sync with the animation log (routing
+        # it through note() here desynced the frontend log counter and dropped it).
         self.session._peek_cards = [c.card_type.name for c in top3]
 
 
@@ -180,6 +181,12 @@ class Session:
                 card = self._private_draw_card(ev.get('turn'))
                 if card:
                     msg = f"**You** draw a **{card}**"
+
+            # Human's own See-the-Future peek: log the exact cards seen (the public
+            # event only says "sees the future"; _peek_cards holds the privates).
+            if t == 'see_future' and self._peek_cards:
+                _pk = [c.replace("_", " ").title() for c in self._peek_cards]
+                msg = "🔮 **You** peeked: " + ", ".join(f"**{n}**" for n in _pk)
 
             if msg:
                 self.note(msg)
@@ -333,7 +340,8 @@ class Session:
             "kind": "choose_action",
             "state": self._state_view(state),
             "valid": [{"i": i, "label": act_label(a, self.names), "type": a.action_type.name,
-                       "target": a.target_player}
+                       "target": a.target_player,
+                       "cat_type": a.cat_type.name if a.cat_type else None}
                       for i, a in enumerate(valid)],
         }
         chosen = self.action_in.get()
