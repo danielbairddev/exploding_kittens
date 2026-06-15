@@ -40,7 +40,10 @@ the EVAL only (to mirror the leaderboard).
 |------|--------|------------------------------|------|
 | 1 | smoke | ~11–24% | strong-4 eval undersold it |
 | 2 | re-anneal ent, arena eval, games 128 | ~24% (iter ~80) | exploration revived |
-| 3 | + games 192, target 0.46, patience 60 | _running_ | this round |
+| 3 | + games 192, target 0.46 | ~41% (true ~38-40%) | big jump from re-anneal |
+| 4 | fleet reweight (strong x3) + self_prob 0.45 | ~40% (noise) | stalled, no real gain |
+| 5 | games 256 + epochs 2 | ~40% (noise) | stalled, no real gain |
+| 6 | **dense finishing-rank reward** (eval still pure win%) | _running_ | break the ~40% plateau |
 
 ## How the loop runs
 

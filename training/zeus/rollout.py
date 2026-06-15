@@ -85,8 +85,15 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
     if r['winner'] < 0 or not step_log:
         return None, 0.0
 
-    won = (seat == r['winner'])          # sole survivor == win
-    reward = 1.0 if won else -1.0        # only winning matters; placement ignored
+    # Dense finishing-rank reward (round 6): +1 for winning, grading down to -1
+    # for going out first. Gives gradient on placing better even when not winning;
+    # the EVAL metric stays pure win-rate, so this only helps if it lifts wins.
+    n_players = len(r['survivors']) + len(r['elimination_order'])
+    if seat in r['survivors']:
+        rank = 1                                   # 1 = best (sole survivor / alive)
+    else:
+        rank = n_players - r['elimination_order'].index(seat)  # first out = worst
+    reward = 1.0 - 2.0 * (rank - 1) / max(n_players - 1, 1)     # +1 .. -1
 
     return {
         'event_vecs': ev_log,
