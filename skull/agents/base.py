@@ -19,6 +19,11 @@ class SkullAgent(ABC):
         """Called once at the start of a game."""
         pass
 
+    def game_over(self, state: ObservableState, won: bool) -> Action | None:
+        """Called once when the game ends. Return ``Action.say(...)`` to post a
+        parting message to the log, or ``None`` to stay silent."""
+        return None
+
     @abstractmethod
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
         """Return one of ``valid_actions``."""

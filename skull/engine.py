@@ -117,6 +117,16 @@ class SkullEngine:
                 return valid[0]   # default to the first legal action
             return action
 
+    def _endgame_chat(self, state: GameState, winner: int) -> None:
+        """Let every agent post one parting message once the game is decided."""
+        for pid in range(len(state.players)):
+            action = self.agents[pid].game_over(
+                self._observable(state, pid), won=(pid == winner))
+            if (action is not None
+                    and action.action_type == ActionType.SAY
+                    and action.message):
+                self._say(pid, action.message)
+
     def _say(self, pid: int, message: str) -> None:
         text = str(message)[:MAX_CHAT_LEN]
         self._log(f"  P{pid} says: {text}")
@@ -352,6 +362,7 @@ class SkullEngine:
         self._log(f"\nGame over — P{winner} wins after {state.round_number} rounds")
         self._event("game_over", winner=winner)
         self._public_event("game_over", winner=winner)
+        self._endgame_chat(state, winner)
 
         survivors = [p.player_id for p in state.alive_players]
         # Full finishing order, best -> worst, for rating every seat each game:
