@@ -27,6 +27,7 @@ from agents.chaos_agent import ChaosAgent
 from agents.heuristic_agent import HeuristicAgent
 from agents.random_agent import RandomAgent
 from agents.gabriel_agent import GabrielAgent
+from agents.zeus_agent import ZeusAgent
 from game.engine import GameEngine
 from game.actions import Action, ActionType
 from game.cards import CardType
@@ -39,6 +40,7 @@ DEF = CardType.DEFUSE
 PLAYABLE = {
     "Rhino":      (RhinoAgent,       "🦏"),
     "Elephant":   (ElephantAgent,    "🐘"),
+    "Zeus":       (ZeusAgent,        "⚡"),
     "Orangutan":  (OrangutanAgent,   "🦧"),
     "Coyote":     (CoyoteAgent,      "🐺"),
     "Sly2":       (SurvivalAgentV2,  "🦝"),
