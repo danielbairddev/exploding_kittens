@@ -33,9 +33,14 @@ from agents.hades_agent import HadesAgent
 from training.hades.rollout import _HadesLearner, _make_net
 from game.engine import GameEngine
 
-# Competitive opponents, weighted toward the strongest winners.
-FLEET = [CoyoteAgent, CoyoteAgent, RhinoAgent, RhinoAgent, ElephantAgent,
-         SurvivalAgentV2, SurvivalAgentV2, SurvivalAgent, OrangutanAgent,
+# Competitive opponents, heavily weighted toward the strongest winners — the
+# headroom past ~41% is in beating Coyote/Rhino/Elephant/Sly2 more often, so
+# Zeus faces them 3x while keeping weaker bots in the mix for generalisation.
+FLEET = [CoyoteAgent, CoyoteAgent, CoyoteAgent,
+         RhinoAgent, RhinoAgent, RhinoAgent,
+         ElephantAgent, ElephantAgent, ElephantAgent,
+         SurvivalAgentV2, SurvivalAgentV2, SurvivalAgentV2,
+         SurvivalAgent, OrangutanAgent,
          AggressiveAgent, HeuristicAgent, RandomAgent, ChaosAgent,
          Ian1Agent, Ian2Agent]
 # Eval fleet mirrors the LIVE arena roster (web/dashboard_server.py ARENA_BOTS)
