@@ -23,6 +23,12 @@ from agents.rhino_agent import RhinoAgent
 from agents.elephant_agent import ElephantAgent
 from agents.ian1_agent import Ian1Agent
 from agents.ian2_agent import Ian2Agent
+from agents.ian3_agent import Ian3Agent
+from agents.perdition2_agent import Perdition2Agent
+from agents.gabriel_agent import GabrielAgent
+from agents.orpheus_agent import OrpheusAgent
+from agents.cassandra_agent import CassandraAgent
+from agents.hades_agent import HadesAgent
 
 from training.hades.rollout import _HadesLearner, _make_net
 from game.engine import GameEngine
@@ -32,8 +38,15 @@ FLEET = [CoyoteAgent, CoyoteAgent, RhinoAgent, RhinoAgent, ElephantAgent,
          SurvivalAgentV2, SurvivalAgentV2, SurvivalAgent, OrangutanAgent,
          AggressiveAgent, HeuristicAgent, RandomAgent, ChaosAgent,
          Ian1Agent, Ian2Agent]
-# Held-out eval fleet: the strong main-arena bots.
-EVAL_FLEET = [CoyoteAgent, RhinoAgent, ElephantAgent, SurvivalAgentV2]
+# Eval fleet mirrors the LIVE arena roster (web/dashboard_server.py ARENA_BOTS)
+# so Zeus's win rate is directly comparable to the leaderboard — strong winners,
+# heuristics, AND the loser/anti-agent bots it would actually meet in the arena.
+# (Keep in sync if the arena roster changes.)
+EVAL_FLEET = [HeuristicAgent, AggressiveAgent, ChaosAgent, SurvivalAgent,
+              RandomAgent, SurvivalAgentV2, CoyoteAgent, OrangutanAgent,
+              Ian1Agent, Ian2Agent, Ian3Agent, Perdition2Agent,
+              RhinoAgent, ElephantAgent, GabrielAgent, OrpheusAgent,
+              CassandraAgent, HadesAgent]
 
 
 def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
@@ -105,7 +118,10 @@ def _evaluate_chunk(args):
     wins = 0; games = 0
     for _ in range(n):
         me = Greedy(name='Zeus')
-        opps = [rng.choice(EVAL_FLEET)(name='fleet') for _ in range(4)]
+        # 4 distinct opponents, mirroring how the arena seats 5 distinct bots
+        opp_cls = (rng.sample(EVAL_FLEET, 4) if len(EVAL_FLEET) >= 4
+                   else [rng.choice(EVAL_FLEET) for _ in range(4)])
+        opps = [c(name='fleet') for c in opp_cls]
         for opp in opps:
             opp._play_mode = True
         agents = [me] + opps
