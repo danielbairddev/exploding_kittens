@@ -55,30 +55,8 @@ def _load_net(path=_WEIGHTS_PATH):
         return None
 
 
-def _action_card_idx(action):
-    at = action.action_type
-    name = {
-        ActionType.PLAY_ATTACK: 'ATTACK', ActionType.PLAY_SKIP: 'SKIP',
-        ActionType.PLAY_FAVOR: 'FAVOR', ActionType.PLAY_SHUFFLE: 'SHUFFLE',
-        ActionType.PLAY_SEE_THE_FUTURE: 'SEE_THE_FUTURE',
-    }.get(at)
-    if name is None and action.cat_type is not None:
-        name = action.cat_type.name
-    return F._CARD_IDX.get(name, None)
-
-
-def _nope_context(action, my_id, currently_noped):
-    ctx = [0.0] * NOPE_CTX
-    try:
-        ctx[ACTIONS.index(action.action_type)] = 1.0
-    except ValueError:
-        pass
-    ci = _action_card_idx(action)
-    if ci is not None:
-        ctx[N_ACTIONS + ci] = 1.0
-    ctx[N_ACTIONS + N_CARD_TYPES] = 1.0 if action.target_player == my_id else 0.0
-    ctx[N_ACTIONS + N_CARD_TYPES + 1] = float(currently_noped)
-    return ctx
+# Nope-head context lives in features.nope_context (shared with training,
+# target-aware: real attack target + "is this my action being noped").
 
 
 def _masked_argmax(logits, mask):
@@ -178,7 +156,7 @@ class HadesAgent(Agent):
             return False
         self._absorb(state)
         a2 = self._forward(state)
-        nctx = _nope_context(action, state.my_id, currently_noped)
+        nctx = F.nope_context(state, action, currently_noped)
         logit, _ = self._NET.nope_logit(a2, np.asarray(nctx, dtype=np.float64))
         return bool(1.0 / (1.0 + np.exp(-np.clip(logit, -20, 20))) > 0.5)
 

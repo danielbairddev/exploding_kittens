@@ -11,6 +11,7 @@ import numpy as np
 from training.hades.net import TransformerActorCritic, _softmax_rows
 from training.hades.event_encode import N_EVENT
 from training.hades.features import N_FEATURES
+from training.hades.net import NOPE_CTX
 
 
 def _logsoftmax_ce(logits, idx):
@@ -87,7 +88,7 @@ def main():
     L = 6
     window = rng.standard_normal((L, N_EVENT))
     snap = rng.standard_normal(N_FEATURES)
-    nope_ctx = rng.standard_normal(24)
+    nope_ctx = rng.standard_normal(NOPE_CTX)
     targets = (2, 0.4, 1, 5, 11, 1.0)
 
     _, grads = loss_and_grads(net, window, snap, nope_ctx, targets)

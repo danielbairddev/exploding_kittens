@@ -23,7 +23,7 @@ import os
 import numpy as np
 
 from training.hades.event_encode import N_EVENT, CONTEXT_WINDOW
-from training.hades.features import N_FEATURES as N_SNAP
+from training.hades.features import N_FEATURES as N_SNAP, NOPE_CTX
 
 # ---- dimensions ----
 D_MODEL = 128
@@ -42,8 +42,9 @@ N_TARGETS = 5
 N_CARD_TYPES = 14               # matches features.N_CARD
 N_PLACE = 50                    # exact deck-depth softmax (deck < 50)
 
-NOPE_CTX = 24                   # action_type(8)+card(14)+targets_me(1)+already_noped(1)
-NOPE_IN = A_CORE + NOPE_CTX     # 152
+# NOPE_CTX imported from features (single source of truth): action(8)+card(14)
+# +targets_me(1)+i_am_actor(1)+already_noped(1)+actor_rel_seat(5) = 30
+NOPE_IN = A_CORE + NOPE_CTX     # 128 + 30 = 158
 NOPE_H = 64
 
 EPS = 1e-5

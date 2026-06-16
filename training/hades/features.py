@@ -12,6 +12,8 @@ The opponent matrix needs running per-player statistics, so callers maintain an
 `OpponentTracker` across the game and pass it to `encode`.
 """
 from game.cards import CardType
+from game.actions import ActionType
+from agents.orangutan_features import ACTIONS as _ACTIONS, N_ACTIONS as _N_ACTIONS
 
 # 13 real card types (incl. EK) + 1 trailing pad slot = 14 per count block.
 CARD_NAMES = [
@@ -38,6 +40,64 @@ N_SCALARS = 10
 N_OPP_MATRIX = N_OPP * OPP_FEATS  # 40
 N_DECK = 3 * N_CARD          # 42
 N_FEATURES = N_CORE + N_SCALARS + N_OPP_MATRIX + N_DECK  # 134
+
+# ---- nope head context (shared by training + inference so they can't drift) ----
+# action_type(8) | card(14) | targets_me(1) | i_am_actor(1) | already_noped(1) | actor_rel_seat(5)
+NOPE_CTX = _N_ACTIONS + N_CARD + 3 + N_PLAYERS   # 8 + 14 + 3 + 5 = 30
+
+_NOPE_ACTION_CARD = {
+    ActionType.PLAY_ATTACK: 'ATTACK', ActionType.PLAY_SKIP: 'SKIP',
+    ActionType.PLAY_FAVOR: 'FAVOR', ActionType.PLAY_SHUFFLE: 'SHUFFLE',
+    ActionType.PLAY_SEE_THE_FUTURE: 'SEE_THE_FUTURE',
+}
+_NOPE_TARGETED = (ActionType.PLAY_FAVOR, ActionType.PLAY_CAT_PAIR, ActionType.PLAY_CAT_TRIPLE)
+
+
+def _nope_next_alive(state, pid):
+    """Seat that an Attack by `pid` would hit (next alive after pid)."""
+    order = sorted(state.alive_players)
+    if pid not in order:
+        return None
+    return order[(order.index(pid) + 1) % len(order)]
+
+
+def nope_context(state, action, currently_noped):
+    """Context vector (NOPE_CTX dims) for the nope head.
+
+    Self-relative and target-aware: works out the action's REAL target — including
+    Attacks, whose target is the next alive seat and is NOT stored on the action —
+    and flags whether *this agent* is the actor whose action is being noped (so it
+    can learn to restore its own action vs. stay out of fights it's not part of).
+    During a nope window the engine keeps state.current_player on the actor.
+    """
+    ctx = [0.0] * NOPE_CTX
+    at = action.action_type
+    try:
+        ctx[_ACTIONS.index(at)] = 1.0
+    except ValueError:
+        pass
+    name = _NOPE_ACTION_CARD.get(at)
+    if name is None and action.cat_type is not None:
+        name = action.cat_type.name
+    ci = _CARD_IDX.get(name)
+    if ci is not None:
+        ctx[_N_ACTIONS + ci] = 1.0
+
+    off = _N_ACTIONS + N_CARD
+    me = state.my_id
+    actor = state.current_player
+    if at in _NOPE_TARGETED:
+        real_target = action.target_player
+    elif at == ActionType.PLAY_ATTACK:
+        real_target = _nope_next_alive(state, actor)
+    else:
+        real_target = None
+    ctx[off + 0] = 1.0 if real_target == me else 0.0   # targets me (correct, incl. attack)
+    ctx[off + 1] = 1.0 if actor == me else 0.0          # it's MY action being noped
+    ctx[off + 2] = float(currently_noped)               # already noped (counter-nope round)
+    if actor is not None:
+        ctx[off + 3 + (actor - me) % N_PLAYERS] = 1.0   # actor's relative seat
+    return ctx
 
 START_DECK = 47.0  # approx full draw pile size at game start (5p)
 
