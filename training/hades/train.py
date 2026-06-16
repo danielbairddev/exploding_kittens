@@ -31,6 +31,7 @@ DEPLOY_OUT = os.path.join(HERE, '..', '..', 'agents', 'hades_weights.json')
 BESTS_LOG  = os.path.join(HERE, 'bests.jsonl')
 
 HUBER_DELTA = 1.0
+NOPE_ENT = 0.15   # entropy weight on the binary nope head (anti-collapse)
 
 
 def _huber_grad(err):
@@ -108,6 +109,12 @@ def _game_grads(net, gd, clip, vf_coef, ent_coef):
         new_logp = float(np.log(prob + 1e-12) if dec else np.log(1.0 - prob + 1e-12))
         d_logp = _ppo_coeff(new_logp, step['old_logp'], step['advantage'], clip) / nn
         d_logit = d_logp * (dec - prob)
+        # Entropy regulariser on the binary nope head: a restoring force toward
+        # p=0.5 (zero exactly at 0.5) so the head can't collapse to always-nope
+        # and the targeting features + nope cost can actually shape it.
+        p_c = min(max(prob, 1e-6), 1.0 - 1e-6)
+        dH_dlogit = p_c * (1.0 - p_c) * np.log((1.0 - p_c) / p_c)
+        d_logit += (-NOPE_ENT / nn) * dH_dlogit
         dvalue = vf_coef * _huber_grad(value - step['return']) / nn
         da2 = net.nope_backward(d_logit, ncache, grads)
         da2 += net.value_backward(dvalue, a2, grads)
