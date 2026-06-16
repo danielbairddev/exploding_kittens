@@ -49,6 +49,7 @@ def observable_to_dict(state: ObservableState) -> dict:
         "hand_sizes": state.hand_sizes,
         "alive_players": state.alive_players,
         "deck_size": state.deck_size,
+        "deck_exploding_kittens_count": state.deck_exploding_kittens_count,
         "discard_pile": [card_to_dict(c) for c in state.discard_pile],
         "turns_remaining": state.turns_remaining,
         "current_player": state.current_player,
@@ -64,6 +65,10 @@ def dict_to_observable(d: dict) -> ObservableState:
         hand_sizes={int(k): v for k, v in d["hand_sizes"].items()},
         alive_players=d["alive_players"],
         deck_size=d["deck_size"],
+        deck_exploding_kittens_count=d.get(
+            "deck_exploding_kittens_count",
+            max(0, len(d["alive_players"]) - 1),
+        ),
         discard_pile=[dict_to_card(c) for c in d["discard_pile"]],
         turns_remaining=d["turns_remaining"],
         current_player=d["current_player"],
