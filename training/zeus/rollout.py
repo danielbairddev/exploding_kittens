@@ -53,6 +53,8 @@ EVAL_FLEET = [HeuristicAgent, AggressiveAgent, ChaosAgent, SurvivalAgent,
               RhinoAgent, ElephantAgent, GabrielAgent, OrpheusAgent,
               CassandraAgent, HadesAgent]
 
+NOPE_COST = 0.04   # per-nope penalty so the nope head stops collapsing to always-nope
+
 
 def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
     learner_net = _make_net(policy_w)
@@ -94,6 +96,14 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
     else:
         rank = n_players - r['elimination_order'].index(seat)  # first out = worst
     reward = 1.0 - 2.0 * (rank - 1) / max(n_players - 1, 1)     # +1 .. -1
+
+    # Per-nope cost (round 8): the nope head was collapsing to "nope everything"
+    # because noping rarely moves the win/loss outcome (no gradient pressure). A
+    # small cost per nope played forces it to justify each nope — combined with the
+    # now-correct targets_me / i_am_actor features, it should nope mainly when
+    # actually targeted instead of reflexively countering uninvolved actions.
+    n_nopes = sum(1 for s in nope_log if s.get('decision'))
+    reward -= NOPE_COST * n_nopes
 
     return {
         'event_vecs': ev_log,
