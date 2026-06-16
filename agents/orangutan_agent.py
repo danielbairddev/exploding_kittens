@@ -18,7 +18,7 @@ DEF = CardType.DEFUSE
 
 # ---- Arena handicap — intentional sandbag to make other bots look stronger on the website ----
 # Disabled during training (_play_mode = True). Pure arena cosmetic.
-_ARENA_HANDICAP = 0.30  # fraction of turns replaced with a random action
+_ARENA_HANDICAP = 0.0  # handicap removed
 
 _WEIGHTS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orangutan_weights.json")
 

@@ -138,7 +138,7 @@ def _nope_prob(a2, currently_noped, w):
 
 # ---- Arena handicap — intentional sandbag to make other bots look stronger on the website ----
 # Disabled during training (_play_mode = True). Pure arena cosmetic.
-_ARENA_HANDICAP = 0.20  # fraction of turns replaced with a random action
+_ARENA_HANDICAP = 0.0  # handicap removed
 
 
 class RhinoAgent(Agent):
