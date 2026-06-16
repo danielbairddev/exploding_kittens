@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Hands-off training for Zeus — the win-maximising twin of Hades.
+# Hands-off ian_folder for Zeus — the win-maximising twin of Hades.
 #
 # Single phase vs the competitive fleet + self-play, until the win-rate target is
-# hit or training stalls. Crash-resilient (always --resume; auto-restarts on a
+# hit or ian_folder stalls. Crash-resilient (always --resume; auto-restarts on a
 # non-zero exit). New bests auto-deploy to agents/zeus_weights.json. Self-stops
 # and writes a DONE summary.
 #
@@ -11,8 +11,8 @@
 # they'll fight for cores. Launch Zeus after Hades finishes (or lower workers).
 #
 # Usage:
-#   training/zeus/run_full_training.sh
-#   HADES_WORKERS=6 ZEUS_TARGET=0.45 training/zeus/run_full_training.sh
+#   ian_folder/zeus/run_full_training.sh
+#   HADES_WORKERS=6 ZEUS_TARGET=0.45 ian_folder/zeus/run_full_training.sh
 #
 # Tunables (env vars / defaults):
 #   ZEUS_WORKERS       parallel workers           (cpu count - 1)
@@ -54,7 +54,7 @@ status "=== Zeus full training started ==="
 status "python=$PY workers=$WORKERS games=$GAMES eval_n=$EVAL_N target=${TARGET} max_iters=$MAX_ITERS"
 
 status "preflight: gradcheck (shared Hades architecture)"
-if ! "$PY" -m training.hades.gradcheck >> "$LOG" 2>&1; then
+if ! "$PY" -m ian_folder.hades.gradcheck >> "$LOG" 2>&1; then
   status "ABORT: gradcheck failed (see $LOG)"
   echo "GRADCHECK FAILED" > "$DONE_MARKER"
   exit 1
@@ -64,7 +64,7 @@ status "gradcheck PASSED"
 restarts=0
 while true; do
   status "launching train.py (attempt $((restarts+1)))"
-  "$PY" -m training.zeus.train --resume --workers "$WORKERS" --games "$GAMES" \
+  "$PY" -m ian_folder.zeus.train --resume --workers "$WORKERS" --games "$GAMES" \
         --eval_n "$EVAL_N" --eval_every "$EVAL_EVERY" --iters "$MAX_ITERS" \
         --patience "$PATIENCE" --target_winrate "$TARGET" >> "$LOG" 2>&1
   rc=$?
@@ -80,7 +80,7 @@ done
 status "final evaluation (n=$EVAL_N) ..."
 FINAL="$("$PY" - <<PYEOF
 import json, os
-from training.zeus.rollout import evaluate
+from ian_folder.zeus.rollout import evaluate
 w = json.load(open(os.path.join("$REPO", "agents", "zeus_weights.json")))
 print(round(evaluate(w, n=$EVAL_N) * 100, 2))
 PYEOF

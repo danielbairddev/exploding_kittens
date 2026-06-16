@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""PPO + BPTT training for Orpheus — must NOT WIN against Gabriel/Perdition opponents.
+"""PPO + BPTT ian_folder for Orpheus — must NOT WIN against Gabriel/Perdition opponents.
 
 Orpheus uses the same GRU-128 architecture as Gabriel/Elephant. Reward is +1 for
 any non-win (any death position), 0 for winning. The opponent fleet is the current
 Biggest Loser arena top bots (Perdition2, Ian3, Gabriel, Ian1, Ian2) — Orpheus must
 beat the actual best losers in the live arena.
 
-    python3 -m training.orpheus.train --workers 6
-    python3 -m training.orpheus.train --resume --workers 6
+    python3 -m ian_folder.orpheus.train --workers 6
+    python3 -m ian_folder.orpheus.train --resume --workers 6
 """
 import argparse, os, sys, time
 from concurrent.futures import ProcessPoolExecutor

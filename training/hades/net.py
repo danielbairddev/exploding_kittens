@@ -2,7 +2,7 @@
 
 Replaces the GRU memory module of the Orpheus/Gabriel family with a Transformer
 encoder (HADES_PLAN.md §2-§3). Everything is hand-differentiated and validated
-by training/hades/gradcheck.py.
+by ian_folder/hades/gradcheck.py.
 
 Design note — no cross-step recurrence:
   A GRU shares one hidden-state chain across all decision steps in a game, which

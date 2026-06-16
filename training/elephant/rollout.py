@@ -1,7 +1,7 @@
 """Rollout workers for Elephant self-play.
 
 All decisions — action type, target, want_to_nope, give_card, place_kitten —
-are made by the learned policy and logged for PPO training.
+are made by the learned policy and logged for PPO ian_folder.
 """
 import numpy as np
 
@@ -271,7 +271,7 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.5):
             opponents.append(Frozen(name='self'))
         else:
             opp = rng.choice(FLEET)(name='fleet')
-            opp._play_mode = True  # disable arena handicap during training
+            opp._play_mode = True  # disable arena handicap during ian_folder
             opponents.append(opp)
 
     agents = [Learner(name='Elephant')] + opponents
@@ -319,7 +319,7 @@ def _evaluate_chunk(args):
     for _ in range(n):
         me = Greedy(name='Elephant')
         opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
-        for opp in opps: opp._play_mode = True  # disable arena handicap during training
+        for opp in opps: opp._play_mode = True  # disable arena handicap during ian_folder
         agents = [me] + opps
         order = list(range(5)); rng.shuffle(order); seat = order.index(0)
         r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)

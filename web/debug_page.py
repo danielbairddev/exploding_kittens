@@ -1,4 +1,4 @@
-"""Secret debug page — /daniel — for monitoring training progress."""
+"""Secret debug page — /daniel — for monitoring ian_folder progress."""
 
 DEBUG_PAGE = r'''<!DOCTYPE html>
 <html lang="en">
@@ -138,7 +138,7 @@ function renderBot(name, entry){
           <td>${fmtTime(b.t)}</td>
           <td class="ago">${fmtAgo(b.t)}</td>
         </tr>`).join('')}
-    </table>` : `<p class="no-data">No bests recorded yet (starts writing on next training session restart)</p>`;
+    </table>` : `<p class="no-data">No bests recorded yet (starts writing on next ian_folder session restart)</p>`;
 
   return `<div class="bot">
     <div class="bot-head">
@@ -208,7 +208,7 @@ function renderMatrix(bots) {
 
 async function load(){
   const [train, loser, deploy] = await Promise.all([
-    fetch('/api/training').then(r=>r.json()).catch(()=>({})),
+    fetch('/api/ian_folder').then(r=>r.json()).catch(()=>({})),
     fetch('/api/loser_stats').then(r=>r.json()).catch(()=>({})),
     fetch('/api/debug/deploy_log').then(r=>r.text()).catch(()=>'unavailable'),
   ]);

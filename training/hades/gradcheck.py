@@ -1,10 +1,10 @@
-"""Numerical gradient check for training/hades/net.py.
+"""Numerical gradient check for ian_folder/hades/net.py.
 
 Builds a scalar loss that routes gradient into every parameter (encoder, trunk,
 and all six heads), computes analytic gradients via the manual backward passes,
 then compares against central finite differences on a random sample of entries.
 
-    python3 -m training.hades.gradcheck
+    python3 -m ian_folder.hades.gradcheck
 """
 import numpy as np
 

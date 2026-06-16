@@ -1,7 +1,7 @@
 """Feature encoding + action vocabulary for the Orangutan neural-net agent.
 
 Pure stdlib so the deployed agent has no third-party dependency. The trainer
-(numpy) and the agent (pure-Python forward pass) both import this so training
+(numpy) and the agent (pure-Python forward pass) both import this so ian_folder
 and inference see identical features.
 """
 from game.actions import Action, ActionType

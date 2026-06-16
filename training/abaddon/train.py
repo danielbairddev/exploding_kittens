@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Abaddon training — Gorilla's tracker / opponent-modeling / explicit-ID PPO
+"""Abaddon ian_folder — Gorilla's tracker / opponent-modeling / explicit-ID PPO
 pipeline with the belief-state encoder (abaddon.features.encode_a).
 
 We set EK_ENCODER=abaddon *before* importing gorilla.train_g, so the pipeline

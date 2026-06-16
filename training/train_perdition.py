@@ -6,7 +6,7 @@ binary: 0.0 if Perdition wins, 1.0 for any loss.  Placement among losers is not
 optimised.  No behavioural-cloning warm-start (we don't want it imitating a
 good player).
 
-    python3 training/train_perdition.py --batches 4000
+    python3 ian_folder/train_perdition.py --batches 4000
 
 Progress lines report Perdition's greedy loss% (= 100 - win%) and average place.
 """
@@ -190,7 +190,7 @@ def main():
     rng = random.Random(1234)
     # Baseline starts at ~0.8 (expected reward when rarely winning in a 5-player game).
     baseline = 0.8
-    print(f"training Perdition (minimise win rate): {args.batches} batches x {args.games} games", flush=True)
+    print(f"ian_folder Perdition (minimise win rate): {args.batches} batches x {args.games} games", flush=True)
     for batch in range(1, args.batches + 1):
         decisions = []
         rewards = []

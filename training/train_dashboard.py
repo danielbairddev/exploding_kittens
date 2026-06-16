@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Local training dashboard — reads log files and serves status at http://localhost:7777
+"""Local ian_folder dashboard — reads log files and serves status at http://localhost:7777
 
 Usage:
-    python3 training/train_dashboard.py
+    python3 ian_folder/train_dashboard.py
 
 Requires: pip3 install psutil
 Temperature: reads die-area temp from battery SMC sensor (Apple Silicon, no sudo needed).
@@ -117,7 +117,7 @@ def get_system():
     return snap
 
 
-# ---- training log parser ----
+# ---- ian_folder log parser ----
 
 def _parse_log(path, total_iters=3000):
     if not os.path.exists(path):
@@ -321,7 +321,7 @@ HTML = r"""<!DOCTYPE html>
        margin: 20px 0 10px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
 
-  /* ---- training cards ---- */
+  /* ---- ian_folder cards ---- */
   .card {
     background: #1e2333; border: 1px solid #2d3548; border-radius: 10px;
     padding: 18px; overflow: hidden;
@@ -487,7 +487,7 @@ function renderSystem(s) {
     </div>`;
 }
 
-/* ---- training cards ---- */
+/* ---- ian_folder cards ---- */
 function renderTraining(runs) {
   document.getElementById('grid').innerHTML = runs.map(r => {
     const pct = r.total > 0 ? (r.iter / r.total * 100).toFixed(1) : 0;

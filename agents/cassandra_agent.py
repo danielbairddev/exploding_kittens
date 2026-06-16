@@ -11,7 +11,7 @@ Architecture improvements over Orpheus/Gabriel:
 Goal: not be the last survivor. Trained against Ian/Perdition loser fleet
       + mixed Rhino/Elephant winner fleet.
 
-Disabled in arena until training matures — see dashboard_server.py (ARENA_BOTS).
+Disabled in arena until ian_folder matures — see dashboard_server.py (ARENA_BOTS).
 """
 import json, math, os
 from agents.base import Agent

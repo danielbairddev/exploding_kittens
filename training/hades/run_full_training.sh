@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 #
-# Hands-off full training for Hades (HADES_PLAN.md curriculum).
+# Hands-off full ian_folder for Hades (HADES_PLAN.md curriculum).
 #
 # Runs the complete curriculum with zero intervention:
 #   Phase 1 (bootstrap): learn to self-destruct vs the winner fleet.
 #   Phase 2 (crucible):  out-lose the loser fleet + self-play, until the
-#                        survival target is hit or training stalls.
+#                        survival target is hit or ian_folder stalls.
 #
-# Crash-resilient: every phase auto-resumes from training/hades/checkpoint.json
+# Crash-resilient: every phase auto-resumes from ian_folder/hades/checkpoint.json
 # (always --resume, which is safe and avoids clobbering deployed weights). New
 # bests auto-deploy to agents/hades_weights.json. Self-terminating: stops on
 # target survival, patience stall, or the iter cap — then writes a DONE summary.
 #
 # Usage:
-#   training/hades/run_full_training.sh
-#   HADES_WORKERS=6 HADES_TARGET=0.02 training/hades/run_full_training.sh
+#   ian_folder/hades/run_full_training.sh
+#   HADES_WORKERS=6 HADES_TARGET=0.02 ian_folder/hades/run_full_training.sh
 #
 # Tunables (env vars, with defaults):
 #   HADES_WORKERS         parallel rollout workers          (cpu count - 1)
@@ -65,7 +65,7 @@ log    "=== run_full_training.sh started: workers=$WORKERS games=$GAMES ==="
 
 # --- preflight: architecture/backprop must be correct before a long run ---
 status "preflight: gradcheck"
-if ! "$PY" -m training.hades.gradcheck >> "$LOG" 2>&1; then
+if ! "$PY" -m ian_folder.hades.gradcheck >> "$LOG" 2>&1; then
   status "ABORT: gradcheck failed (see $LOG)"
   echo "GRADCHECK FAILED" > "$DONE_MARKER"
   exit 1
@@ -80,7 +80,7 @@ run_phase() {
   while true; do
     status "[$label] launching train.py (attempt $((restarts+1)))"
     log "[$label] args: $*"
-    "$PY" -m training.hades.train "$@" >> "$LOG" 2>&1
+    "$PY" -m ian_folder.hades.train "$@" >> "$LOG" 2>&1
     local rc=$?
     if [ $rc -eq 0 ]; then
       status "[$label] completed cleanly"
@@ -109,7 +109,7 @@ run_phase crucible --phase crucible --iters "$CRUCIBLE_ITERS" \
 status "final evaluation (n=$EVAL_N) ..."
 FINAL="$("$PY" - <<PYEOF
 import json, os
-from training.hades.rollout import evaluate
+from ian_folder.hades.rollout import evaluate
 w = json.load(open(os.path.join("$REPO", "agents", "hades_weights.json")))
 print(round(evaluate(w, n=$EVAL_N) * 100, 2))
 PYEOF

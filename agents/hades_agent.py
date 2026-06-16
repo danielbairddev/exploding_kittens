@@ -1,8 +1,8 @@
 """Hades — Transformer anti-agent trained to intentionally lose (HADES_PLAN.md).
 
 Successor to the Orpheus/Gabriel "loser" family: the GRU memory module is replaced
-by a Transformer encoder over the last 128 public events (see training/hades/). The
-greedy forward pass here mirrors training/hades/rollout.py exactly, so training and
+by a Transformer encoder over the last 128 public events (see ian_folder/hades/). The
+greedy forward pass here mirrors ian_folder/hades/rollout.py exactly, so ian_folder and
 inference see identical features and architecture.
 
 Inference needs numpy + trained weights. If either is missing the agent degrades to
@@ -30,7 +30,7 @@ try:
     from training.hades.event_encode import encode_event, new_context
     from agents.orangutan_features import ACTIONS
     _IMPORT_OK = True
-except Exception:   # numpy or training package unavailable
+except Exception:   # numpy or ian_folder package unavailable
     _IMPORT_OK = False
 
 DEF = CardType.DEFUSE
@@ -38,7 +38,7 @@ DEF = CardType.DEFUSE
 
 def _load_net(path=_WEIGHTS_PATH):
     """Load a TransformerActorCritic from a weights JSON. Returns None on any
-    failure (missing numpy/training pkg, missing/corrupt file) so the agent can
+    failure (missing numpy/ian_folder pkg, missing/corrupt file) so the agent can
     fall back safely. Shared by HadesAgent and its win-seeking sibling ZeusAgent."""
     if not _IMPORT_OK:
         return None

@@ -1,4 +1,4 @@
-"""Rollout workers for Hades training (HADES_PLAN.md §4-§5).
+"""Rollout workers for Hades ian_folder (HADES_PLAN.md §4-§5).
 
 Hades is trained to LOSE. Terminal reward is +1 for dying (any death position),
 -1 for being the sole survivor. Dense auxiliary shaping rewards self-sabotage:
@@ -327,7 +327,7 @@ def play_one(policy_w, pool_w, rng, npr, phase='crucible', self_prob=0.2):
         else:
             src = WINNER_FLEET if phase == 'bootstrap' else LOSER_FLEET
             opp = rng.choice(src)(name='fleet')
-            opp._play_mode = True  # disable arena handicap during training
+            opp._play_mode = True  # disable arena handicap during ian_folder
             opponents.append(opp)
 
     agents = [Learner(name='Hades')] + opponents

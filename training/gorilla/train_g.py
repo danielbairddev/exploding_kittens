@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gorilla training: opponent-modeling encoder (encode_g) + PPO self-play.
+"""Gorilla ian_folder: opponent-modeling encoder (encode_g) + PPO self-play.
 
 Same recipe that took Orangutan to 40%, but the learner carries a GameTracker
 and uses encode_g (base 52 + per-opponent behavior profiles + danger). Tests
@@ -197,7 +197,7 @@ def behavioral_clone_g(net, n_games=60000, epochs=6, lr=1e-3):
         GameEngine([agents[i] for i in order]).play_game(5)
     X = np.array([s[0] for s in samples]); y = np.array([s[1] for s in samples])
     M = np.array([s[2] for s in samples]); oh = np.eye(N_ACTIONS)[y]
-    print(f"BC-g: {len(X)} decisions; training...", flush=True)
+    print(f"BC-g: {len(X)} decisions; ian_folder...", flush=True)
     idx = np.arange(len(X)); bs = 1024
     for ep in range(epochs):
         np.random.shuffle(idx); correct = 0

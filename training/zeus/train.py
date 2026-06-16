@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""PPO training for Zeus — the win-maximising Transformer (Hades's twin).
+"""PPO ian_folder for Zeus — the win-maximising Transformer (Hades's twin).
 
-Reuses Hades's architecture and PPO machinery wholesale (training.hades.net +
-training.hades.train); only the rollout reward (+1 win / -1 loss) and the metric
+Reuses Hades's architecture and PPO machinery wholesale (ian_folder.hades.net +
+ian_folder.hades.train); only the rollout reward (+1 win / -1 loss) and the metric
 (win rate, HIGHER is better) differ. Single phase vs the competitive fleet with
 self-play — no anti-logic curriculum.
 
-    python3 -m training.zeus.train --workers 6
-    python3 -m training.zeus.train --resume --workers 6
+    python3 -m ian_folder.zeus.train --workers 6
+    python3 -m ian_folder.zeus.train --resume --workers 6
 """
 import argparse, json, os, sys, time
 from concurrent.futures import ProcessPoolExecutor

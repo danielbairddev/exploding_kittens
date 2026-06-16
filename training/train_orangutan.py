@@ -7,7 +7,7 @@ games against random subsets of the existing bots; the reward is placement-based
 entropy bonus. Weights are checkpointed to agents/orangutan_weights.json (the
 format the deployed OrangutanAgent reads). Run in the background:
 
-    python3 training/train_orangutan.py --batches 4000
+    python3 ian_folder/train_orangutan.py --batches 4000
 
 Progress lines report Orangutan's greedy win% and average place vs the fleet.
 """
@@ -191,7 +191,7 @@ def behavioral_clone(net, n_games=60000, epochs=6, lr=1e-3):
     y = np.array([s[1] for s in samples])
     M = np.array([s[2] for s in samples])
     onehot = np.eye(N_ACTIONS)[y]
-    print(f"BC: {len(X)} decisions; training {epochs} epochs (vectorized)...", flush=True)
+    print(f"BC: {len(X)} decisions; ian_folder {epochs} epochs (vectorized)...", flush=True)
     idx = np.arange(len(X)); bs = 1024
     for ep in range(epochs):
         np.random.shuffle(idx)
@@ -251,7 +251,7 @@ def main():
             return
     rng = random.Random(1234)
     baseline = 0.5
-    print(f"training: {args.batches} batches x {args.games} games", flush=True)
+    print(f"ian_folder: {args.batches} batches x {args.games} games", flush=True)
     for batch in range(1, args.batches + 1):
         decisions = []   # (cache, mask, probs, idx, reward)
         rewards = []

@@ -166,9 +166,9 @@ The pipeline is done; these are research levers to push survival lower:
 ## Useful commands
 
 ```bash
-python3 -m training.hades.gradcheck          # must print GRADCHECK PASSED
-python3 -m training.hades.train --phase bootstrap --iters 100 --workers 6   # phase 1 only
-python3 -m training.hades.train --resume --workers 6                        # auto bootstrap->crucible
+python3 -m ian_folder.hades.gradcheck          # must print GRADCHECK PASSED
+python3 -m ian_folder.hades.train --phase bootstrap --iters 100 --workers 6   # phase 1 only
+python3 -m ian_folder.hades.train --resume --workers 6                        # auto bootstrap->crucible
 ```
 </content>
 </invoke>

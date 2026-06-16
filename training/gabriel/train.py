@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""PPO + BPTT training for Gabriel — trained to die FIRST.
+"""PPO + BPTT ian_folder for Gabriel — trained to die FIRST.
 
 Gabriel uses the same GRU-128 architecture as Elephant, but the reward is
 inverted: +1 when Gabriel is the first player to explode, 0 otherwise.
 
-    python3 -m training.gabriel.train --iters 3000 --workers 6
+    python3 -m ian_folder.gabriel.train --iters 3000 --workers 6
 """
 import argparse, os, sys, time
 from concurrent.futures import ProcessPoolExecutor

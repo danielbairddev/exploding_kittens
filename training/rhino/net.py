@@ -187,7 +187,7 @@ class GRUActorCritic:
         da2 = self.Wplace.T @ dlogits
         return da2, {'Wplace': np.outer(dlogits, a2), 'bplace': dlogits.copy()}
 
-    # ---- Convenience: full forward (used in training) ----
+    # ---- Convenience: full forward (used in ian_folder) ----
 
     def mlp_forward(self, h, snap):
         """Trunk + policy head. Returns (logits, value, a2, trunk_cache)."""

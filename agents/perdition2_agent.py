@@ -1,7 +1,7 @@
 """Perdition 2.1 — neural-net loser, trained to avoid winning.
 
 Same architecture and self-sabotage hooks as Perdition2, with weights
-from a longer training run that achieved a lower win rate. Handicap tuned
+from a longer ian_folder run that achieved a lower win rate. Handicap tuned
 to narrowly beat Ian's bots in the Biggest Loser arena (first-to-explode).
 """
 import json

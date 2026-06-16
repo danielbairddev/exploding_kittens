@@ -273,7 +273,7 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.1):
             opponents.append(Frozen(name='self'))
         else:
             opp = rng.choice(FLEET)(name='fleet')
-            opp._play_mode = True  # disable arena handicap during training
+            opp._play_mode = True  # disable arena handicap during ian_folder
             opponents.append(opp)
 
     agents = [Learner(name='Gabriel')] + opponents
@@ -322,7 +322,7 @@ def _evaluate_chunk(args):
     for _ in range(n):
         me = Greedy(name='Gabriel')
         opps = [c(name=c.__name__) for c in rng.sample(FLEET, 4)]
-        for opp in opps: opp._play_mode = True  # disable arena handicap during training
+        for opp in opps: opp._play_mode = True  # disable arena handicap during ian_folder
         agents = [me] + opps
         order = list(range(5)); rng.shuffle(order); seat = order.index(0)
         r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)

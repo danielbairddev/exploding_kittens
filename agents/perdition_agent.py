@@ -80,7 +80,7 @@ class PerditionAgent(CoyoteAgent):
             return chosen
         return acts[0]
 
-    # --- self-sabotage hooks (not covered by RL training) ---
+    # --- self-sabotage hooks (not covered by RL ian_folder) ---
 
     def place_exploding_kitten(self, state, deck_size):
         """Put the bomb back on top — we'll draw it on our very next turn."""

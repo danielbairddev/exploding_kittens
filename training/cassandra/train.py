@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""PPO + BPTT training for Cassandra.
+"""PPO + BPTT ian_folder for Cassandra.
 
 Same loop as Elephant/Orpheus but adapted for Cassandra's expanded heads:
   - Nope head receives 24-dim action context (stored in nope_steps['nope_ctx'])
   - Place head receives deck_parity context (stored in place_steps['deck_parity'])
 
-    python3 -m training.cassandra.train --workers 6
-    python3 -m training.cassandra.train --resume --workers 6
+    python3 -m ian_folder.cassandra.train --workers 6
+    python3 -m ian_folder.cassandra.train --resume --workers 6
 """
 import argparse, os, sys, time, random, math
 from concurrent.futures import ProcessPoolExecutor

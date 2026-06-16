@@ -42,23 +42,23 @@ nohup python3 -m gorilla.train --workers 6 >> /tmp/gorilla_train.log 2>&1 &
 
 ### Orpheus (vs Gabriel/Perdition losing-fleet)
 ```bash
-nohup python3 -m training.orpheus.train --workers 6 >> /tmp/orpheus_train.log 2>&1 &
+nohup python3 -m ian_folder.orpheus.train --workers 6 >> /tmp/orpheus_train.log 2>&1 &
 ```
 Orpheus is **disabled in the arena** — trained only. Metric is `first-death %` against a fleet of Gabriel+Perdition bots also trying to die. Bootstrapped from Gabriel weights.
 
 ### Hades (Transformer anti-agent, vs the loser fleet)
 ```bash
 # Phase 1 — bootstrap: learn to self-destruct vs winner bots
-nohup python3 -m training.hades.train --phase bootstrap --iters 100 --workers 6 >> /tmp/hades_train.log 2>&1 &
+nohup python3 -m ian_folder.hades.train --phase bootstrap --iters 100 --workers 6 >> /tmp/hades_train.log 2>&1 &
 # Phase 2 — crucible: out-lose the losers (auto-switches after --bootstrap_iters)
-nohup python3 -m training.hades.train --resume --workers 6 >> /tmp/hades_train.log 2>&1 &
+nohup python3 -m ian_folder.hades.train --resume --workers 6 >> /tmp/hades_train.log 2>&1 &
 ```
 ### Zeus (Transformer, win-maximising twin of Hades)
 ```bash
 # full unattended run vs the competitive fleet + self-play
-training/zeus/run_full_training.sh
+ian_folder/zeus/run_full_training.sh
 # or directly:
-nohup python3 -m training.zeus.train --resume --workers 6 >> /tmp/zeus_train.log 2>&1 &
+nohup python3 -m ian_folder.zeus.train --resume --workers 6 >> /tmp/zeus_train.log 2>&1 &
 ```
 Zeus reuses Hades's exact architecture (`training/hades/net.py` + encoders) but flips
 the objective: reward +1 for winning (sole survivor), −1 otherwise, no shaping. Metric is
@@ -95,7 +95,7 @@ nohup python3 -m rhino.train --resume --workers 6 >> /tmp/rhino_train.log 2>&1 &
 ```bash
 # Restore from git
 git checkout HEAD -- agents/rhino_weights.json
-# Then copy back to training files
+# Then copy back to ian_folder files
 cp agents/rhino_weights.json rhino/best_policy.json rhino/checkpoint.json
 ```
 
@@ -104,7 +104,7 @@ cp agents/rhino_weights.json rhino/best_policy.json rhino/checkpoint.json
 ## Monitoring progress
 
 ```bash
-# Tail any training log
+# Tail any ian_folder log
 tail -f /tmp/rhino_train.log
 tail -f /tmp/elephant_train.log
 

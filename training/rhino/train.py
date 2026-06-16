@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPO + BPTT training for Rhino.
+"""PPO + BPTT ian_folder for Rhino.
 
 All five decision types (action, target, nope, give, place) are trained with
 the same PPO + BPTT loop. Each shares the GRU and trunk; only the head weights

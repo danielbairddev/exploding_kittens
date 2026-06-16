@@ -47,13 +47,13 @@ One epoch per iter is standard for PPO with a large batch (256 games). If traini
 **Full rollback** (revert everything to before this commit):
 ```bash
 git revert 360f905
-# then restart training with --resume
+# then restart ian_folder with --resume
 ```
 
 **Partial rollbacks** (change flags without touching code):
 ```bash
 # More gradient passes per iter (slower but potentially better)
-python3 -m training.elephant.train --resume --workers 4 --epochs 2
+python3 -m ian_folder.elephant.train --resume --workers 4 --epochs 2
 
 # More frequent evals
 # Edit train.py: change `it % 20` back to `it % 10`

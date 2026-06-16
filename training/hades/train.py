@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPO training for Hades — the Transformer anti-agent (HADES_PLAN.md §4-§5).
+"""PPO ian_folder for Hades — the Transformer anti-agent (HADES_PLAN.md §4-§5).
 
 All five decision types (action+target, nope, give, place) plus the value critic
 are trained with one PPO loop. Each decision step re-encodes its own event window
@@ -8,9 +8,9 @@ shared parameters simply accumulate across steps and games.
 
 Metric: survival rate vs the eval fleet — LOWER is better (target < 2%).
 
-    python3 -m training.hades.train --workers 6
-    python3 -m training.hades.train --resume --workers 6
-    python3 -m training.hades.train --phase bootstrap --iters 200   # phase 1 only
+    python3 -m ian_folder.hades.train --workers 6
+    python3 -m ian_folder.hades.train --resume --workers 6
+    python3 -m ian_folder.hades.train --phase bootstrap --iters 200   # phase 1 only
 """
 import argparse, json, math, os, sys, time
 from concurrent.futures import ProcessPoolExecutor

@@ -1,4 +1,4 @@
-"""Rollout workers for Orpheus training.
+"""Rollout workers for Orpheus ian_folder.
 
 Orpheus is trained to NOT WIN — reward is +1 for any loss (any finishing position
 except 1st). Uses a mixed fleet: losers pool (bots trying to lose) + winners pool
@@ -289,7 +289,7 @@ def play_one(policy_w, pool_w, rng, npr, self_prob=0.3):
             # Mixed game: slots 2-3 are winners; pure-loser game: all from loser fleet
             src = WINNER_FLEET if (mixed_game and i >= 2) else LOSER_FLEET
             opp = rng.choice(src)(name='fleet')
-            opp._play_mode = True  # disable arena handicap during training
+            opp._play_mode = True  # disable arena handicap during ian_folder
             opponents.append(opp)
 
     agents = [Learner(name='Orpheus')] + opponents
@@ -338,7 +338,7 @@ def _evaluate_chunk(args):
         me = Greedy(name='Orpheus')
         opps = [rng.choice(FLEET)(name='fleet') for _ in range(4)]
         for opp in opps:
-            opp._play_mode = True  # disable arena explore-rate handicap during training
+            opp._play_mode = True  # disable arena explore-rate handicap during ian_folder
         agents = [me] + opps
         order = list(range(5)); rng.shuffle(order); seat = order.index(0)
         r = GameEngine([agents[i] for i in order], collect_events=True).play_game(5)

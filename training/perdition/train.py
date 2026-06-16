@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPO training for Perdition — optimise to lose (minimise win rate).
+"""PPO ian_folder for Perdition — optimise to lose (minimise win rate).
 
 Mirrors gorilla/train.py but with:
   - Inverted reward (-1 win, +1 any loss) from perdition/rollout.py

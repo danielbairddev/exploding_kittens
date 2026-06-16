@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""PPO + BPTT training for Elephant.
+"""PPO + BPTT ian_folder for Elephant.
 
 All five decision types (action, target, nope, give, place) are trained with
 the same PPO + BPTT loop. Each shares the GRU and trunk; only the head weights
 differ. Gradients from all heads accumulate into dh_from_mlp and flow back
 through the GRU via BPTT.
 
-    python3 -m training.elephant.train --iters 3000 --workers 6
+    python3 -m ian_folder.elephant.train --iters 3000 --workers 6
 """
 import argparse, os, sys, time
 from collections import defaultdict

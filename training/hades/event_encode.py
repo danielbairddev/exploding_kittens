@@ -1,6 +1,6 @@
 """Hades event encoding — 64-dim event vectors (HADES_PLAN.md §1.1).
 
-Expanded from the 39-dim Rhino/GRU encoder. Pure stdlib (training wraps the
+Expanded from the 39-dim Rhino/GRU encoder. Pure stdlib (ian_folder wraps the
 returned list with np.array; the deployed agent uses it directly).
 
 Layout (64 dims):

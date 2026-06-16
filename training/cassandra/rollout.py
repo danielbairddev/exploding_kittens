@@ -1,4 +1,4 @@
-"""Rollout workers for Cassandra training.
+"""Rollout workers for Cassandra ian_folder.
 
 Cassandra trains to NOT WIN (same goal as Orpheus), but with a richer architecture:
 - Nope head receives full action context so it can selectively nope

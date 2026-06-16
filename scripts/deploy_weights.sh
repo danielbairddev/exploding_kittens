@@ -1,12 +1,12 @@
 #!/bin/bash
-# Pull latest training weights for all active bots, bump stats_version, commit, push.
+# Pull latest ian_folder weights for all active bots, bump stats_version, commit, push.
 #
 # Usage: ./scripts/deploy_weights.sh [--dry-run]
 #
 # Bots and their sources:
-#   Rhino      <- server: training/rhino/best_policy.json    -> agents/rhino_weights.json
-#   Gorilla    <- server: training/gorilla/best_policy.json  -> agents/orangutan2_weights.json
-#   Elephant   <- local:  training/elephant/best_policy.json -> agents/elephant_weights.json
+#   Rhino      <- server: ian_folder/rhino/best_policy.json    -> agents/rhino_weights.json
+#   Gorilla    <- server: ian_folder/gorilla/best_policy.json  -> agents/orangutan2_weights.json
+#   Elephant   <- local:  ian_folder/elephant/best_policy.json -> agents/elephant_weights.json
 set -euo pipefail
 
 SERVER="root@162.243.161.27"

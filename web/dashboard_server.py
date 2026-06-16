@@ -108,7 +108,7 @@ EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 # Skull roster — its own pool of bots, served on the alternate port. Mirrors the
 # ROSTER shape (bot_id + the bot's ARENA metadata) so the same Arena machinery
 # can rank it. Add a bot by appending its class here.
-
+'''
 Ian1Bots = []
 for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
     bot = partial(Ian1, secret_meta_value1=secret_meta_value)
@@ -116,11 +116,11 @@ for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
              "blurb": "Ian's Fist Attempt", "author": "Ian Brobin"}
     bot.__name__ = "Ian1"
     Ian1Bots.append(bot)
-
+'''
 SKULL_BOTS = [
     RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
     IanLosingAgent,      # Ian's attempt to lose
-    *Ian1Bots,           # Fleet for Ian's First Attempt
+    Ian1,           # Fleet for Ian's First Attempt
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
@@ -989,7 +989,7 @@ def prune_logs():
 
 
 # --------------------------------------------------------------------------
-# Training progress — parse log files written by training runs
+# Training progress — parse log files written by ian_folder runs
 # --------------------------------------------------------------------------
 import re as _re
 
@@ -999,9 +999,9 @@ _TRAIN_LOGS = {
     "Elephant": "/tmp/elephant_train.log",
 }
 _BESTS_FILES = {
-    "Rhino":    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'rhino',    'bests.jsonl'),
-    "Gorilla":  os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'gorilla',  'bests.jsonl'),
-    "Elephant": os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'training', 'elephant', 'bests.jsonl'),
+    "Rhino":    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ian_folder', 'rhino',    'bests.jsonl'),
+    "Gorilla":  os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ian_folder', 'gorilla',  'bests.jsonl'),
+    "Elephant": os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ian_folder', 'elephant', 'bests.jsonl'),
 }
 _ITER_RE = _re.compile(
     r"iter\s+(\d+)\s+rollout_win\s+([\d.]+)%.*?win\s+([\d.]+)%\s+place\s+([\d.]+).*?\(best\s+([\d.]+)%\)"
@@ -1078,7 +1078,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps(play.state(q.get("id", [""])[0])))
         elif path == "/daniel":
             self._send(DEBUG_PAGE, "text/html")
-        elif path == "/api/training":
+        elif path == "/api/ian_folder":
             self._send(json.dumps(_training_progress()))
         elif path == "/api/debug/deploy_log":
             try:

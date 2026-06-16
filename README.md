@@ -77,9 +77,9 @@ smoke_test.py  Pre-deploy gate: import the stack, play one game
 The neural bots are trained by the pipelines in `training/`, each named after the experiment that produced it (`gorilla` = PPO pipeline behind Orangutan2, `rhino` = GRU + PPO/BPTT, `perdition` = inverted-reward sabotage bot, `abaddon`/`mandrill` = follow-up experiments). Trainers write best weights directly into `agents/*_weights.json`, which the deployed agents load with no numpy required at inference time.
 
 ```bash
-python3 training/train_orangutan.py --batches 4000   # behavioural cloning
-python3 training/gorilla/train.py                    # PPO against the fleet
-python3 training/train_dashboard.py                  # local training monitor on :7777
+python3 ian_folder/train_orangutan.py --batches 4000   # behavioural cloning
+python3 ian_folder/gorilla/train.py                    # PPO against the fleet
+python3 ian_folder/train_dashboard.py                  # local ian_folder monitor on :7777
 ```
 
 ## Deployment

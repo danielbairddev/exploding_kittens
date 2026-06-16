@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPO self-play training for Gorilla / improved Orangutan.
+"""PPO self-play ian_folder for Gorilla / improved Orangutan.
 
 Warm-starts from Orangutan's BC weights, then runs a clipped-objective
 Actor-Critic PPO loop against a mix of the heuristic fleet and snapshots of its
@@ -35,7 +35,7 @@ DEFAULT_LOG = os.path.join(HERE, "..", "..", "logs", "train_orangutan_gorilla2.l
 
 
 def parse_log_progress(log_path):
-    """Last iter + best win rate from a training log (for --resume)."""
+    """Last iter + best win rate from a ian_folder log (for --resume)."""
     if not os.path.exists(log_path):
         return 0, None
     last_iter, best = 0, None
@@ -125,7 +125,7 @@ def main():
     ap.add_argument("--resume", action="store_true",
                     help="load checkpoint.json; --iters is additional iters to run")
     ap.add_argument("--log", default=DEFAULT_LOG,
-                    help="training log to read last iter/best when resuming")
+                    help="ian_folder log to read last iter/best when resuming")
     args = ap.parse_args()
 
     net = ActorCritic()
