@@ -15,8 +15,22 @@ from concurrent.futures import ProcessPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from training.hades.net import TransformerActorCritic
-from training.hades.train import compute_targets, ppo_update, _ent_coef
+from training.hades.train import compute_targets, ppo_update, _ent_coef, PLACE_ENT, TGT_ENT
 from training.zeus.rollout import rollout_worker, evaluate
+
+
+def _aux_ent(it, args):
+    """Anneal the place/target head entropy from full strength down to 1/10th over
+    --aux_ent_decay_iters. A fixed-high coefficient (the first fix attempt) held
+    placement near-uniform forever and capped win rate below the collapsed-but-rigid
+    baseline; annealing lets the heads explore early, then sharpen so the learned
+    greedy placement/targeting can actually beat 'always top / always seat-4'."""
+    if args.aux_ent_decay_iters <= 0:
+        frac = 1.0
+    else:
+        frac = min(1.0, it / args.aux_ent_decay_iters)
+    scale = 1.0 - 0.9 * frac            # 1.0 -> 0.1
+    return PLACE_ENT * scale, TGT_ENT * scale
 
 HERE       = os.path.dirname(os.path.abspath(__file__))
 BEST_OUT   = os.path.join(HERE, 'best_policy.json')
@@ -36,6 +50,8 @@ def main():
     ap.add_argument('--ent_start', type=float, default=0.02)
     ap.add_argument('--ent_end',   type=float, default=0.005)
     ap.add_argument('--ent_decay_iters', type=int, default=400)
+    ap.add_argument('--aux_ent_decay_iters', type=int, default=400,
+                    help='iters to anneal place/target head entropy from full to 1/10')
     ap.add_argument('--lr',        type=float, default=1e-4)
     ap.add_argument('--gamma',     type=float, default=0.99)
     ap.add_argument('--self_prob', type=float, default=0.3)
@@ -57,6 +73,20 @@ def main():
     best = base  # higher win rate is better
     print(f'baseline greedy vs eval-fleet: win {base*100:.2f}%', flush=True)
 
+    # Deploy floor: never regress the live bot. After a head re-init the resumed
+    # checkpoint evaluates LOWER than deployed Zeus, so the bar to overwrite
+    # agents/zeus_weights.json must be the *deployed* net's win rate (same eval
+    # seed -> directly comparable), not the checkpoint's. Only a genuinely-better
+    # net ships.
+    if os.path.exists(DEPLOY_OUT):
+        with open(DEPLOY_OUT) as f:
+            deployed_w = json.load(f)
+        floor = evaluate(deployed_w, n=args.eval_n)
+        if floor > best:
+            best = floor
+        print(f'deploy floor (live Zeus): win {floor*100:.2f}%  -> must beat {best*100:.2f}% to ship',
+              flush=True)
+
     ex = ProcessPoolExecutor(max_workers=args.workers) if args.workers > 1 else None
     pool = []
     seed = 5000
@@ -65,6 +95,7 @@ def main():
     for it in range(1, args.iters + 1):
         t0 = time.time()
         ent = _ent_coef(it, args)
+        place_ent, tgt_ent = _aux_ent(it, args)
         pw = net.weights()
         per = max(1, args.games // max(1, args.workers))
 
@@ -81,7 +112,8 @@ def main():
 
         t_upd = time.time()
         compute_targets(games, args.gamma)
-        ppo_update(net, games, args.epochs, args.clip, args.vf, ent, args.lr, ex=ex)
+        ppo_update(net, games, args.epochs, args.clip, args.vf, ent, args.lr, ex=ex,
+                   place_ent=place_ent, tgt_ent=tgt_ent)
         t_done = time.time()
         net.save(CKPT_OUT)
 
@@ -101,7 +133,8 @@ def main():
             else:
                 no_improve += 1
             won = sum(1 for _, r in games if r > 0)
-            print(f'iter {it:4d}  rollout_win {won/max(len(games),1)*100:4.1f}%  ent {ent:.3f}  |  '
+            print(f'iter {it:4d}  rollout_win {won/max(len(games),1)*100:4.1f}%  ent {ent:.3f}  '
+                  f'pl_ent {place_ent:.3f}  |  '
                   f'greedy win {wr*100:5.2f}%  (best {best*100:.2f}%)  '
                   f'{time.time()-t0:.1f}s/it  [roll={t_upd-t_roll:.1f}s upd={t_done-t_upd:.1f}s]{tag}',
                   flush=True)

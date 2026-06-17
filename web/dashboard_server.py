@@ -96,7 +96,7 @@ ARENA_BOTS = [
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 56
+GLOBAL_STATS_VERSION = 57
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -145,15 +145,15 @@ SERVER_INSTANCE_ID = uuid.uuid4().hex
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = "dashboard_state_v11.json"
-LOSER_SNAPSHOT_PATH = "loser_state_v2.json"
+SNAPSHOT_PATH = "dashboard_state_v12.json"
+LOSER_SNAPSHOT_PATH = "loser_state_v3.json"
 # Bump the version suffix to reset Skull stats when the roster or rules change.
 # v2: standard Skull rules + random-only baseline roster.
 SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 25
+LOSER_STATS_VERSION = 26
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot

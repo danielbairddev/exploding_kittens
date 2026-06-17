@@ -32,6 +32,14 @@ BESTS_LOG  = os.path.join(HERE, 'bests.jsonl')
 
 HUBER_DELTA = 1.0
 NOPE_ENT = 0.15   # entropy weight on the binary nope head (anti-collapse)
+# Place/target heads collapse for the same reason nope did: their decision rarely
+# flips the win/loss outcome, so PPO gives them almost no gradient and they
+# saturate to one output (place->always top-of-deck, target->always one seat). A
+# persistent softmax-entropy regulariser is a restoring force toward uniform over
+# the *valid* (masked) choices, keeping them state-dependent so the sparse outcome
+# signal can still shape them. Paired with a one-time head re-init (reinit_heads.py).
+PLACE_ENT = 0.05  # entropy weight on the 50-way place softmax
+TGT_ENT   = 0.03  # entropy weight on the 5-way target softmax
 
 
 def _huber_grad(err):
@@ -55,7 +63,7 @@ def _window_for(event_vecs, ec):
     return event_vecs[lo:ec]
 
 
-def _game_grads(net, gd, clip, vf_coef, ent_coef):
+def _game_grads(net, gd, clip, vf_coef, ent_coef, place_ent=PLACE_ENT, tgt_ent=TGT_ENT):
     grads = net.zero_grads()
     event_vecs = gd['event_vecs']
 
@@ -94,7 +102,7 @@ def _game_grads(net, gd, clip, vf_coef, ent_coef):
             new_tlogp = float(np.log(tP[ta] + 1e-12))
             d_tlogp = _ppo_coeff(new_tlogp, step['target_logp'], step['advantage'], clip) / n
             oh = np.zeros(N_TARGETS); oh[ta] = 1.0
-            dtgt = d_tlogp * (oh - tP) * tgt_mask
+            dtgt = d_tlogp * (oh - tP) * tgt_mask + _entropy_dlogits(tP, tgt_mask, tgt_ent / n)
             da2 += net._lin_head_backward('tgt', dtgt, a2, grads)
         back(da2, tc, ec)
 
@@ -150,7 +158,7 @@ def _game_grads(net, gd, clip, vf_coef, ent_coef):
         new_logp = float(np.log(P[bi] + 1e-12))
         d_logp = _ppo_coeff(new_logp, step['old_logp'], step['advantage'], clip) / npl
         oh = np.zeros(N_PLACE); oh[bi] = 1.0
-        dlogits = d_logp * (oh - P) * mask
+        dlogits = d_logp * (oh - P) * mask + _entropy_dlogits(P, mask, place_ent / npl)
         dvalue = vf_coef * _huber_grad(value - step['return']) / npl
         da2 = net._lin_head_backward('place', dlogits, a2, grads)
         da2 += net.value_backward(dvalue, a2, grads)
@@ -160,12 +168,12 @@ def _game_grads(net, gd, clip, vf_coef, ent_coef):
 
 
 def _grads_chunk(args):
-    weights, chunk, clip, vf, ent = args
+    weights, chunk, clip, vf, ent, place_ent, tgt_ent = args
     net = TransformerActorCritic()
     net.load_weights(weights)
     sum_grads = None
     for gd, _ in chunk:
-        g = _game_grads(net, gd, clip, vf, ent)
+        g = _game_grads(net, gd, clip, vf, ent, place_ent, tgt_ent)
         if sum_grads is None:
             sum_grads = {k: v.copy() for k, v in g.items()}
         else:
@@ -174,7 +182,8 @@ def _grads_chunk(args):
     return sum_grads, len(chunk)
 
 
-def ppo_update(net, games, epochs, clip, vf, ent, lr, ex=None):
+def ppo_update(net, games, epochs, clip, vf, ent, lr, ex=None,
+               place_ent=PLACE_ENT, tgt_ent=TGT_ENT):
     import random
     idxs = list(range(len(games)))
     for _ in range(epochs):
@@ -182,13 +191,13 @@ def ppo_update(net, games, epochs, clip, vf, ent, lr, ex=None):
         shuffled = [games[i] for i in idxs]
         if ex is None:
             for gd, _ in shuffled:
-                net.step(_game_grads(net, gd, clip, vf, ent), lr)
+                net.step(_game_grads(net, gd, clip, vf, ent, place_ent, tgt_ent), lr)
         else:
             workers = ex._max_workers
             cs = max(1, math.ceil(len(shuffled) / workers))
             chunks = [shuffled[i:i+cs] for i in range(0, len(shuffled), cs)]
             w = net.weights()
-            futs = [ex.submit(_grads_chunk, (w, c, clip, vf, ent)) for c in chunks]
+            futs = [ex.submit(_grads_chunk, (w, c, clip, vf, ent, place_ent, tgt_ent)) for c in chunks]
             sum_grads, n_total = None, 0
             for f in futs:
                 g, n = f.result()
