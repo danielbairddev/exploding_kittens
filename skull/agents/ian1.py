@@ -1,3 +1,4 @@
+import copy
 import math
 import random
 
@@ -110,7 +111,7 @@ NUMBER_OF_FIELDS_TO_MUTATE = 4
 MAX_CHANGE_IN_MUTATION = 10
 
 class Genes:
-    def __init__(self, values: list[int], rng: random.Random):
+    def __init__(self, values: list[float], rng: random.Random):
         self.values: list[int] = values
         self.rng = rng
 
@@ -123,32 +124,34 @@ class Genes:
 
     def mutate(self) -> "Genes":
         indexes_to_mutate = self.rng.sample(range(len(self.values)), NUMBER_OF_FIELDS_TO_MUTATE)
+        new_values = copy.deepcopy(self.values)
         for index_to_mutate in indexes_to_mutate:
             delta = self.rng.randint(-MAX_CHANGE_IN_MUTATION, MAX_CHANGE_IN_MUTATION)
-            self.values[index_to_mutate] += delta
-        return self
+            new_values[index_to_mutate] += delta
+        return Genes(new_values, self.rng)
 
     def normalize(self) -> "Genes":
-        if self.values[0] > 100:
-            self.values[0] = 100
-        if self.values[0] < 0:
-            self.values[0] = 0
+        new_values = copy.deepcopy(self.values)
+        if new_values[0] > 100:
+            new_values[0] = 100
+        if new_values[0] < 0:
+            new_values[0] = 0
         index = 1
         for pair_size in range(2,5):
             sum_true_values = 0
             for i in range(pair_size):
-                sum_true_values += self.values[index + (i * 2)]
+                sum_true_values += new_values[index + (i * 2)]
             for i in range(pair_size):
                 index_to_normalize = index + (i * 2)
-                self.values[index_to_normalize] = self.values[index_to_normalize] / sum_true_values * 100
+                new_values[index_to_normalize] = new_values[index_to_normalize] / sum_true_values * 100
             sum_false_values = 0
             for i in range(pair_size):
-                sum_false_values += self.values[index + 1 + (i * 2)]
+                sum_false_values += new_values[index + 1 + (i * 2)]
             for i in range(pair_size):
                 index_to_normalize = index + 1 + (i * 2)
-                self.values[index_to_normalize] = self.values[index_to_normalize] / sum_false_values * 100
+                new_values[index_to_normalize] = new_values[index_to_normalize] / sum_false_values * 100
             index += pair_size * 2
-        return self
+        return Genes(new_values, self.rng)
 
     def __str__(self):
         return str(self.values)
@@ -161,28 +164,34 @@ class Genes:
 class Ian1(SkullAgent):
     ARENA = {"name": "Ian1", "emoji": "🐼", "color": "#D9D9D9",
              "blurb": "Ian's Fist Attempt", "author": "Ian Brobin"}
-    SECRET_META_VALUES1: list[int] = [0, 10, 20 , 30, 40, 50, 60, 70, 80, 90, 100]
-    # Map of player count to bid as a percentage. Starting at 2
-    SECRET_META_VALUES2: Genes = Genes([98, 44.230769230769226, 42.028985507246375, 55.769230769230774, 57.971014492753625, 39.74895397489539, 10.218978102189782, 36.82008368200837, 21.897810218978105, 23.430962343096233, 67.88321167883211, 36.61971830985916, 22.885572139303484, 7.042253521126761, 22.388059701492537, 50.0, 31.8407960199005, 6.338028169014084, 22.885572139303484],
-                                       random.Random())
+    SECRET_META_VALUES1: list[Genes] = [
+        Genes([98, 44.230769230769226, 42.028985507246375, 55.769230769230774, 57.971014492753625, 39.74895397489539,
+               10.218978102189782, 36.82008368200837, 21.897810218978105, 23.430962343096233, 67.88321167883211,
+               36.61971830985916, 22.885572139303484, 7.042253521126761, 22.388059701492537, 50.0, 31.8407960199005,
+               6.338028169014084, 22.885572139303484],
+              random.Random()),
+        Genes([100, 62.0, 35.333333333333336, 38.0, 64.66666666666666, 46.71052631578947, 15.822784810126583, 28.289473684210524, 12.658227848101266, 25.0, 71.51898734177216, 22.666666666666664, 16.10738255033557, 32.0, 19.463087248322147, 44.0, 17.449664429530202, 1.3333333333333335, 46.97986577181208], random.Random())]
 
     def __init__(self, name: str | None = None,
                  seed: int | None = None,
-                 gene: Genes = SECRET_META_VALUES2):
+                 secret_meta_value1: Genes = SECRET_META_VALUES1[0]):
         self.name = name or self.ARENA["name"]
         self.seed = seed
         self.rng: random.Random = random.Random(seed)
-        if gene is None:
+        if secret_meta_value1 is None:
             raise Exception("Must pass in gene")
-        self.gene = gene
-        self.bomb_placement_percentage = gene.values[0]
-        self.bet_placement_percentage_map = PlayersToMaxBidPercentageProvider.from_list(gene.values[1:])
+        self.gene = secret_meta_value1
+        self.bomb_placement_percentage = secret_meta_value1.values[0]
+        self.bet_placement_percentage_map = PlayersToMaxBidPercentageProvider.from_list(secret_meta_value1.values[1:])
 
     def breed(self, other: "Ian1") -> "Ian1":
         return Ian1(self.name, self.seed, self.gene.breed(other.gene))
 
     def mutate(self):
         return Ian1(self.name, self.seed, self.gene.mutate())
+
+    def normalize(self):
+        return Ian1(self.name, self.seed, self.gene.normalize())
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
         if self.rng.randint(0, 100) <= 50:

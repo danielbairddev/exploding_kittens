@@ -108,7 +108,7 @@ EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 # Skull roster — its own pool of bots, served on the alternate port. Mirrors the
 # ROSTER shape (bot_id + the bot's ARENA metadata) so the same Arena machinery
 # can rank it. Add a bot by appending its class here.
-'''
+
 Ian1Bots = []
 for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
     bot = partial(Ian1, secret_meta_value1=secret_meta_value)
@@ -116,11 +116,11 @@ for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
              "blurb": "Ian's Fist Attempt", "author": "Ian Brobin"}
     bot.__name__ = "Ian1"
     Ian1Bots.append(bot)
-'''
+
 SKULL_BOTS = [
     RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
     IanLosingAgent,      # Ian's attempt to lose
-    Ian1,           # Fleet for Ian's First Attempt
+    *Ian1Bots,           # Fleet for Ian's First Attempt
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
