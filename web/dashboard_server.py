@@ -89,8 +89,8 @@ ARENA_BOTS = [
     GabrielAgent,       # Gabriel (GRU-128)
     OrpheusAgent,      # Orpheus
     CassandraAgent,    # Cassandra (GRU-192)
-    HadesAgent,        # Hades (Transformer anti-agent) — deployed at ~15.5% survival (plateau-break run)
-    ZeusAgent,         # Zeus (Hades architecture, win-maximising) — deployed ~41% win; still training to beat Elephant
+    HadesAgent,        # Hades (Transformer anti-agent) — ~15% survival; target-aware nope head
+    ZeusAgent,         # Zeus (Hades architecture, win-maximising) — ~40% win; nope head fixed (target-aware, no longer always-nopes)
     KaushalPlayer1,    # k_player_1
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
@@ -153,7 +153,7 @@ SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 24
+LOSER_STATS_VERSION = 25
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
