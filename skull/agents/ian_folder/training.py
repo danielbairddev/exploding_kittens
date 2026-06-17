@@ -1,6 +1,6 @@
 import time
 import random
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from skull.agents.ian1 import Ian1, Genes
 from skull.agents.random_agent import RandomSkullAgent
@@ -23,7 +23,7 @@ class Simulator:
             fitness_map = self.get_generation_fitness(agents)
             sorted_fitness_map: list[tuple[Ian1, float]] = sorted(fitness_map.items(),
                                                                   key= lambda item: item[1], reverse=True)
-            sampled_agents = sorted_fitness_map[:NUMBER_OF_GENERATIONS]
+            sampled_agents = sorted_fitness_map[:GENERATION_SAMPLE_SIZE]
             self.print_agents_with_fitness(sampled_agents)
             agents = self.create_next_generation(sampled_agents)
 
@@ -35,7 +35,7 @@ class Simulator:
                 param = self.rng.randint(0, 100)
                 params.append(param)
             print(f"params = {params}")
-            gene: Genes = Genes(params, self.rng).normalize()
+            gene: Genes = Genes(params, random.Random()).normalize()
             print(f"gene = {gene}")
             agents.append(Ian1(secret_meta_value1=gene))
 
@@ -45,18 +45,25 @@ class Simulator:
     def get_generation_fitness(self, agents: list[Ian1]) -> dict[Ian1, float]:
         start_time = time.perf_counter()
         fitness_map = {}
+        completed_tasks = 0
         with ProcessPoolExecutor() as executor:
-            results = executor.map(self.get_fitness, agents)
+            futures = {executor.submit(self.get_fitness, agent): agent for agent in agents}
             sum = 0
             max_fitness = 0
             best_agent = None
-            for agent, fitness in zip(agents, results):
+
+            for future in as_completed(futures):
+                completed_tasks += 1
+                percent_complete = completed_tasks / len(agents) * 100
+                print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(agents)} completed)", end="")
+                agent = futures[future]
+                fitness = future.result()
                 fitness_map[agent] = fitness
                 sum += fitness
                 if fitness > max_fitness:
                     max_fitness = fitness
                     best_agent = agent
-            print(f"Average fitness = {sum / POPULATION_SIZE}")
+            print(f"\nAverage fitness = {sum / POPULATION_SIZE}")
             print(f"Max fitness = {max_fitness}")
             print(f"Best agent = {best_agent.gene}")
             print(f"Total time = {time.perf_counter() - start_time} seconds")
