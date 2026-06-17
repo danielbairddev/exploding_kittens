@@ -145,8 +145,8 @@ SERVER_INSTANCE_ID = uuid.uuid4().hex
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
 # (keyed by bot_id) don't carry over into a different lineup.
-SNAPSHOT_PATH = "dashboard_state_v10.json"
-LOSER_SNAPSHOT_PATH = "loser_state_v1.json"
+SNAPSHOT_PATH = "dashboard_state_v11.json"
+LOSER_SNAPSHOT_PATH = "loser_state_v2.json"
 # Bump the version suffix to reset Skull stats when the roster or rules change.
 # v2: standard Skull rules + random-only baseline roster.
 SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
