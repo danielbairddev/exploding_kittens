@@ -15,8 +15,19 @@ class DanBot(SkullAgent):
         self.name = name or self.ARENA["name"]
         self.rng = random.Random(seed)
 
+        self.last_action_say_say = False
+
+    def return_say_action(self):
+        self.last_action_say_say = True
+        return Action.say("I'm the joker...")
+
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        Action.say("I'm the joker!")
+        if not self.last_action_say_say:
+            return self.return_say_action()
+
+        state
+
+        self.last_action_say_say = False
         return self.rng.choice(valid_actions)
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
