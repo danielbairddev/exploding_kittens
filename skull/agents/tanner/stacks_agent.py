@@ -10,7 +10,7 @@ class StacksBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
     ARENA = {"name": "Stacks", "emoji": "🥞", "color": "#c3925b",
-             "blurb": "always be stackin", "author": "Tanner", "version": '1.5'}
+             "blurb": "always be stackin", "author": "Tanner", "version": '1.6'}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
@@ -31,7 +31,7 @@ class StacksBot(SkullAgent):
         return DiscType.ROSE in discs
     
     def observe(self, state: ObservableState, player: int, action: Action) -> None:
-        if action.action_type == ActionType.BID and state.stack_sizes[player] == 1:
+        if action.action_type == ActionType.BID and state.stack_sizes[player] != state.disc_counts[player]:
             if player not in self.spite_tracker:
                 self.spite_tracker[player] = 0
             self.spite_tracker[player] += 1
