@@ -10,7 +10,7 @@ class StacksBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
     ARENA = {"name": "Stacks", "emoji": "🥞", "color": "#c3925b",
-             "blurb": "always be stackin", "author": "Tanner", "version": '1.3'}
+             "blurb": "always be stackin", "author": "Tanner", "version": '1.4'}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
@@ -47,11 +47,17 @@ class StacksBot(SkullAgent):
 
         if DiscType.ROSE in state.my_hand:
             return place(DiscType.ROSE)
+        elif DiscType.SKULL in state.my_hand:
+            # add SKULL on top if max ROSE is ever reached
+            return place(DiscType.SKULL)
         return self.handle_bidding(state)
 
     def handle_bidding(self, state: ObservableState):
         def bid(amount: int):
             return Action(action_type=ActionType.BID, amount=amount)
+        
+        if state.my_stack[-1] == DiscType.SKULL:
+            return Action(action_type=ActionType.PASS)
 
         if len(state.my_stack) > 1:
             SafetyStackerID = None
