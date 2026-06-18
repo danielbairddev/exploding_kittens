@@ -127,8 +127,6 @@ SKULL_BOTS = [
     IanLosingAgent,      # Ian's attempt to lose
     *Ian1Bots,           # Fleet for Ian's First Attempt
     DanBot,
-    #StackerBot,
-    SafeStackerBot,
     #Cruncher,
     StacksBot,
 ]
