@@ -12,7 +12,7 @@ SIMULATIONS_TO_RUN = 100
 TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION = 1_000
 POPULATION_SIZE = 1024
 GENERATION_SAMPLE_SIZE = 32
-PARAMETER_SIZE = 19
+PARAMETER_SIZE = 21
 NUMBER_OF_GENERATIONS = 100
 
 class WinRate:
@@ -87,14 +87,12 @@ class Simulator:
                 result = future.result()
                 for agent, win_rate in result.items():
                     win_rate_map[agent] = win_rate_map[agent].add(win_rate)
-                #print("Added current run to win rate")
             print("Calculating fitness")
             sum = 0
             max_fitness = -1
             best_agent = None
             for agent, win_rate in win_rate_map.items():
                 fitness = win_rate.get_win_rate()
-                print(f"win_rate = {fitness}")
                 fitness_map[agent] = fitness
                 sum += fitness
                 if fitness > max_fitness:
