@@ -59,13 +59,8 @@ from skull.agents.random_agent import RandomSkullAgent
 from skull.agents.ian_losing_agent import IanLosingAgent
 from skull.agents.ian1 import Ian1
 from skull.agents.dan import DanBot
-<<<<<<< HEAD
 from skull.agents.dan2 import DanBot as Cruncher
-from skull.agents.tanner.stacker import StackerBot
-from skull.agents.tanner.SafeStacker import SafeStackerBot
-=======
 from skull.agents.tanner.stacks_agent import StacksBot
->>>>>>> 63cde88ca1e5720c383a740570dd295e30b8bc79
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
