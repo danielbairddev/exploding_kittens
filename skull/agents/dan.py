@@ -73,17 +73,6 @@ class DanBot(SkullAgent):
             if state.current_bid >= 2:
                 return Action(action_type=ActionType.PASS)
 
-            # Take advantage of stackers.
-            # TODO Remove
-            stacker_detected = False
-            total_discs = 0
-            for pid, ss in enumerate(state.stack_sizes):
-                total_discs += ss
-                if ss > 1:
-                    stacker_detected = True
-            if stacker_detected:
-                return Action(action_type=ActionType.BID, amount=total_discs)
-
             return Action(action_type=ActionType.BID, amount=2)
 
         if state.current_bid == 0:
