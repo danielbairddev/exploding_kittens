@@ -58,6 +58,7 @@ from skull.engine import SkullEngine
 from skull.agents.random_agent import RandomSkullAgent
 from skull.agents.ian_losing_agent import IanLosingAgent
 from skull.agents.ian1 import Ian1
+from skull.agents.dan import DanBot
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
@@ -96,7 +97,7 @@ ARENA_BOTS = [
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 57
+GLOBAL_STATS_VERSION = 60
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -121,6 +122,7 @@ SKULL_BOTS = [
     RandomSkullAgent,    # Lucky — random legal moves; the baseline to beat
     IanLosingAgent,      # Ian's attempt to lose
     *Ian1Bots,           # Fleet for Ian's First Attempt
+    DanBot,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
