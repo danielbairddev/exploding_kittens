@@ -62,9 +62,9 @@ class DanBot(SkullAgent):
     def handle_bidding(self, state):
         if state.my_stack[0] is DiscType.ROSE:
             print(state.current_bid)
-            if state.current_bid >= 1:
+            if state.current_bid >= 2:
                 return Action(action_type=ActionType.PASS)
-            return Action(action_type=ActionType.BID, amount=state.current_bid + 1)
+            return Action(action_type=ActionType.BID, amount=2)
         return Action(action_type=ActionType.PASS)
 
     def handle_reveal(self, state):
