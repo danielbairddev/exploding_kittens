@@ -40,12 +40,12 @@ class StacksBot(SkullAgent):
         def place(disc_type: DiscType):
             return Action(action_type=ActionType.PLACE, disc_type=disc_type)
 
-        has_starting_player_spite = state.round_starting_player in self.spite_tracker
-        starting_player_spite_chance = self.rng.choice(range(self.spite_tracker[state.round_starting_player]))
-        if self.has_bomb(state.my_hand) and has_starting_player_spite and starting_player_spite_chance != 0:
+        spite_count = self.spite_tracker.get(state.round_starting_player, 0)
+        if (self.has_bomb(state.my_hand) and spite_count
+                and self.rng.randrange(spite_count) != 0):
             return place(DiscType.SKULL)
 
-        if state.my_stack[-1] == DiscType.SKULL:
+        if state.my_stack and state.my_stack[-1] == DiscType.SKULL:
             return Action(action_type=ActionType.PASS)
 
         if DiscType.ROSE in state.my_hand:
