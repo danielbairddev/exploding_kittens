@@ -72,26 +72,26 @@ from skull.agents.dan import DanBot
 # agent file with an ARENA block and append the class here. Append (don't
 # reorder) to keep bot_ids stable; bump SNAPSHOT_PATH's version when you do.
 ARENA_BOTS = [
-    HeuristicAgent,    # Professor
-    AggressiveAgent,   # Maverick
-    ChaosAgent,        # Gremlin
+    #HeuristicAgent,    # Professor
+    #AggressiveAgent,   # Maverick
+    #ChaosAgent,        # Gremlin
     SurvivalAgent,     # Sly
     RandomAgent,       # Lucky
-    SurvivalAgentV2,   # Sly2
-    CoyoteAgent,       # Coyote
-    OrangutanAgent,    # Orangutan
+    #SurvivalAgentV2,   # Sly2
+    #CoyoteAgent,       # Coyote
+    #OrangutanAgent,    # Orangutan
     # Orangutan2Agent,   # Orangutan2 — benched
     Ian1Agent,         # Ian1 (contributor template)
     Ian2Agent,         # Yum
     Ian3Agent,         # It's bombing
-    Perdition2Agent,   # Perdition
-    RhinoAgent,         # Rhino
-    ElephantAgent,      # Elephant
-    GabrielAgent,       # Gabriel (GRU-128)
-    OrpheusAgent,      # Orpheus
-    CassandraAgent,    # Cassandra (GRU-192)
-    HadesAgent,        # Hades (Transformer anti-agent) — ~15% survival; target-aware nope head
-    ZeusAgent,         # Zeus (Hades architecture, win-maximising) — ~40% win; nope head fixed (target-aware, no longer always-nopes)
+    #Perdition2Agent,   # Perdition
+    #RhinoAgent,         # Rhino
+    #ElephantAgent,      # Elephant
+    #GabrielAgent,       # Gabriel (GRU-128)
+    #OrpheusAgent,      # Orpheus
+    #CassandraAgent,    # Cassandra (GRU-192)
+    #HadesAgent,        # Hades (Transformer anti-agent) — ~15% survival; target-aware nope head
+    #ZeusAgent,         # Zeus (Hades architecture, win-maximising) — ~40% win; nope head fixed (target-aware, no longer always-nopes)
     KaushalPlayer1,    # k_player_1
 ]
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
