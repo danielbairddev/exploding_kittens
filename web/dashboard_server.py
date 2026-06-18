@@ -97,7 +97,7 @@ ARENA_BOTS = [
 # Bump to reset ALL bots' stats at once. Individual bots can set a higher
 # stats_version in their own ARENA dict to reset independently without
 # affecting the rest of the leaderboard.
-GLOBAL_STATS_VERSION = 63
+GLOBAL_STATS_VERSION = 65
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
