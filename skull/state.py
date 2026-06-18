@@ -62,6 +62,7 @@ class ObservableState:
     my_stack: list[DiscType]            # your own face-down discs (you placed them)
     stack_sizes: dict[int, int]          # player_id -> face-down disc count
     disc_counts: dict[int, int]          # player_id -> total discs still owned
+    bot_names: dict[int, str]            # player_id key (as in stack_sizes/disc_counts) -> bot name
     points: dict[int, int]               # player_id -> challenges won
     alive_players: list[int]
     current_bid: int
