@@ -2,8 +2,6 @@ import copy
 import math
 import random
 
-from pyexpat.errors import messages
-
 from skull.agents.base import SkullAgent
 from skull.discs import DiscType
 from skull.state import ObservableState, Phase
@@ -16,6 +14,10 @@ Test with:
 
 python -m skull.run --agent "Ian1"
 """
+
+NUMBER_OF_FIELDS_TO_MUTATE = 4
+MAX_CHANGE_IN_MUTATION = 50
+
 
 
 class SkullPlacementToMaxBidProvider:
@@ -107,8 +109,6 @@ class PlayersToMaxBidPercentageProvider:
             raise Exception("Invalid player count")
         return max_bid_percentage_provider.get_max_bid(rng, isSkullPlaced)
 
-NUMBER_OF_FIELDS_TO_MUTATE = 4
-MAX_CHANGE_IN_MUTATION = 10
 
 class Genes:
     def __init__(self, values: list[float], rng: random.Random):
@@ -178,7 +178,12 @@ class Ian1(SkullAgent):
         Genes([100, 54.54545454545454, 29.577464788732392, 45.45454545454545, 70.4225352112676, 40.52287581699346,
                 4.225352112676056, 33.33333333333333, 25.352112676056336, 26.143790849673206, 70.4225352112676,
                 29.333333333333332, 19.10828025477707, 36.666666666666664, 25.477707006369428, 34.0,
-                19.745222929936308, 0.0, 35.6687898089172], random.Random())]
+                19.745222929936308, 0.0, 35.6687898089172], random.Random()),
+        Genes([100, 20.634920634920633, 0.9900990099009901, 79.36507936507937, 99.00990099009901,
+               9.917355371900827, 3.8461538461538463, 82.64462809917356, 0.0, 7.43801652892562, 96.15384615384616,
+               48.18652849740933, 5.88235294117647, 51.813471502590666, 10.457516339869281, 0.0, 18.30065359477124,
+               0.0, 65.359477124183],
+              random.Random())]
 
     def __init__(self, name: str | None = None,
                  seed: int | None = None,
