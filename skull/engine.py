@@ -3,6 +3,11 @@ import random
 from .discs import Disc, DiscType, build_starting_hand
 from .state import GameState, PlayerState, ObservableState, Phase
 from .actions import Action, ActionType
+from .events import (
+    Event, ChatEvent, RoundStartEvent, PlaceEvent, BidEvent, PassEvent,
+    ChallengeEvent, RevealEvent, SuccessEvent, FailEvent, EliminatedEvent,
+    GameOverEvent,
+)
 
 POINTS_TO_WIN = 2          # two successful challenges wins the game
 MAX_ROUNDS = 300           # safety valve against a pathological game never ending
@@ -31,7 +36,7 @@ class SkullEngine:
         self.collect_events = collect_events
         self.rng = random.Random(seed)
         self._events: list[dict] = []
-        self._public_events: list[dict] = []
+        self._public_events: list[Event] = []
         self._next_public_event_id = 1
         self._round = 0
         self._elim_order: list[int] = []
@@ -45,14 +50,14 @@ class SkullEngine:
         if self.collect_events:
             self._events.append({"turn": self._round, "type": type, **kwargs})
 
-    def _public_event(self, type: str, **kwargs):
-        self._public_events.append({
-            "event_id": self._next_public_event_id,
-            "turn": self._round,
-            "type": type,
-            **kwargs,
-        })
+    def _emit(self, event: Event) -> Event:
+        """Stamp a typed event with its id + round and append it to the public
+        log that bots read via ``ObservableState.recent_events``."""
+        event.event_id = self._next_public_event_id
+        event.turn = self._round
+        self._public_events.append(event)
         self._next_public_event_id += 1
+        return event
 
     # -------------------------------------------------------------- observation
     def _observable(self, state: GameState, for_player: int) -> ObservableState:
@@ -132,7 +137,7 @@ class SkullEngine:
         text = str(message)[:MAX_CHAT_LEN]
         self._log(f"  P{pid} says: {text}")
         self._event("chat", player=pid, message=text)
-        self._public_event("chat", player=pid, message=text)
+        self._emit(ChatEvent(player=pid, message=text))
 
     # ------------------------------------------------------------- valid moves
     def _placing_actions(self, player: PlayerState, can_bid: bool,
@@ -164,8 +169,8 @@ class SkullEngine:
         n_alive = len(state.alive_players)
         self._event("round_start", starting_player=state.starting_player,
                     alive=[p.player_id for p in state.alive_players])
-        self._public_event("round_start", starting_player=state.starting_player,
-                           alive=[p.player_id for p in state.alive_players])
+        self._emit(RoundStartEvent(starting_player=state.starting_player,
+                                   alive=[p.player_id for p in state.alive_players]))
 
         # --- PLACING -------------------------------------------------------
         placements = 0
@@ -184,7 +189,7 @@ class SkullEngine:
                 placements += 1
                 self._log(f"  P{pid} places a disc (stack={len(player.stack)})")
                 self._event("place", player=pid)
-                self._public_event("place", player=pid, stack=len(player.stack))
+                self._emit(PlaceEvent(player=pid, stack=len(player.stack)))
                 state.current_player = self._next_alive(state, pid)
             else:   # BID — opens the auction
                 self._open_bid(state, pid, action.amount)
@@ -208,12 +213,12 @@ class SkullEngine:
                 state.highest_bidder = pid
                 self._log(f"  P{pid} bids {action.amount}")
                 self._event("bid", player=pid, amount=action.amount)
-                self._public_event("bid", player=pid, amount=action.amount)
+                self._emit(BidEvent(player=pid, amount=action.amount))
             else:
                 player.passed = True
                 self._log(f"  P{pid} passes")
                 self._event("pass", player=pid)
-                self._public_event("pass", player=pid)
+                self._emit(PassEvent(player=pid))
             state.current_player = self._next_active_bidder(state, pid)
 
         # --- REVEAL --------------------------------------------------------
@@ -228,7 +233,7 @@ class SkullEngine:
         state.current_player = self._next_active_bidder(state, pid)
         self._log(f"  P{pid} opens bidding at {amount}")
         self._event("bid", player=pid, amount=amount, opening=True)
-        self._public_event("bid", player=pid, amount=amount, opening=True)
+        self._emit(BidEvent(player=pid, amount=amount, opening=True))
 
     # ------------------------------------------------------------- the reveal
     def _resolve_reveal(self, state: GameState) -> None:
@@ -237,7 +242,7 @@ class SkullEngine:
         cp = state.players[challenger]
         self._log(f"  P{challenger} must flip {bid} discs")
         self._event("challenge", player=challenger, bid=bid)
-        self._public_event("challenge", player=challenger, bid=bid)
+        self._emit(ChallengeEvent(player=challenger, bid=bid))
 
         flipped = 0
         hit_skull = False
@@ -262,8 +267,8 @@ class SkullEngine:
             self._log(f"    flips {disc.disc_type.name} from P{source.player_id}")
             self._event("reveal", player=challenger, owner=source.player_id,
                         disc=disc.disc_type.name)
-            self._public_event("reveal", player=challenger, owner=source.player_id,
-                              disc=disc.disc_type.name)
+            self._emit(RevealEvent(player=challenger, owner=source.player_id,
+                                   disc=disc.disc_type))
             if is_skull:
                 hit_skull = True
                 own_skull = source.player_id == challenger
@@ -280,7 +285,7 @@ class SkullEngine:
             cp.points += 1
             self._log(f"  P{challenger} SUCCEEDS — {cp.points} point(s)")
             self._event("success", player=challenger, points=cp.points)
-            self._public_event("success", player=challenger, points=cp.points)
+            self._emit(SuccessEvent(player=challenger, points=cp.points))
             state.starting_player = challenger
         else:
             self._fail(state, challenger, own_skull=own_skull)
@@ -314,13 +319,13 @@ class SkullEngine:
         self._log(f"  P{challenger} FAILS — loses a disc ({cp.disc_count} left)")
         self._event("fail", player=challenger, lost=lost.disc_type.name,
                     discs_left=cp.disc_count)
-        self._public_event("fail", player=challenger, discs_left=cp.disc_count)
+        self._emit(FailEvent(player=challenger, discs_left=cp.disc_count))
         if cp.disc_count == 0:
             cp.alive = False
             self._elim_order.append(challenger)
             self._log(f"  P{challenger} is ELIMINATED")
             self._event("explode", player=challenger)     # arena death-order event
-            self._public_event("eliminated", player=challenger)
+            self._emit(EliminatedEvent(player=challenger))
             state.starting_player = self._next_alive(state, challenger)
         else:
             # Standard Skull: the player who failed starts the next round.
@@ -367,7 +372,7 @@ class SkullEngine:
 
         self._log(f"\nGame over — P{winner} wins after {state.round_number} rounds")
         self._event("game_over", winner=winner)
-        self._public_event("game_over", winner=winner)
+        self._emit(GameOverEvent(winner=winner))
         self._endgame_chat(state, winner)
 
         survivors = [p.player_id for p in state.alive_players]

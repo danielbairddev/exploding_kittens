@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .discs import Disc, DiscType
+from .events import Event
 
 
 class Phase:
@@ -68,4 +69,4 @@ class ObservableState:
     total_on_table: int
     current_player: int
     round_starting_player: int = 0       # who opens the current round (placed first)
-    recent_events: list[dict] = field(default_factory=list)
+    recent_events: list[Event] = field(default_factory=list)  # typed log; see skull/events.py
