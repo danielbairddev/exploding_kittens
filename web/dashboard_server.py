@@ -94,9 +94,10 @@ ARENA_BOTS = [
     #ZeusAgent,         # Zeus (Hades architecture, win-maximising) — ~40% win; nope head fixed (target-aware, no longer always-nopes)
     KaushalPlayer1,    # k_player_1
 ]
-# Bump to reset ALL bots' stats at once. Individual bots can set a higher
-# stats_version in their own ARENA dict to reset independently without
-# affecting the rest of the leaderboard.
+# NOTE: every deployment now wipes all stats automatically (snapshots are keyed
+# by DEPLOY_ID), so bumping this is no longer needed for a global reset. It is
+# kept only as a per-bot escape hatch: an individual bot can set a higher
+# stats_version in its own ARENA dict to reset itself between deploys.
 GLOBAL_STATS_VERSION = 66
 
 ROSTER = [
@@ -143,6 +144,15 @@ BUILD = {
 # Unique ID for this server process — changes on every restart so clients
 # can detect redeploys regardless of whether the git SHA changed.
 SERVER_INSTANCE_ID = uuid.uuid4().hex
+
+# Identity of the current deployment. Each deploy ships a fresh EK_DEPLOY_SHA +
+# EK_DEPLOY_AT (a per-deploy timestamp — see scripts/deploy_dashboard.sh and
+# auto_deploy.sh), so this string changes on every deployment. Snapshots are
+# stamped with it and only restored when it matches: a deployment therefore
+# always starts from zeroed stats, no manual version bump required. (A plain
+# in-place restart with the same env keeps stats; local dev — sha "dev", at ""
+# — is stable so iterating doesn't wipe the snapshot.)
+DEPLOY_ID = f"{BUILD['sha']}|{BUILD['at']}"
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 # Bump the version suffix whenever the ROSTER changes so stale per-bot stats
@@ -493,6 +503,12 @@ class Arena:
                 s = json.load(f)
         except (OSError, ValueError):
             return
+        # Fresh stats on every deployment: a snapshot from a different deploy is
+        # ignored entirely (see DEPLOY_ID).
+        if s.get("deploy_id") != DEPLOY_ID:
+            print(f"[arena] new deployment ({DEPLOY_ID}) — resetting stats "
+                  f"(snapshot was {s.get('deploy_id')})", flush=True)
+            return
         try:
             self.total_games = s.get("total_games", 0)
             self.total_turns = s.get("total_turns", 0)
@@ -534,6 +550,7 @@ class Arena:
     def save_snapshot(self):
         with self.lock:
             data = {
+                "deploy_id": DEPLOY_ID,
                 "total_games": self.total_games,
                 "total_turns": self.total_turns,
                 "tallies": dict(self.tallies),
@@ -765,6 +782,11 @@ class LoserArena:
                 s = json.load(f)
         except (OSError, ValueError):
             return
+        # Fresh stats on every deployment (see DEPLOY_ID).
+        if s.get("deploy_id") != DEPLOY_ID:
+            print(f"[loser] new deployment ({DEPLOY_ID}) — resetting stats "
+                  f"(snapshot was {s.get('deploy_id')})", flush=True)
+            return
         try:
             self.total_games = s.get("total_games", 0)
             reset_bids = set()
@@ -798,6 +820,7 @@ class LoserArena:
     def save_snapshot(self):
         with self.lock:
             data = {
+                "deploy_id": DEPLOY_ID,
                 "total_games": self.total_games,
                 "pairwise": dict(self.pairwise),
                 "bots": {str(b["bot_id"]): {
