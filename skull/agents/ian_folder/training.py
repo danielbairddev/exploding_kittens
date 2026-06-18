@@ -16,7 +16,7 @@ PARAMETER_SIZE = 19
 NUMBER_OF_GENERATIONS = 100
 
 class WinRate:
-    def __init__(self):
+    def __init__(self, games = 0, wins = 0):
         self.games = 0
         self.wins = 0
 
@@ -31,6 +31,9 @@ class WinRate:
         if self.games == 0:
             return 0
         return self.wins / self.games * 100
+
+    def add(self, other: "WinRate") -> "WinRate":
+        WinRate(self.games + other.games, self.wins + other.wins)
 
 class Simulator:
     def __init__(self):
@@ -65,9 +68,7 @@ class Simulator:
         fitness_map = {}
         completed_tasks = 0
         futures: list[Future] = []
-        win_rate_map: dict[Ian1, WinRate] = {}
-        for agent in agents:
-            win_rate_map[agent] = WinRate()
+        win_rate_map: dict[Ian1, WinRate] = self.get_empty_win_rate_map(agents)
         print("Win rate generated.....")
         with ProcessPoolExecutor() as executor:
             completed_tasks_submitted = 0
@@ -75,9 +76,8 @@ class Simulator:
                 sampled_agents = self.rng.sample(agents, k=PLAYERS_COUNT)
                 futures.append(executor.submit(self.simulate_game, sampled_agents))
                 completed_tasks_submitted += 1
-                if simulations % 1000 == 0:
-                    percent_complete = completed_tasks_submitted / TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION * 100
-                    print(f"\rTasks submitted progress: {percent_complete:.1f}% ({completed_tasks_submitted}/{TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION} completed)", end="")
+                percent_complete = completed_tasks_submitted / TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION * 100
+                print(f"\rTasks submitted progress: {percent_complete:.1f}% ({completed_tasks_submitted}/{TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION} completed)", end="")
             print("\n")
             sum = 0
             max_fitness = 0
@@ -86,15 +86,10 @@ class Simulator:
             for future in as_completed(futures):
                 completed_tasks += 1
                 percent_complete = completed_tasks / len(futures) * 100
-                if completed_tasks % 1000 == 0:
-                    print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(futures)} completed)", end="")
+                print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(futures)} completed)", end="")
                 result = future.result()
-                for agent, did_win in result.items():
-
-                    if did_win:
-                        win_rate_map[agent].win()
-                    else:
-                        win_rate_map[agent].loss()
+                for agent, win_rate in result.items():
+                    win_rate_map[agent] = win_rate_map[agent].add(win_rate)
                 for agent, win_rate in win_rate_map.items():
                     fitness = win_rate.get_win_rate()
                     fitness_map[agent] = fitness
@@ -108,27 +103,27 @@ class Simulator:
             print(f"Total time = {time.perf_counter() - start_time} seconds")
             return fitness_map
 
-    def simulate_game(self, agents: list[SkullAgent]) -> dict[SkullAgent, bool]:
+    def simulate_game(self, agents: list[SkullAgent]) -> dict[SkullAgent, WinRate]:
         """
         Simulates the game and returns the winner in a map
         """
         engine = SkullEngine(agents)
-        result = engine.play_game(PLAYERS_COUNT)
-        winner = result.get("winner")
-        wins = 0
+        winner_map: dict[SkullAgent, WinRate] = self.get_empty_win_rate_map(agents)
         for cycle in range(SIMULATIONS_TO_RUN):
             result = engine.play_game(PLAYERS_COUNT)
-            if result.get("winner") == 0:
-                wins += 1
-        fitness = wins / SIMULATIONS_TO_RUN * 100
-
-        winner_map: dict[SkullAgent, bool] = {}
-        for index, agent in enumerate(agents):
-            if winner == index:
-                winner_map[agent] = True
-            else:
-                winner_map[agent] = False
+            winner = result.get("winner")
+            for index, agent in enumerate(agents):
+                if winner == index:
+                    winner_map[agent].win()
+                else:
+                    winner_map[agent].loss()
         return winner_map
+
+    def get_empty_win_rate_map(self, agents: list[SkullAgent]) -> dict[Ian1, WinRate]:
+        win_rate_map = {}
+        for agent in agents:
+            win_rate_map[agent] = WinRate()
+        return win_rate_map
 
     def get_generation_fitness_against_one_agent(self, agents: list[Ian1], base_line_agent_type: type[SkullAgent] = RandomSkullAgent) -> dict[Ian1, float]:
         start_time = time.perf_counter()

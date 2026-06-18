@@ -67,4 +67,5 @@ class ObservableState:
     highest_bidder: int | None
     total_on_table: int
     current_player: int
+    round_starting_player: int = 0       # who opens the current round (placed first)
     recent_events: list[dict] = field(default_factory=list)
