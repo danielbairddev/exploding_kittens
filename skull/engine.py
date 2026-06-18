@@ -70,6 +70,7 @@ class SkullEngine:
             highest_bidder=state.highest_bidder,
             total_on_table=state.discs_on_table,
             current_player=state.current_player,
+            round_starting_player=state.starting_player,
             recent_events=list(self._public_events),
         )
 
