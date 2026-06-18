@@ -74,7 +74,6 @@ class DanBot(SkullAgent):
         return RANDOM_ACTION
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        raise Exception("Not implemented")
         if not self.last_action_say_say:
             return self.return_say_action()
 
