@@ -72,6 +72,7 @@ class DanBot(SkullAgent):
         if state.my_stack[0] is DiscType.ROSE:
             if state.current_bid >= 2:
                 return Action(action_type=ActionType.PASS)
+
             return Action(action_type=ActionType.BID, amount=2)
 
         if state.current_bid == 0:
