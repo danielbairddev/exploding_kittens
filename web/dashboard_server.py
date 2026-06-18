@@ -222,7 +222,21 @@ class Arena:
         # pairwise head-to-head: "minid:maxid" -> {a_wins, b_wins, shared}
         self.pairwise = {}
 
+        # Quarantine: bot_id -> reason. A bot that throws during a game is added
+        # here, excluded from future lineups, and shown crossed-out on the
+        # dashboard. In-memory only, so a redeploy with a fix clears it.
+        self.disabled = {}
+
         self._load_snapshot()
+
+    def disable_bot(self, bot_id, reason: str):
+        """Cross a bot off the active roster after it crashed mid-game."""
+        with self.lock:
+            if bot_id not in self.disabled:
+                self.disabled[bot_id] = reason
+
+    def enabled_roster(self):
+        return [b for b in self.roster if b["bot_id"] not in self.disabled]
 
     # ------------------------------------------------------------------ run
     def record_game(self, seats, result, events):
@@ -411,6 +425,8 @@ class Arena:
                     "recent": list(bd["recent"]),
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
                     "first_outs": bd["first_outs"],
+                    "disabled": b["bot_id"] in self.disabled,
+                    "disabled_reason": self.disabled.get(b["bot_id"]),
                 })
             leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
 
@@ -449,7 +465,10 @@ class Arena:
             bd = self.bots[b["bot_id"]]
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
-            ordered = sorted(self.roster, key=avg_place)   # ascending: best place first
+            roster = self.enabled_roster()
+            ordered = sorted(roster, key=avg_place)   # ascending: best place first
+        if not ordered:                               # every bot quarantined
+            return []
         n_top = min(self.players_per_game - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
@@ -457,13 +476,13 @@ class Arena:
         if rest:
             lineup.append(rng.choice(rest))
         # If the pool is smaller than the ring, top up with distinct extras.
-        pool = [b for b in self.roster if b not in lineup]
+        pool = [b for b in roster if b not in lineup]
         rng.shuffle(pool)
         while len(lineup) < self.players_per_game and pool:
             lineup.append(pool.pop())
         # Still short (roster smaller than the ring)? Repeat bots to fill seats.
         while len(lineup) < self.players_per_game:
-            lineup.append(rng.choice(self.roster))
+            lineup.append(rng.choice(roster))
         rng.shuffle(lineup)
         return lineup
 
@@ -580,7 +599,17 @@ class LoserArena:
             for b in self.roster
         }
         self.pairwise = {}
+        # Quarantine: bot_id -> reason (see Arena.disable_bot). In-memory only.
+        self.disabled = {}
         self._load_snapshot()
+
+    def disable_bot(self, bot_id, reason: str):
+        with self.lock:
+            if bot_id not in self.disabled:
+                self.disabled[bot_id] = reason
+
+    def enabled_roster(self):
+        return [b for b in self.roster if b["bot_id"] not in self.disabled]
 
     def record_game(self, seats, result, events):
         winner_seat = result["winner"]
@@ -694,6 +723,8 @@ class LoserArena:
                     "no_win_rate": round(bd["no_wins"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
+                    "disabled": b["bot_id"] in self.disabled,
+                    "disabled_reason": self.disabled.get(b["bot_id"]),
                 })
             leaderboard.sort(key=lambda x: (x["elo"], x["wins"]), reverse=True)
             pairwise = [
@@ -709,19 +740,22 @@ class LoserArena:
             bd = self.bots[b["bot_id"]]
             return bd["place_sum"] / bd["place_games"] if bd["place_games"] >= 20 else 3.0
         with self.lock:
-            ordered = sorted(self.roster, key=avg_place)
+            roster = self.enabled_roster()
+            ordered = sorted(roster, key=avg_place)
+        if not ordered:                              # every bot quarantined
+            return []
         n_top = min(self.players_per_game - 1, len(ordered))
         top = ordered[:n_top]
         rest = ordered[n_top:]
         lineup = list(top)
         if rest:
             lineup.append(rng.choice(rest))
-        pool = [b for b in self.roster if b not in lineup]
+        pool = [b for b in roster if b not in lineup]
         rng.shuffle(pool)
         while len(lineup) < self.players_per_game and pool:
             lineup.append(pool.pop())
         while len(lineup) < self.players_per_game:   # repeat bots if roster < ring
-            lineup.append(rng.choice(self.roster))
+            lineup.append(rng.choice(roster))
         rng.shuffle(lineup)
         return lineup
 
@@ -802,6 +836,48 @@ LOSER_ARENA = LoserArena()
 # limiter is shared CPU, not this number. Override with EK_SLEEP; 0 = flat out.
 GAME_SLEEP = float(os.environ.get("EK_SLEEP", "0.001"))   # more aggressive (was 0.004)
 
+
+class BotCrash(Exception):
+    """Raised when a seat agent throws inside a game callback.
+
+    Carries the offending seat so the simulation loop can attribute the crash to
+    a specific bot and quarantine it, instead of letting one buggy bot kill the
+    whole simulation thread (which is exactly how the Skull arena once stalled
+    silently — see _GuardedAgent)."""
+
+    def __init__(self, seat: int, original: BaseException):
+        self.seat = seat
+        self.original = original
+        super().__init__(f"seat {seat} crashed: {original!r}")
+
+
+class _GuardedAgent:
+    """Transparent proxy around a seat agent that converts any exception raised
+    in a callback (choose_action, game_over, ...) into a BotCrash tagged with the
+    seat. The engine is none the wiser; the loop above catches BotCrash and
+    crosses the bot off the roster. Non-callable attribute access (e.g. .name)
+    passes straight through."""
+
+    def __init__(self, agent, seat: int):
+        # Bypass our own __getattr__/__setattr__ for the two real slots.
+        object.__setattr__(self, "_agent", agent)
+        object.__setattr__(self, "_seat", seat)
+
+    def __getattr__(self, attr):
+        target = getattr(self._agent, attr)
+        if not callable(target):
+            return target
+        seat = self._seat
+
+        def guarded(*args, **kwargs):
+            try:
+                return target(*args, **kwargs)
+            except Exception as exc:
+                raise BotCrash(seat, exc) from exc
+
+        return guarded
+
+
 class ServerBackGroundThreadExecutor:
     """
     General server class used to hold the logic that runs various Agents and Engines
@@ -849,16 +925,36 @@ class ServerBackGroundThreadExecutor:
         return lineup
 
 
+    def _quarantine(self, seats, crash: "BotCrash"):
+        """Cross a crashed bot off every ladder so one buggy bot can't stall the
+        arena. Disables in both the main and loser arenas (they share a roster)."""
+        bot = seats[crash.seat]
+        reason = repr(crash.original)
+        self.arena.disable_bot(bot["bot_id"], reason)
+        self.loser_arena.disable_bot(bot["bot_id"], reason)
+        print(f"[arena{(' ' + self.log_prefix) if self.log_prefix else ''}] "
+              f"DISABLED bot '{bot['name']}' (bot_id {bot['bot_id']}) after crash: "
+              f"{reason}", flush=True)
+
     def simulation_loop(self):
         rng = random.Random()
         while True:
             # Rated ladder: top bots by ELO + a random challenger each game.
             seats = self.arena.rated_lineup(rng)
+            if not seats:                       # every bot quarantined — idle
+                time.sleep(1)
+                continue
             # Fresh agent instance per seat so a repeated agent never shares state
-            # across two seats in the same game.
-            seat_agents = [b["cls"](name=b["name"]) for b in seats]
+            # across two seats in the same game. Each is wrapped so a crash is
+            # attributed to its seat instead of killing this thread.
+            seat_agents = [_GuardedAgent(b["cls"](name=b["name"]), i)
+                           for i, b in enumerate(seats)]
             engine = self.engine_cls(seat_agents, seed=None, collect_events=True)
-            result = engine.play_game(len(seats))
+            try:
+                result = engine.play_game(len(seats))
+            except BotCrash as crash:
+                self._quarantine(seats, crash)
+                continue
             self.arena.record_game(seats, result, result["events"])
             if GAME_SLEEP:
                 time.sleep(GAME_SLEEP)
@@ -937,9 +1033,17 @@ class ServerBackGroundThreadExecutor:
         rng = random.Random()
         while True:
             seats = self.loser_arena.rated_lineup(rng)
-            seat_agents = [b["cls"](name=b["name"]) for b in seats]
+            if not seats:                       # every bot quarantined — idle
+                time.sleep(1)
+                continue
+            seat_agents = [_GuardedAgent(b["cls"](name=b["name"]), i)
+                           for i, b in enumerate(seats)]
             engine = self.engine_cls(seat_agents, seed=None, collect_events=True)
-            result = engine.play_game(len(seats))
+            try:
+                result = engine.play_game(len(seats))
+            except BotCrash as crash:
+                self._quarantine(seats, crash)
+                continue
             self.loser_arena.record_game(seats, result, result["events"])
             if GAME_SLEEP:
                 time.sleep(GAME_SLEEP)

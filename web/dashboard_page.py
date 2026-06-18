@@ -102,6 +102,11 @@ PAGE = r'''<!DOCTYPE html>
   /* ---------------- leaderboard ---------------- */
   .lb-row { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0; border-bottom:1px solid var(--border); }
   .lb-row:last-child{ border-bottom:none; }
+  .lb-row.disabled { opacity:0.5; }
+  .lb-row.disabled .lb-name, .lb-row.disabled .lb-blurb { text-decoration:line-through; }
+  .lb-crashed { display:inline-block; margin-left:0.35rem; padding:0 0.3rem; border-radius:4px;
+    background:#7f1d1d; color:#fecaca; font-size:0.6rem; font-weight:700; vertical-align:middle;
+    text-decoration:none; letter-spacing:0.03em; }
   .lb-rank { font-size:0.8rem; color:var(--muted); width:18px; text-align:center; font-weight:700;}
   .lb-av { font-size:1.4rem; }
   .lb-main { flex:1; min-width:0; }
@@ -402,11 +407,12 @@ function renderLadder(){
   $('leaderboard').innerHTML = rows.map((b,i)=>{
     const streak = b.streak>=2 ? `<span class="streak">🔥${b.streak}</span>` : '';
     const gamesLabel = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
-    return `<div class="lb-row">
+    const crashed = b.disabled ? `<span class="lb-crashed" title="${(b.disabled_reason||'crashed during a game').replace(/"/g,"'")}">CRASHED</span>` : '';
+    return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}${crashed}</div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
         ${m==='elo' ? eloSpark(b.elo_recent, b.color) : ''}
@@ -659,11 +665,12 @@ function renderLoserLadder(){
   $('loser-leaderboard').innerHTML = rows.map((b,i)=>{
     const streak = b.streak>=2 ? `<span class="streak">💀${b.streak}</span>` : '';
     const gl = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
-    return `<div class="lb-row">
+    const crashed = b.disabled ? `<span class="lb-crashed" title="${(b.disabled_reason||'crashed during a game').replace(/"/g,"'")}">CRASHED</span>` : '';
+    return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}</div>
+        <div class="lb-name" style="color:${b.color}">${b.name} ${streak}${crashed}</div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb}</div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
       </div>

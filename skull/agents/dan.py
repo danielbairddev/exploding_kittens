@@ -22,10 +22,10 @@ class DanBot(SkullAgent):
 
     def return_normal_action(self, action, valid_actions):
         self.last_action_say_say = False
-        if action.action_type == ActionType.SAY:
-            raise Exception("Attempting to say a non-say action" + action)
         if action is None:
             return self.rng.choice(valid_actions)
+        if action.action_type == ActionType.SAY:
+            raise Exception(f"Attempting to say a non-say action {action!r}")
         return action
 
     def has_bomb(self, discs: list[DiscType]):
