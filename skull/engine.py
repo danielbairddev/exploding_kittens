@@ -76,6 +76,10 @@ class SkullEngine:
             my_stack=[d.disc_type for d in me.stack],
             stack_sizes={p.player_id: len(p.stack) for p in state.alive_players},
             disc_counts={p.player_id: p.disc_count for p in state.alive_players},
+            bot_names={
+                p.player_id: getattr(self.agents[p.player_id], "name", f"P{p.player_id}")
+                for p in state.alive_players
+            },
             points={p.player_id: p.points for p in state.alive_players},
             alive_players=[p.player_id for p in state.alive_players],
             current_bid=state.current_bid,
