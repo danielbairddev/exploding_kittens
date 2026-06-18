@@ -56,4 +56,4 @@ class DanBot(SkullAgent):
         return self.return_normal_action(self.rng.choice(valid_actions), valid_actions)
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
-        return Action.say("I'm lucky") if won else None
+        return Action.say("Yehaw") if won else None
