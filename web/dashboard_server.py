@@ -98,7 +98,7 @@ ARENA_BOTS = [
 # by DEPLOY_ID), so bumping this is no longer needed for a global reset. It is
 # kept only as a per-bot escape hatch: an individual bot can set a higher
 # stats_version in its own ARENA dict to reset itself between deploys.
-GLOBAL_STATS_VERSION = 66
+GLOBAL_STATS_VERSION = 99
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
