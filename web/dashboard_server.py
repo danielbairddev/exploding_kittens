@@ -127,7 +127,7 @@ SKULL_BOTS = [
     *Ian1Bots,           # Fleet for Ian's First Attempt
     DanBot,
     StackerBot,
-    SafeStackerBot,
+    # SafeStackerBot,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 

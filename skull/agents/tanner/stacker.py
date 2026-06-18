@@ -3,12 +3,13 @@ import random
 from skull.agents.base import SkullAgent
 from skull.state import ObservableState, Phase
 from skull.actions import Action, ActionType, DiscType
+from skull.agents.tanner.SafeStacker import SafeStackerBot
 
 
 class StackerBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
-    ARENA = {"name": "Stacker 1.0", "emoji": "🥞", "color": "#c3925b",
+    ARENA = {"name": "Stacker 1.2", "emoji": "🥞", "color": "#c3925b",
              "blurb": "always be stackin", "author": "Tanner"}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
@@ -53,8 +54,19 @@ class StackerBot(SkullAgent):
             return Action(action_type=ActionType.BID, amount=amount)
 
         if len(state.my_stack) > 1:
-            shouldBid = len(state.my_stack) + 1 < state.total_on_table
-            return bid(len(state.my_stack)) if shouldBid else Action(action_type=ActionType.PASS)
+            SafetyStackerID = None
+            for id in state.stack_sizes:
+                if state.bot_names[id] == SafeStackerBot.ARENA['name']:
+                    SafetyStackerID = id
+
+            base_bid = len(state.my_stack)
+            safety_stacker_bonus = state.stack_sizes[SafetyStackerID] if SafetyStackerID != None else 0
+            if safety_stacker_bonus > 0:
+                return bid(base_bid + safety_stacker_bonus)
+
+            random_stack_bonus = 0 # TODO: Choose random stack that's greater than 1 and add it to bid
+            shouldBid = len(state.my_stack) + self.rng.choice(range(state.total_on_table - len(state.my_stack))) < state.total_on_table
+            return bid(base_bid) if shouldBid else Action(action_type=ActionType.PASS)
         return None
 
     def handle_reveal(self, _: ObservableState):
