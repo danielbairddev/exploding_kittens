@@ -8,7 +8,7 @@ from skull.actions import Action, ActionType, DiscType
 class StackerBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
-    ARENA = {"name": "Stack 1.0", "emoji": "🥞", "color": "#0084ff",
+    ARENA = {"name": "Stack 1.0", "emoji": "🥞", "color": "#c3925b",
              "blurb": "always be stackin", "author": "Tanner"}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
