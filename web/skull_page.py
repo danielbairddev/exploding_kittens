@@ -106,6 +106,11 @@ SKULL_PAGE = r'''<!DOCTYPE html>
   .lb-sub { font-size:0.68rem; color:var(--muted); margin:-0.3rem 0 0.7rem; }
   .lb-row { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0; border-bottom:1px solid var(--border); }
   .lb-row:last-child{ border-bottom:none; }
+  .lb-row.disabled { opacity:0.5; }
+  .lb-row.disabled .lb-name, .lb-row.disabled .lb-blurb { text-decoration:line-through; }
+  .lb-crashed { display:inline-block; margin-left:0.35rem; padding:0 0.3rem; border-radius:4px;
+    background:#7f1d1d; color:#fecaca; font-size:0.6rem; font-weight:700; vertical-align:middle;
+    text-decoration:none; letter-spacing:0.03em; }
   .lb-rank { font-size:0.8rem; color:var(--muted); width:18px; text-align:center; font-weight:700;}
   .lb-av { font-size:1.4rem; }
   .lb-main { flex:1; min-width:0; }
@@ -317,11 +322,12 @@ function renderLeaderboard(rows){
     const prov = b.provisional ? `<span class="lb-prov" title="provisional (<10 rated games)">?</span>` : '';
     const gl = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
     const form = (b.recent||[]).slice(-12).map(w=>`<i class="${w?'w':''}"></i>`).join('');
-    return `<div class="lb-row">
+    const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name}</div>
+        <div class="lb-name" style="color:${b.color}">${b.name}${crashed}</div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb} <span class="lb-author">· by ${b.author||'—'}</span></div>
         <div class="lb-bar"><i style="width:${(8+b.win_rate/wmax*92).toFixed(1)}%;background:${b.color}"></i></div>
         <div class="spark">${form}</div>
@@ -526,11 +532,12 @@ function renderLoserLadder(){
          <div class="lb-wr">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN · ${b.avg_place??'–'} PLACE</span></div>`
       : `<div class="lb-elo" style="color:${b.color}">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN</span></div>
          <div class="lb-wr">${b.elo}<span class="lb-unit">LOSER ELO · ${b.avg_place??'–'} PLACE</span></div>`;
-    return `<div class="lb-row">
+    const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
       <div class="lb-main">
-        <div class="lb-name" style="color:${b.color}">${b.name}</div>
+        <div class="lb-name" style="color:${b.color}">${b.name}${crashed}</div>
         <div class="lb-blurb" title="${b.blurb}">${b.blurb}</div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
       </div>

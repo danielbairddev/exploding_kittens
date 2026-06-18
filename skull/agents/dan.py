@@ -23,8 +23,8 @@ class DanBot(SkullAgent):
 
     def return_normal_action(self, action):
         self.last_action_say_say = False
-        if action.action_type() == ActionType.SAY:
-            raise Exception("Attempting to say a non-say action" + action)
+        if action.action_type == ActionType.SAY:
+            raise Exception(f"Attempting to say a non-say action {action!r}")
         return action
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
