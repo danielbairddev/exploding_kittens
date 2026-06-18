@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repository and in the working tree, so
+# edits from Windows (CRLF) and WSL/Linux (LF) stop producing whole-file
+# line-ending churn in diffs. All tracked files here are text.
+* text=auto eol=lf
