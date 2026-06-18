@@ -10,11 +10,12 @@ class StacksBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
     ARENA = {"name": "Stacks", "emoji": "🥞", "color": "#c3925b",
-             "blurb": "always be stackin", "author": "Tanner", "version": '1.4'}
+             "blurb": "always be stackin", "author": "Tanner", "version": '1.5'}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
         self.rng = random.Random(seed)
+        self.spite_tracker = dict()
 
     def return_normal_action(self, action, valid_actions):
         if action is None:
@@ -28,10 +29,24 @@ class StacksBot(SkullAgent):
 
     def has_rose(self, discs: list[DiscType]):
         return DiscType.ROSE in discs
+    
+    def observe(self, state: ObservableState, player: int, action: Action) -> None:
+        if action.action_type == ActionType.BID and state.stack_sizes[player] == 1:
+            if player not in self.spite_tracker:
+                self.spite_tracker[player] = 0
+            self.spite_tracker[player] += 1
 
     def handle_placing(self, state: ObservableState):
         def place(disc_type: DiscType):
             return Action(action_type=ActionType.PLACE, disc_type=disc_type)
+
+        has_starting_player_spite = state.round_starting_player in self.spite_tracker
+        starting_player_spite_chance = self.rng.choice(range(self.spite_tracker[state.round_starting_player]))
+        if self.has_bomb(state.my_hand) and has_starting_player_spite and starting_player_spite_chance != 0:
+            return place(DiscType.SKULL)
+
+        if state.my_stack[-1] == DiscType.SKULL:
+            return Action(action_type=ActionType.PASS)
 
         if DiscType.ROSE in state.my_hand:
             return place(DiscType.ROSE)
@@ -43,7 +58,7 @@ class StacksBot(SkullAgent):
     def handle_bidding(self, state: ObservableState):
         def bid(amount: int):
             return Action(action_type=ActionType.BID, amount=amount)
-        
+
         if state.my_stack[-1] == DiscType.SKULL:
             return Action(action_type=ActionType.PASS)
 
