@@ -18,7 +18,8 @@ class DanBot(SkullAgent):
 
     def return_say_action(self):
         self.last_action_say_say = True
-        return Action.say("I'm the joker...")
+        #return Action.say("I'm the joker...")
+        return Action.say("")
 
     def return_normal_action(self, action, valid_actions):
         self.last_action_say_say = False
@@ -41,6 +42,9 @@ class DanBot(SkullAgent):
         return False
 
     def handle_placing(self, state):
+        if len(state.my_stack) > 0:
+            return Action(action_type=ActionType.PASS)
+
         if self.has_bomb(state.my_hand) and len(state.alive_players) > 2:
             # Jokar mode
             return Action(action_type=ActionType.PLACE, disc_type=DiscType.SKULL)
