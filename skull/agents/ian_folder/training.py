@@ -8,7 +8,7 @@ from skull.agents.random_agent import RandomSkullAgent
 from skull.engine import SkullEngine
 
 PLAYERS_COUNT = 4
-SIMULATIONS_TO_RUN = 1000
+SIMULATIONS_TO_RUN = 100
 TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION = 1_000
 POPULATION_SIZE = 1024
 GENERATION_SAMPLE_SIZE = 32
@@ -17,8 +17,8 @@ NUMBER_OF_GENERATIONS = 100
 
 class WinRate:
     def __init__(self, games = 0, wins = 0):
-        self.games = 0
-        self.wins = 0
+        self.games = games
+        self.wins = wins
 
     def win(self):
         self.games += 1
@@ -33,7 +33,7 @@ class WinRate:
         return self.wins / self.games * 100
 
     def add(self, other: "WinRate") -> "WinRate":
-        WinRate(self.games + other.games, self.wins + other.wins)
+        return WinRate(self.games + other.games, self.wins + other.wins)
 
 class Simulator:
     def __init__(self):
@@ -79,9 +79,6 @@ class Simulator:
                 percent_complete = completed_tasks_submitted / TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION * 100
                 print(f"\rTasks submitted progress: {percent_complete:.1f}% ({completed_tasks_submitted}/{TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION} completed)", end="")
             print("\n")
-            sum = 0
-            max_fitness = 0
-            best_agent = None
 
             for future in as_completed(futures):
                 completed_tasks += 1
@@ -90,13 +87,19 @@ class Simulator:
                 result = future.result()
                 for agent, win_rate in result.items():
                     win_rate_map[agent] = win_rate_map[agent].add(win_rate)
-                for agent, win_rate in win_rate_map.items():
-                    fitness = win_rate.get_win_rate()
-                    fitness_map[agent] = fitness
-                    sum += fitness
-                    if fitness > max_fitness:
-                        max_fitness = fitness
-                        best_agent = agent
+                #print("Added current run to win rate")
+            print("Calculating fitness")
+            sum = 0
+            max_fitness = -1
+            best_agent = None
+            for agent, win_rate in win_rate_map.items():
+                fitness = win_rate.get_win_rate()
+                print(f"win_rate = {fitness}")
+                fitness_map[agent] = fitness
+                sum += fitness
+                if fitness > max_fitness:
+                    max_fitness = fitness
+                    best_agent = agent
             print(f"\nAverage fitness = {sum / POPULATION_SIZE}")
             print(f"Max fitness = {max_fitness}")
             print(f"Best agent = {best_agent.gene}")

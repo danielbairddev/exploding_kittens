@@ -225,7 +225,7 @@ class Ian1(SkullAgent):
                 return self._get_reveal_action(state, valid_actions)
             case Phase.DISCARD:
                 return self._get_discard_action(state, valid_actions)
-        return valid_actions[0]
+        raise Exception("No valid action found")
 
     def _get_placing_action(self, state: ObservableState, valid_actions: list[Action]):
         if self._can_bid(valid_actions):
@@ -245,13 +245,13 @@ class Ian1(SkullAgent):
         for action in valid_actions:
             if action.disc_type == DiscType.SKULL:
                 return action
-        return valid_actions[0]
+        return self._place_rose(valid_actions)
 
     def _place_rose(self, valid_actions: list[Action]) -> Action:
         for action in valid_actions:
             if action.disc_type == DiscType.ROSE:
                 return action
-        return valid_actions[0]
+        return self._place_skull(valid_actions)
 
     def _can_bid(self, valid_actions: list[Action]) -> bool:
         for action in valid_actions:
@@ -281,10 +281,7 @@ class Ian1(SkullAgent):
         return False
 
     def _get_reveal_action(self, state: ObservableState, valid_actions: list[Action]):
-        for action in valid_actions:
-            if action.target_player == state.my_id:
-                return action
-        return valid_actions[0]
+        return self.rng.sample(valid_actions, 1)[0]
 
     def _get_discard_action(self, state: ObservableState, valid_actions: list[Action]):
         if state.disc_counts[state.my_id] < 2:
@@ -295,10 +292,10 @@ class Ian1(SkullAgent):
         for action in valid_actions:
             if action.disc_type == DiscType.ROSE:
                 return action
-        return valid_actions[0]
+        return self._discard_skull(valid_actions)
 
     def _discard_skull(self, valid_actions: list[Action]) -> Action:
         for action in valid_actions:
             if action.disc_type == DiscType.SKULL:
                 return action
-        return valid_actions[0]
+        raise self._discard_rose(valid_actions)
