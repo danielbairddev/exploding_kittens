@@ -2,6 +2,7 @@ import random
 
 from skull.agents.base import SkullAgent
 from skull.state import ObservableState, Phase
+from skull.events import *
 from skull.actions import Action, ActionType, DiscType
 
 
@@ -23,17 +24,22 @@ class DanBot(SkullAgent):
         #return Action.say("I'm the joker...")
         return Action.say("")
 
-    def analyze_full_game(self, gamelog):
-        pass
+    def analyze_full_game(self, gamelog: list[Event]):
+        for event in gamelog:
+            if isinstance(event, PlaceEvent):
+                print(event)
 
     def return_normal_action(self, action, valid_actions):
         self.last_action_say_say = False
         if action is RANDOM_ACTION:
-            return self.rng.choice(valid_actions)
+            random_action = self.rng.choice(valid_actions)
+            print("Intended Random. ", random_action)
+            return random_action
         if action.action_type == ActionType.SAY:
             raise Exception(f"Attempting to say a non-say action {action!r}")
         if action not in valid_actions:
             print("Invalid action ", valid_actions, action)
+        print(action)
         return action
 
     def has_bomb(self, discs: list[DiscType]):
@@ -67,6 +73,11 @@ class DanBot(SkullAgent):
             if state.current_bid >= 2:
                 return Action(action_type=ActionType.PASS)
             return Action(action_type=ActionType.BID, amount=2)
+
+        if state.current_bid == 0:
+            # We are turn player, and therefore need to bid something...
+            return Action(action_type=ActionType.BID, amount=1)
+
         return Action(action_type=ActionType.PASS)
 
     def handle_reveal(self, state):
@@ -74,8 +85,11 @@ class DanBot(SkullAgent):
         return RANDOM_ACTION
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        if not self.last_action_say_say:
-            return self.return_say_action()
+        #self.analyze_full_game(state.recent_events)
+        #print(state.disc_counts)
+
+        #if not self.last_action_say_say:
+            #return self.return_say_action()
 
         if state.phase == Phase.BIDDING:
             return self.return_normal_action(self.handle_bidding(state), valid_actions)
@@ -84,6 +98,7 @@ class DanBot(SkullAgent):
         elif state.phase == Phase.REVEAL:
             return self.return_normal_action(self.handle_reveal(state), valid_actions)
 
+        print("Missing handling for ", state.phase)
         return self.return_normal_action(self.rng.choice(valid_actions), valid_actions)
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
