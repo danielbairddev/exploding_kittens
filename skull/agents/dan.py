@@ -60,6 +60,7 @@ class DanBot(SkullAgent):
         return Action(action_type=ActionType.PLACE, disc_type=DiscType.ROSE)
 
     def handle_bidding(self, state):
+
         if state.my_stack[0] is DiscType.ROSE:
             if state.current_bid >= 2:
                 return Action(action_type=ActionType.PASS)
