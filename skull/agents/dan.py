@@ -9,7 +9,7 @@ class DanBot(SkullAgent):
     """Plays a uniformly random legal move — the floor every bot should beat."""
 
     ARENA = {"name": "Bongos", "emoji": "😀", "color": "#ff7800",
-             "blurb": "idk", "author": "Dan"}
+             "blurb": "#1 Bot on site", "author": "Dan"}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
