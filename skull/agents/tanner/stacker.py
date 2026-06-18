@@ -9,7 +9,7 @@ from skull.agents.tanner.SafeStacker import SafeStackerBot
 class StackerBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
-    ARENA = {"name": "Stacker 1.1", "emoji": "🥞", "color": "#c3925b",
+    ARENA = {"name": "Stacker 1.2", "emoji": "🥞", "color": "#c3925b",
              "blurb": "always be stackin", "author": "Tanner"}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
@@ -65,7 +65,7 @@ class StackerBot(SkullAgent):
                 return bid(base_bid + safety_stacker_bonus)
 
             random_stack_bonus = 0 # TODO: Choose random stack that's greater than 1 and add it to bid
-            shouldBid = len(state.my_stack) + 1 < state.total_on_table
+            shouldBid = len(state.my_stack) + self.rng.choice(range(state.total_on_table - len(state.my_stack))) < state.total_on_table
             return bid(base_bid) if shouldBid else Action(action_type=ActionType.PASS)
         return None
 
