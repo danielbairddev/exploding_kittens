@@ -8,8 +8,8 @@ from skull.actions import Action
 class DanBot(SkullAgent):
     """Plays a uniformly random legal move — the floor every bot should beat."""
 
-    ARENA = {"name": "Dan", "emoji": "😀", "color": "#ff7800",
-             "blurb": "idk", "author": "D Money"}
+    ARENA = {"name": "Bongos", "emoji": "😀", "color": "#ff7800",
+             "blurb": "idk", "author": "Dan"}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
