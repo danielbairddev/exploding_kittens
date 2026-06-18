@@ -21,7 +21,7 @@ class DanBot(SkullAgent):
         self.last_action_say_say = True
         return Action.say("I'm the joker...")
 
-    def return_non_say_action(self, action):
+    def return_normal_action(self, action):
         self.last_action_say_say = False
         if action.action_type() == ActionType.SAY:
             raise Exception("Attempting to say a non-say action" + action)
@@ -31,8 +31,7 @@ class DanBot(SkullAgent):
         if not self.last_action_say_say:
             return self.return_say_action()
 
-        self.last_action_say_say = False
-        return self.rng.choice(valid_actions)
+        return self.return_normal_action(self.rng.choice(valid_actions))
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
         return Action.say("I'm lucky") if won else None
