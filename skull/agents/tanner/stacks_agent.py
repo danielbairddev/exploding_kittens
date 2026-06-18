@@ -15,14 +15,8 @@ class StacksBot(SkullAgent):
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
         self.rng = random.Random(seed)
-        self.last_action_say_say = False
-
-    def return_say_action(self):
-        self.last_action_say_say = True
-        return Action.say("STACK!")
 
     def return_normal_action(self, action, valid_actions):
-        self.last_action_say_say = False
         if action is None:
             return self.rng.choice(valid_actions)
         if action.action_type == ActionType.SAY:
@@ -30,16 +24,10 @@ class StacksBot(SkullAgent):
         return action
 
     def has_bomb(self, discs: list[DiscType]):
-        for disc in discs:
-            if disc == disc.SKULL:
-                return True
-        return False
+        return DiscType.SKULL in discs
 
     def has_rose(self, discs: list[DiscType]):
-        for disc in discs:
-            if disc == disc.ROSE:
-                return True
-        return False
+        return DiscType.ROSE in discs
 
     def handle_placing(self, state: ObservableState):
         def place(disc_type: DiscType):
@@ -77,9 +65,6 @@ class StacksBot(SkullAgent):
         return None
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        # if not self.last_action_say_say:
-        #     return self.return_say_action()
-
         if state.phase == Phase.BIDDING:
             return self.return_normal_action(self.handle_bidding(state), valid_actions)
         elif state.phase == Phase.PLACING:
