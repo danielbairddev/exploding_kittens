@@ -23,6 +23,9 @@ class DanBot(SkullAgent):
         #return Action.say("I'm the joker...")
         return Action.say("")
 
+    def analyze_full_game(self, gamelog):
+        pass
+
     def return_normal_action(self, action, valid_actions):
         self.last_action_say_say = False
         if action is RANDOM_ACTION:
@@ -71,6 +74,7 @@ class DanBot(SkullAgent):
         return RANDOM_ACTION
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
+        raise Exception("Not implemented")
         if not self.last_action_say_say:
             return self.return_say_action()
 
