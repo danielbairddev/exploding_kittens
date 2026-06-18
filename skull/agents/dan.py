@@ -34,15 +34,26 @@ class DanBot(SkullAgent):
                 return True
         return False
 
+    def has_rose(self, discs: list[DiscType]):
+        for disc in discs:
+            if disc == disc.ROSE:
+                return True
+        return False
 
     def handle_placing(self, state, valid_actions):
         if self.has_bomb(state.my_hand) and len(state.alive_players) > 2:
             # Jokar mode
             return Action(action_type=ActionType.PLACE, disc_type=DiscType.SKULL)
-        return None
+
+        # Either no bomb, or 2 players... try to win
+        if not self.has_rose(state.my_hand):
+            return Action(action_type=ActionType.PLACE, disc_type=DiscType.SKULL)
+        return Action(action_type=ActionType.PLACE, disc_type=DiscType.ROSE)
 
     def handle_bidding(self, state, valid_actions):
-        return None
+        if state.my_stack[0] is DiscType.ROSE:
+            return Action(action_type=ActionType.BID, amount=1)
+        return Action(action_type=ActionType.PASS)
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
         if not self.last_action_say_say:
