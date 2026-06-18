@@ -197,6 +197,13 @@ class Ian1(SkullAgent):
         self.bomb_placement_percentage = secret_meta_value1.values[0]
         self.bet_placement_percentage_map = PlayersToMaxBidPercentageProvider.from_list(secret_meta_value1.values[1:])
 
+    def __eq__(self, other):
+        if not isinstance(other, Ian1):
+            return False
+        return self.__hash__() == other.__hash__()
+    def __hash__(self):
+        return tuple(self.gene.values).__hash__()
+
     def breed(self, other: "Ian1") -> "Ian1":
         return Ian1(self.name, self.seed, self.gene.breed(other.gene))
 

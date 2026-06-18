@@ -8,8 +8,8 @@ from skull.agents.random_agent import RandomSkullAgent
 from skull.engine import SkullEngine
 
 PLAYERS_COUNT = 4
-SIMULATIONS_TO_RUN_AGAINST_ONE_AGENT = 1000
-SIMULATIONS_TO_RUN = 1_000_000
+SIMULATIONS_TO_RUN = 1000
+TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION = 1_000
 POPULATION_SIZE = 1024
 GENERATION_SAMPLE_SIZE = 32
 PARAMETER_SIZE = 19
@@ -65,13 +65,20 @@ class Simulator:
         fitness_map = {}
         completed_tasks = 0
         futures: list[Future] = []
-        win_rate: dict[SkullAgent, WinRate] = {}
+        win_rate_map: dict[Ian1, WinRate] = {}
         for agent in agents:
-            win_rate[agent] = WinRate()
+            win_rate_map[agent] = WinRate()
+        print("Win rate generated.....")
         with ProcessPoolExecutor() as executor:
-            for simulations in range(SIMULATIONS_TO_RUN):
+            completed_tasks_submitted = 0
+            for simulations in range(TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION):
                 sampled_agents = self.rng.sample(agents, k=PLAYERS_COUNT)
                 futures.append(executor.submit(self.simulate_game, sampled_agents))
+                completed_tasks_submitted += 1
+                if simulations % 1000 == 0:
+                    percent_complete = completed_tasks_submitted / TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION * 100
+                    print(f"\rTasks submitted progress: {percent_complete:.1f}% ({completed_tasks_submitted}/{TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION} completed)", end="")
+            print("\n")
             sum = 0
             max_fitness = 0
             best_agent = None
@@ -79,17 +86,22 @@ class Simulator:
             for future in as_completed(futures):
                 completed_tasks += 1
                 percent_complete = completed_tasks / len(futures) * 100
-                print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(futures)} completed)", end="")
+                if completed_tasks % 1000 == 0:
+                    print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(futures)} completed)", end="")
                 result = future.result()
-                for agent, did_win in result:
+                for agent, did_win in result.items():
+
                     if did_win:
-                        
-                    win_rate[agent]
-                fitness_map[agent] = fitness
-                sum += fitness
-                if fitness > max_fitness:
-                    max_fitness = fitness
-                    best_agent = agent
+                        win_rate_map[agent].win()
+                    else:
+                        win_rate_map[agent].loss()
+                for agent, win_rate in win_rate_map.items():
+                    fitness = win_rate.get_win_rate()
+                    fitness_map[agent] = fitness
+                    sum += fitness
+                    if fitness > max_fitness:
+                        max_fitness = fitness
+                        best_agent = agent
             print(f"\nAverage fitness = {sum / POPULATION_SIZE}")
             print(f"Max fitness = {max_fitness}")
             print(f"Best agent = {best_agent.gene}")
@@ -103,6 +115,13 @@ class Simulator:
         engine = SkullEngine(agents)
         result = engine.play_game(PLAYERS_COUNT)
         winner = result.get("winner")
+        wins = 0
+        for cycle in range(SIMULATIONS_TO_RUN):
+            result = engine.play_game(PLAYERS_COUNT)
+            if result.get("winner") == 0:
+                wins += 1
+        fitness = wins / SIMULATIONS_TO_RUN * 100
+
         winner_map: dict[SkullAgent, bool] = {}
         for index, agent in enumerate(agents):
             if winner == index:
@@ -143,11 +162,11 @@ class Simulator:
         engine = SkullEngine(agents)
 
         wins = 0
-        for cycle in range(SIMULATIONS_TO_RUN_AGAINST_ONE_AGENT):
+        for cycle in range(SIMULATIONS_TO_RUN):
             result = engine.play_game(PLAYERS_COUNT)
             if result.get("winner") == 0:
                 wins += 1
-        fitness = wins / SIMULATIONS_TO_RUN_AGAINST_ONE_AGENT * 100
+        fitness = wins / SIMULATIONS_TO_RUN * 100
         return fitness
 
 
