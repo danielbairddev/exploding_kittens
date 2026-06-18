@@ -3,12 +3,13 @@ import random
 from concurrent.futures import ProcessPoolExecutor, as_completed, Future
 
 from skull.agents.base import SkullAgent
+from skull.agents.dan import DanBot
 from skull.agents.ian1 import Ian1, Genes
 from skull.agents.random_agent import RandomSkullAgent
 from skull.engine import SkullEngine
 
 PLAYERS_COUNT = 4
-SIMULATIONS_TO_RUN = 100
+SIMULATIONS_TO_RUN = 1000
 TIMES_TO_SAMPLE_AGENTS_FOR_SIMULATION = 1_000
 POPULATION_SIZE = 1024
 GENERATION_SAMPLE_SIZE = 32
@@ -42,7 +43,7 @@ class Simulator:
         agents = self.get_initial_agents()
         for generation in range(NUMBER_OF_GENERATIONS):
             print(f"-------GENERATION {generation}-------")
-            fitness_map = self.get_generation_fitness(agents)
+            fitness_map = self.get_generation_fitness_against_one_agent(agents, base_line_agent_type=DanBot)
             sorted_fitness_map: list[tuple[Ian1, float]] = sorted(fitness_map.items(),
                                                                   key= lambda item: item[1], reverse=True)
             sampled_agents = sorted_fitness_map[:GENERATION_SAMPLE_SIZE]

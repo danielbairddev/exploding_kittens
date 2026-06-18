@@ -19,6 +19,20 @@ class SkullAgent(ABC):
         """Called once at the start of a game."""
         pass
 
+    def observe(self, state: ObservableState, player: int, action: Action) -> None:
+        """Called for *every* agent after *any* player takes an action, whether or
+        not it was this agent's turn — a passive hook for tracking the game.
+
+        ``state`` is this agent's own ObservableState. ``player`` is the player who
+        just acted (also available as ``state.current_player``). ``action`` is a
+        redacted copy of what they did, with anything face-down (e.g. *which* disc
+        was placed or discarded) stripped out — only what every player is allowed to
+        see survives: PLACE/PASS carry no extra detail, BID carries its ``amount``,
+        FLIP carries its ``target_player``.
+
+        Optional: the default does nothing. Return value is ignored."""
+        pass
+
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
         """Called once when the game ends. Return ``Action.say(...)`` to post a
         parting message to the log, or ``None`` to stay silent."""

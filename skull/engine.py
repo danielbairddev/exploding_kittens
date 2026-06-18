@@ -134,6 +134,32 @@ class SkullEngine:
                 return valid[0]   # default to the first legal action
             return action
 
+    @staticmethod
+    def _public_action(action: Action) -> Action:
+        """A copy of ``action`` carrying only what opponents are allowed to see.
+        Face-down details (which disc was placed/discarded, chat text) are dropped;
+        the publicly visible ``amount`` (BID) and ``target_player`` (FLIP) survive."""
+        return Action(
+            action_type=action.action_type,
+            amount=action.amount,
+            target_player=action.target_player,
+        )
+
+    def _broadcast(self, state: GameState, actor: int, action: Action) -> None:
+        """Notify every alive agent that ``actor`` just took ``action`` via their
+        optional ``observe`` hook. Each agent gets its own ObservableState — with
+        ``current_player`` pinned to ``actor`` so it knows who moved — and a redacted
+        copy of the action (see ``_public_action``)."""
+        public = self._public_action(action)
+        saved = state.current_player
+        state.current_player = actor
+        try:
+            for pid in range(len(state.players)):
+                if state.players[pid].alive:
+                    self.agents[pid].observe(self._observable(state, pid), actor, public)
+        finally:
+            state.current_player = saved
+
     def _endgame_chat(self, state: GameState, winner: int) -> None:
         """Let every agent post one parting message once the game is decided."""
         for pid in range(len(state.players)):
@@ -201,6 +227,7 @@ class SkullEngine:
                 self._log(f"  {self._pname(pid)} places a disc (stack={len(player.stack)})")
                 self._event("place", player=pid)
                 self._emit(PlaceEvent(player=pid, stack=len(player.stack)))
+                self._broadcast(state, pid, action)
                 state.current_player = self._next_alive(state, pid)
             else:   # BID — opens the auction
                 self._open_bid(state, pid, action.amount)
@@ -225,11 +252,13 @@ class SkullEngine:
                 self._log(f"  {self._pname(pid)} bids {action.amount}")
                 self._event("bid", player=pid, amount=action.amount)
                 self._emit(BidEvent(player=pid, amount=action.amount))
+                self._broadcast(state, pid, action)
             else:
                 player.passed = True
                 self._log(f"  {self._pname(pid)} passes")
                 self._event("pass", player=pid)
                 self._emit(PassEvent(player=pid))
+                self._broadcast(state, pid, Action(ActionType.PASS))
             state.current_player = self._next_active_bidder(state, pid)
 
         # --- REVEAL --------------------------------------------------------
@@ -241,10 +270,11 @@ class SkullEngine:
         state.current_bid = amount
         state.highest_bidder = pid
         state.phase = Phase.BIDDING
-        state.current_player = self._next_active_bidder(state, pid)
         self._log(f"  {self._pname(pid)} opens bidding at {amount}")
         self._event("bid", player=pid, amount=amount, opening=True)
         self._emit(BidEvent(player=pid, amount=amount, opening=True))
+        self._broadcast(state, pid, Action(ActionType.BID, amount=amount))
+        state.current_player = self._next_active_bidder(state, pid)
 
     # ------------------------------------------------------------- the reveal
     def _resolve_reveal(self, state: GameState) -> None:
@@ -280,6 +310,8 @@ class SkullEngine:
                         disc=disc.disc_type.name)
             self._emit(RevealEvent(player=challenger, owner=source.player_id,
                                    disc=disc.disc_type))
+            self._broadcast(state, challenger,
+                            Action(ActionType.FLIP, target_player=source.player_id))
             if is_skull:
                 hit_skull = True
                 own_skull = source.player_id == challenger
