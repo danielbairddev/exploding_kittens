@@ -24,7 +24,7 @@ class DanBot(SkullAgent):
     def return_say_action(self):
         self.last_action_say_say = True
         #return Action.say("I'm the joker...")
-        return Action.say("")
+        return Action.say("" + str(INT_COUNTER))
 
     def analyze_full_game(self, gamelog: list[Event]):
         for event in gamelog:
