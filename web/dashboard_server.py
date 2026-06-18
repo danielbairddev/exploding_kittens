@@ -59,6 +59,7 @@ from skull.agents.random_agent import RandomSkullAgent
 from skull.agents.ian_losing_agent import IanLosingAgent
 from skull.agents.ian1 import Ian1
 from skull.agents.dan import DanBot
+from skull.agents.tanner.stacker import StackerBot
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
@@ -123,6 +124,7 @@ SKULL_BOTS = [
     IanLosingAgent,      # Ian's attempt to lose
     *Ian1Bots,           # Fleet for Ian's First Attempt
     DanBot,
+    StackerBot,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
