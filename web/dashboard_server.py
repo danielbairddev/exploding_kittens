@@ -118,7 +118,7 @@ EK_PLAYERS_PER_GAME = 5             # full Exploding Kittens table
 Ian1Bots = []
 for index, secret_meta_value in enumerate(Ian1.SECRET_META_VALUES1):
     bot = partial(Ian1, secret_meta_value1=secret_meta_value)
-    bot.ARENA = {"name": f"Breeder-{index + Ian1.IAN_OFFSET}", "emoji": "🐼", "color": "#D9D9D9",
+    bot.ARENA = {"name": f"Breeder-{index + Ian1.IAN_OFFSET}", "emoji": "🧬", "color": "#D9D9D9",
              "blurb": "Previously Ian1", "author": "Ian Brobin"}
     bot.__name__ = "Ian1"
     Ian1Bots.append(bot)
