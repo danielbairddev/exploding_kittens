@@ -10,7 +10,7 @@ class StacksBot(SkullAgent):
     """always places ROSE and stacks everything else is random."""
 
     ARENA = {"name": "Stacks", "emoji": "🥞", "color": "#c3925b",
-             "blurb": "always be stackin", "author": "Tanner", "version": '1.6'}
+             "blurb": "always be stackin", "author": "Tanner", "version": '1.7'}
 
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
@@ -70,7 +70,7 @@ class StacksBot(SkullAgent):
             safety_stacker_bonus = state.stack_sizes[SafetyStackerID] if SafetyStackerID != None else 0
 
             base_bid = len(state.my_stack) + safety_stacker_bonus
-            if base_bid >= state.total_on_table:   # can't bid this high safely -> pass
+            if base_bid >= state.total_on_table:
                 return Action(action_type=ActionType.PASS)
             aggressiveness = self.rng.choice(range(state.total_on_table - base_bid))
             shouldBid = base_bid + aggressiveness < state.total_on_table
