@@ -130,7 +130,6 @@ SKULL_BOTS = [
     #StackerBot,
     SafeStackerBot,
     Cruncher,
-    #Cruncher,
     StacksBot,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
