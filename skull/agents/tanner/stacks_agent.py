@@ -92,4 +92,5 @@ class StacksBot(SkullAgent):
         return self.return_normal_action(self.rng.choice(valid_actions), valid_actions)
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
+        self.spite_tracker = dict()
         return Action.say("It's Stacking Time!") if won else Action.say("NOT ENOUGH STACKING!!!")
