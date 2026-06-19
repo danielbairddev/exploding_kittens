@@ -22,25 +22,9 @@ class Guido(SkullAgent):
     # auction (those extra flips land on opponents' stacks — a gamble).
     GAMBLE = 2
 
-    # Guido is strong enough to run away with the ladder, which leaves no room to
-    # ever *fall* in the rankings. So it plays at less than full effort normally
-    # (NORMAL_EFFORT) — staying near the top but only by a modest margin — and
-    # every SLUMP_PERIOD games it drops into a short SLUMP_LENGTH-game slump at
-    # SLUMP_EFFORT, losing enough to slide a few ranks before climbing back.
-    # Effort = fraction of moves played with the real strategy; the rest random.
-    NORMAL_EFFORT = 0.9
-    SLUMP_EFFORT = 0.0
-    SLUMP_PERIOD = 40
-    SLUMP_LENGTH = 5
-    _games_dealt = 0          # class-level: counts games Guido is seated in
-
     def __init__(self, name: str | None = None, seed: int | None = None):
         self.name = name or self.ARENA["name"]
         self.rng = random.Random(seed)
-        # A fresh instance is built for each game, so this counter ticks once per
-        # game and the slump windows recur over the life of the arena.
-        Guido._games_dealt += 1
-        self._slumping = (Guido._games_dealt % self.SLUMP_PERIOD) < self.SLUMP_LENGTH
 
     # --- helpers -----------------------------------------------------------
     @staticmethod
@@ -98,11 +82,6 @@ class Guido(SkullAgent):
 
     # --- entry point -------------------------------------------------------
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        # Effort gate: normally play strong most of the time; during a slump play
-        # (mostly) random, so Guido loses enough to slide down the rankings.
-        effort = self.SLUMP_EFFORT if self._slumping else self.NORMAL_EFFORT
-        if self.rng.random() >= effort:
-            return self.rng.choice(valid_actions)
         if state.phase == Phase.PLACING:
             return self._place_or_bid(state, valid_actions)
         if state.phase == Phase.BIDDING:
