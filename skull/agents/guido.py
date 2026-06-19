@@ -28,9 +28,9 @@ class Guido(SkullAgent):
     # every SLUMP_PERIOD games it drops into a short SLUMP_LENGTH-game slump at
     # SLUMP_EFFORT, losing enough to slide a few ranks before climbing back.
     # Effort = fraction of moves played with the real strategy; the rest random.
-    NORMAL_EFFORT = 0.55
+    NORMAL_EFFORT = 0.9
     SLUMP_EFFORT = 0.0
-    SLUMP_PERIOD = 35
+    SLUMP_PERIOD = 40
     SLUMP_LENGTH = 5
     _games_dealt = 0          # class-level: counts games Guido is seated in
 
