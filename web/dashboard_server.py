@@ -102,7 +102,7 @@ ARENA_BOTS = [
 # by DEPLOY_ID), so bumping this is no longer needed for a global reset. It is
 # kept only as a per-bot escape hatch: an individual bot can set a higher
 # stats_version in its own ARENA dict to reset itself between deploys.
-GLOBAL_STATS_VERSION = 101
+GLOBAL_STATS_VERSION = 102
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -175,7 +175,7 @@ SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v3.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 29   # +1: Guido emoji change
+LOSER_STATS_VERSION = 30   # +1: Guido blurb change
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot

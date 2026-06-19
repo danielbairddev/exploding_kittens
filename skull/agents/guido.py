@@ -15,7 +15,7 @@ class Guido(SkullAgent):
     """
 
     ARENA = {"name": "Guido", "emoji": "\U0001F431", "color": "#3776ab",
-             "blurb": "Bids on what it can prove, gambles only on the margin.",
+             "blurb": "meow",
              "author": "kirsten"}
 
     # How far above our guaranteed-safe own-rose count we'll reach to win an
