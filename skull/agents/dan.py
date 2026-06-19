@@ -104,3 +104,6 @@ class DanBot(SkullAgent):
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
         return Action.say("Yehaw") if won else None
+
+    def observe(self, state: ObservableState, player: int, action: Action) -> None:
+        print("!! ", action)
