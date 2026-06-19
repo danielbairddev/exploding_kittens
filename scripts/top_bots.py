@@ -26,7 +26,9 @@ from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from web.dashboard_server import SKULL_BOTS, SKULL_PLAYERS_PER_GAME
+from web.dashboard_server import (
+    SKULL_BOTS, SKULL_PLAYERS_PER_GAME, _GuardedAgent, BotCrash,
+)
 from skull.engine import SkullEngine
 
 DEFAULT_GAMES = 1000
@@ -60,7 +62,7 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
     Each row: {name, wins, games, win_rate, avg_place}. A bot is counted once
     per game it appears in and credited at most one win, matching the arena.
     """
-    roster = roster if roster is not None else SKULL_BOTS
+    roster = list(roster if roster is not None else SKULL_BOTS)
     cls_by_name = {_bot_name(b): b for b in roster}
     rng = random.Random(seed)
     wins = defaultdict(int)
@@ -68,12 +70,29 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
     place_sum = defaultdict(int)
     place_games = defaultdict(int)
 
+    disabled = set()      # names of bots that threw mid-game — benched, like the arena
+    failures = 0          # games dropped because a bot crashed
+
     # Some bots print on every move; swallow it so only the leaderboard shows.
     with contextlib.redirect_stdout(io.StringIO()):
         for _ in range(n_games):
-            lineup = _draw_lineup(rng, roster, players_per_game)
-            agents = [b(name=_bot_name(b)) for b in lineup]
-            result = SkullEngine(agents).play_game(len(agents))
+            active = [b for b in roster if _bot_name(b) not in disabled]
+            if len(active) < 2:           # not enough working bots left to play
+                break
+            lineup = _draw_lineup(rng, active, players_per_game)
+            # Wrap each seat so a crash is attributed to its bot instead of
+            # killing the whole tournament (mirrors the live arena).
+            agents = [_GuardedAgent(b(name=_bot_name(b)), i)
+                      for i, b in enumerate(lineup)]
+            try:
+                result = SkullEngine(agents).play_game(len(agents))
+            except BotCrash as crash:
+                disabled.add(_bot_name(lineup[crash.seat]))
+                failures += 1
+                continue
+            except Exception:             # unattributable engine error — skip the game
+                failures += 1
+                continue
 
             winner = result["winner"]
             winner_name = _bot_name(lineup[winner]) if winner >= 0 else None
@@ -87,6 +106,12 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
                 name = _bot_name(lineup[seat])
                 place_sum[name] += place + 1
                 place_games[name] += 1
+
+    if failures:
+        msg = f"[top_bots] skipped {failures} game(s) due to bot crashes"
+        if disabled:
+            msg += "; benched: " + ", ".join(sorted(disabled))
+        print(msg, file=sys.stderr)
 
     table = []
     for name, g in games.items():
