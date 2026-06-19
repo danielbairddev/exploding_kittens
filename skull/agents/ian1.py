@@ -284,8 +284,6 @@ class Ian1(SkullAgent):
         return Ian1(self.name, self.seed, self.gene.normalize())
 
     def choose_action(self, state: ObservableState, valid_actions: list[Action]) -> Action:
-        if self.rng.randint(0, 100) <= 50:
-            return Action(ActionType.SAY, message="You'll pay for this")
         match state.phase:
             case Phase.PLACING:
                 return self._get_placing_action(state, valid_actions)
