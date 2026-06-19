@@ -41,3 +41,11 @@ class Action:
         if self.target_player is not None:
             parts.append(f"target={self.target_player}")
         return f"Action({', '.join(parts)})"
+
+    def __eq__(self, other):
+        if not isinstance(other, Action):
+            return NotImplemented
+        return self.key() == other.key()
+
+    def __hash__(self):
+        return hash(self.key())

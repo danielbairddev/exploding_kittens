@@ -1,4 +1,5 @@
 import random
+from types import MappingProxyType
 
 from .discs import Disc, DiscType, build_starting_hand
 from .state import GameState, PlayerState, ObservableState, Phase
@@ -67,27 +68,50 @@ class SkullEngine:
         return event
 
     # -------------------------------------------------------------- observation
-    def _observable(self, state: GameState, for_player: int) -> ObservableState:
+    def _public_view(self, state: GameState) -> dict:
+        """The public ObservableState fields — identical for every player. Built
+        once per snapshot (a single pass over alive players) and shared by every
+        per-player view, instead of being recomputed for each bot."""
+        stack_sizes, disc_counts, bot_names, points, alive = {}, {}, {}, {}, []
+        total = 0
+        for p in state.players:
+            if not p.alive:
+                continue
+            pid = p.player_id
+            ns = len(p.stack)
+            stack_sizes[pid] = ns
+            disc_counts[pid] = len(p.hand) + ns
+            points[pid] = p.points
+            bot_names[pid] = getattr(self.agents[pid], "name", f"P{pid}")
+            alive.append(pid)
+            total += ns
+        # Read-only so the shared snapshot can't be mutated by one bot's observe
+        # and corrupt another's view of the same broadcast.
+        return {
+            "stack_sizes": MappingProxyType(stack_sizes),
+            "disc_counts": MappingProxyType(disc_counts),
+            "bot_names": MappingProxyType(bot_names),
+            "points": MappingProxyType(points),
+            "alive_players": tuple(alive),
+            "total_on_table": total,
+            "recent_events": tuple(self._public_events),
+        }
+
+    def _observable(self, state: GameState, for_player: int,
+                    pub: dict | None = None) -> ObservableState:
         me = state.players[for_player]
+        if pub is None:
+            pub = self._public_view(state)
         return ObservableState(
             my_id=for_player,
             phase=state.phase,
             my_hand=[d.disc_type for d in me.hand],
             my_stack=[d.disc_type for d in me.stack],
-            stack_sizes={p.player_id: len(p.stack) for p in state.alive_players},
-            disc_counts={p.player_id: p.disc_count for p in state.alive_players},
-            bot_names={
-                p.player_id: getattr(self.agents[p.player_id], "name", f"P{p.player_id}")
-                for p in state.alive_players
-            },
-            points={p.player_id: p.points for p in state.alive_players},
-            alive_players=[p.player_id for p in state.alive_players],
             current_bid=state.current_bid,
             highest_bidder=state.highest_bidder,
-            total_on_table=state.discs_on_table,
             current_player=state.current_player,
             round_starting_player=state.starting_player,
-            recent_events=list(self._public_events),
+            **pub,
         )
 
     # -------------------------------------------------------------------- setup
@@ -154,9 +178,11 @@ class SkullEngine:
         saved = state.current_player
         state.current_player = actor
         try:
+            pub = self._public_view(state)          # shared across all per-player views
             for pid in range(len(state.players)):
                 if state.players[pid].alive:
-                    self.agents[pid].observe(self._observable(state, pid), actor, public)
+                    self.agents[pid].observe(
+                        self._observable(state, pid, pub), actor, public)
         finally:
             state.current_player = saved
 
@@ -389,6 +415,7 @@ class SkullEngine:
 
     def _run(self, state: GameState) -> dict:
         winner = -1
+        win_reason = None        # "points" (flipped all flowers) | "elimination" (killed all) | "timeout"
         while state.round_number < MAX_ROUNDS:
             state.round_number += 1
             self._round = state.round_number
@@ -397,21 +424,24 @@ class SkullEngine:
                 break
             self._play_round(state)
 
-            # win by points
+            # win by points — survived enough safe challenges (flipping all flowers)
             for p in state.alive_players:
                 if p.points >= POINTS_TO_WIN:
                     winner = p.player_id
+                    win_reason = "points"
                     break
             if winner >= 0:
                 break
-            # win by being the last player with discs
+            # win by being the last player with discs (killing all opponents)
             if len(state.alive_players) == 1:
                 winner = state.alive_players[0].player_id
+                win_reason = "elimination"
                 break
 
         if winner < 0 and state.alive_players:        # MAX_ROUNDS hit: rank by points
             winner = max(state.alive_players,
                          key=lambda p: (p.points, p.disc_count)).player_id
+            win_reason = "timeout"
 
         self._log(f"\nGame over — {self._pname(winner)} wins after {state.round_number} rounds")
         self._event("game_over", winner=winner)
@@ -427,6 +457,7 @@ class SkullEngine:
         finish_order = [p.player_id for p in alive_sorted] + list(reversed(self._elim_order))
         result = {
             "winner": winner,
+            "win_reason": win_reason,
             "turns": state.round_number,
             "survivors": survivors,
             "elimination_order": list(self._elim_order),

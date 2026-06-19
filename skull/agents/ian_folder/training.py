@@ -2,6 +2,7 @@ import time
 import random
 from concurrent.futures import ProcessPoolExecutor, as_completed, Future
 
+from scripts.top_bots import get_top_bots
 from skull.agents.base import SkullAgent
 from skull.agents.dan import DanBot
 from skull.agents.ian1 import Ian1, Genes
@@ -39,11 +40,14 @@ class WinRate:
 class Simulator:
     def __init__(self):
         self.rng = random.Random(42)
+        self.top_bots = get_top_bots()
+        print(f"Top bots in the arena: {self.top_bots}")
+
     def main(self):
         agents = self.get_initial_agents()
         for generation in range(NUMBER_OF_GENERATIONS):
             print(f"-------GENERATION {generation}-------")
-            fitness_map = self.get_generation_fitness_against_one_agent(agents, base_line_agent_type=DanBot)
+            fitness_map = self.get_generation_fitness_against_representative_arena_sample(agents)
             sorted_fitness_map: list[tuple[Ian1, float]] = sorted(fitness_map.items(),
                                                                   key= lambda item: item[1], reverse=True)
             sampled_agents = sorted_fitness_map[:GENERATION_SAMPLE_SIZE]
@@ -57,14 +61,12 @@ class Simulator:
             for _ in range(PARAMETER_SIZE):
                 param = self.rng.randint(0, 100)
                 params.append(param)
-            print(f"params = {params}")
             gene: Genes = Genes(params, random.Random()).normalize()
-            print(f"gene = {gene}")
             agents.append(Ian1(secret_meta_value1=gene))
 
         return agents
 
-    def get_generation_fitness(self, agents: list[Ian1]) -> dict[Ian1, float]:
+    def get_generation_fitness_against_population(self, agents: list[Ian1]) -> dict[Ian1, float]:
         start_time = time.perf_counter()
         fitness_map = {}
         completed_tasks = 0
@@ -126,6 +128,48 @@ class Simulator:
         for agent in agents:
             win_rate_map[agent] = WinRate()
         return win_rate_map
+
+    def get_generation_fitness_against_representative_arena_sample(self, agents: list[Ian1]):
+        start_time = time.perf_counter()
+        fitness_map = {}
+        completed_tasks = 0
+        with ProcessPoolExecutor() as executor:
+            futures = {executor.submit(self.get_fitness_against_representative_arena_sample, agent): agent for agent
+                       in agents}
+            sum = 0
+            max_fitness = 0
+            best_agent = None
+
+            for future in as_completed(futures):
+                completed_tasks += 1
+                percent_complete = completed_tasks / len(agents) * 100
+                print(f"\rProgress: {percent_complete:.1f}% ({completed_tasks}/{len(agents)} completed)", end="")
+                agent = futures[future]
+                fitness = future.result()
+                fitness_map[agent] = fitness
+                sum += fitness
+                if fitness > max_fitness:
+                    max_fitness = fitness
+                    best_agent = agent
+            print(f"\nAverage fitness = {sum / POPULATION_SIZE}")
+            print(f"Max fitness = {max_fitness}")
+            print(f"Best agent = {best_agent.gene}")
+            print(f"Total time = {time.perf_counter() - start_time} seconds")
+            return fitness_map
+
+    def get_fitness_against_representative_arena_sample(self, agent: Ian1) -> float:
+        agents = [agent]
+        for top_bot_type in self.top_bots:
+            agents.append(top_bot_type())
+        engine = SkullEngine(agents)
+
+        wins = 0
+        for cycle in range(SIMULATIONS_TO_RUN):
+            result = engine.play_game(PLAYERS_COUNT)
+            if result.get("winner") == 0:
+                wins += 1
+        fitness = wins / SIMULATIONS_TO_RUN * 100
+        return fitness
 
     def get_generation_fitness_against_one_agent(self, agents: list[Ian1], base_line_agent_type: type[SkullAgent] = RandomSkullAgent) -> dict[Ian1, float]:
         start_time = time.perf_counter()
