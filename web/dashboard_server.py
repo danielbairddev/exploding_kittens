@@ -62,6 +62,7 @@ from skull.agents.dan import DanBot
 from skull.agents.dan2 import DanBot as Cruncher
 from skull.agents.tanner.stacks_agent import StacksBot
 from skull.agents.tanner.stacks_agent import SafeStackerBot
+from skull.agents.guido import Guido
 
 # --------------------------------------------------------------------------
 # Roster — the full pool of bot personalities. Each game randomly draws
@@ -101,7 +102,7 @@ ARENA_BOTS = [
 # by DEPLOY_ID), so bumping this is no longer needed for a global reset. It is
 # kept only as a per-bot escape hatch: an individual bot can set a higher
 # stats_version in its own ARENA dict to reset itself between deploys.
-GLOBAL_STATS_VERSION = 99
+GLOBAL_STATS_VERSION = 100
 
 ROSTER = [
     {"bot_id": i, "cls": cls, **cls.ARENA,
@@ -131,6 +132,7 @@ SKULL_BOTS = [
     SafeStackerBot,
     Cruncher,
     StacksBot,
+    Guido,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
 
@@ -173,7 +175,7 @@ SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v3.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 27   # +1: adds win-reason breakdown (flowers vs kills)
+LOSER_STATS_VERSION = 28   # +1: add Guido (Skull bot)
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
