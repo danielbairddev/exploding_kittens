@@ -285,6 +285,10 @@ SKULL_PAGE = r'''<!DOCTYPE html>
 
 <script>
 const $ = id => document.getElementById(id);
+// Global HTML-escape. The leaderboard renderers reference esc() when a bot is
+// disabled; without this it only existed inside makeReplay(), so a quarantined
+// bot threw ReferenceError and blanked the whole leaderboard.
+const esc = s => (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function fmtUptime(s){
   const h=Math.floor(s/3600), m=Math.floor(s%3600/60);
@@ -372,7 +376,6 @@ function makeReplay(cfg){
   });
   const sleep = ms => new Promise(r=>setTimeout(r, ms*SPEED));
   const nm = seat => table.seats[seat] ? `<b style="color:${table.seats[seat].color}">${table.seats[seat].name}</b>` : '?';
-  const esc = s => (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   function renderTable(highlightWinner=-1){
     E(cfg.players).innerHTML = table.seats.map((p,seat)=>{
