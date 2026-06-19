@@ -122,6 +122,8 @@ SKULL_PAGE = r'''<!DOCTYPE html>
   .lb-right { text-align:right; }
   .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
   .lb-wr { font-weight:700; font-size:1.0rem; color:#cbd5e1; font-variant-numeric:tabular-nums; line-height:1.2; margin-top:1px; }
+  .lb-split { font-size:0.6rem; font-weight:600; color:var(--muted); margin-top:2px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .lb-split .rose { color:var(--rose); } .lb-split .kill { color:var(--red); }
   .lb-unit{ font-size:0.56rem; color:var(--muted); font-weight:700; letter-spacing:0.05em; margin-left:3px; }
   .lb-prov{ font-size:0.6rem; color:var(--yellow); border:1px solid var(--yellow); border-radius:3px; padding:0 3px; margin-left:3px; vertical-align:middle; font-weight:700;}
   .lb-games{ font-size:0.64rem; color:var(--muted); text-align:right; margin-top:2px; }
@@ -217,7 +219,7 @@ SKULL_PAGE = r'''<!DOCTYPE html>
     <!-- LEADERBOARD -->
     <div class="card">
       <h2>Leaderboard</h2>
-      <div class="lb-sub">ranked by win rate · ELO once the roster has 4+ distinct bots</div>
+      <div class="lb-sub">ranked by win rate · split = share of this bot's wins: <span style="color:var(--rose)">🌹 flowers</span> (2 safe challenges) vs <span style="color:var(--red)">☠️ kills</span> (last bot standing)</div>
       <div id="leaderboard"></div>
     </div>
   </div>
@@ -323,6 +325,10 @@ function renderLeaderboard(rows){
     const gl = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
     const form = (b.recent||[]).slice(-12).map(w=>`<i class="${w?'w':''}"></i>`).join('');
     const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    // Split as a share of this bot's decisive wins, so flowers + kills = 100%.
+    const decisive = (b.wins_by_points||0) + (b.wins_by_elim||0);
+    const flowersPct = decisive ? (b.wins_by_points/decisive*100) : 0;
+    const killsPct   = decisive ? (b.wins_by_elim/decisive*100)   : 0;
     return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
@@ -334,6 +340,9 @@ function renderLeaderboard(rows){
       </div>
       <div class="lb-right">
         <div class="lb-elo" style="color:${b.color}">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN</span></div>
+        <div class="lb-split" title="share of this bot's wins by type: flipping all flowers (2 safe challenges) vs killing every opponent (last bot standing)">
+          ${decisive ? `<span class="rose">🌹 ${flowersPct.toFixed(0)}%</span> · <span class="kill">☠️ ${killsPct.toFixed(0)}%</span>` : '<span style="opacity:0.5">no wins yet</span>'}
+        </div>
         <div class="lb-wr">${b.elo}${prov}<span class="lb-unit">ELO · ${b.avg_place??'–'} PLACE</span></div>
         <div class="lb-games">${gl} games</div>
       </div>
@@ -533,6 +542,10 @@ function renderLoserLadder(){
       : `<div class="lb-elo" style="color:${b.color}">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN</span></div>
          <div class="lb-wr">${b.elo}<span class="lb-unit">LOSER ELO · ${b.avg_place??'–'} PLACE</span></div>`;
     const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    // Split as a share of this bot's losses, so flowers + kills = 100%.
+    const decisive = (b.wins_by_points||0) + (b.wins_by_elim||0);
+    const flowersPct = decisive ? (b.wins_by_points/decisive*100) : 0;
+    const killsPct   = decisive ? (b.wins_by_elim/decisive*100)   : 0;
     return `<div class="lb-row${b.disabled?' disabled':''}">
       <div class="lb-rank">${i+1}</div>
       <div class="lb-av">${b.emoji}</div>
@@ -541,7 +554,11 @@ function renderLoserLadder(){
         <div class="lb-blurb" title="${b.blurb}">${b.blurb}</div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
       </div>
-      <div class="lb-right">${big}<div class="lb-games">${gl} games</div></div>
+      <div class="lb-right">${big}
+        <div class="lb-split" title="share of this bot's losses by how the game was won: a rival flipping all flowers vs this bot being killed off / outlasted">
+          ${decisive ? `<span class="rose">🌹 ${flowersPct.toFixed(0)}%</span> · <span class="kill">☠️ ${killsPct.toFixed(0)}%</span>` : '<span style="opacity:0.5">—</span>'}
+        </div>
+        <div class="lb-games">${gl} games</div></div>
     </div>`;
   }).join('') || '<div class="lb-blurb">waiting for the first game…</div>';
 }

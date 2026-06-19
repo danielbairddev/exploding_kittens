@@ -389,6 +389,7 @@ class SkullEngine:
 
     def _run(self, state: GameState) -> dict:
         winner = -1
+        win_reason = None        # "points" (flipped all flowers) | "elimination" (killed all) | "timeout"
         while state.round_number < MAX_ROUNDS:
             state.round_number += 1
             self._round = state.round_number
@@ -397,21 +398,24 @@ class SkullEngine:
                 break
             self._play_round(state)
 
-            # win by points
+            # win by points — survived enough safe challenges (flipping all flowers)
             for p in state.alive_players:
                 if p.points >= POINTS_TO_WIN:
                     winner = p.player_id
+                    win_reason = "points"
                     break
             if winner >= 0:
                 break
-            # win by being the last player with discs
+            # win by being the last player with discs (killing all opponents)
             if len(state.alive_players) == 1:
                 winner = state.alive_players[0].player_id
+                win_reason = "elimination"
                 break
 
         if winner < 0 and state.alive_players:        # MAX_ROUNDS hit: rank by points
             winner = max(state.alive_players,
                          key=lambda p: (p.points, p.disc_count)).player_id
+            win_reason = "timeout"
 
         self._log(f"\nGame over — {self._pname(winner)} wins after {state.round_number} rounds")
         self._event("game_over", winner=winner)
@@ -427,6 +431,7 @@ class SkullEngine:
         finish_order = [p.player_id for p in alive_sorted] + list(reversed(self._elim_order))
         result = {
             "winner": winner,
+            "win_reason": win_reason,
             "turns": state.round_number,
             "survivors": survivors,
             "elimination_order": list(self._elim_order),

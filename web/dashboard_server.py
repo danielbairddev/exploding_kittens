@@ -130,6 +130,7 @@ SKULL_BOTS = [
     #StackerBot,
     SafeStackerBot,
     Cruncher,
+    #Cruncher,
     StacksBot,
 ]
 SKULL_PLAYERS_PER_GAME = 4          # Skull seats 3-6; 4 randoms fill the table
@@ -168,11 +169,12 @@ SNAPSHOT_PATH = "dashboard_state_v12.json"
 LOSER_SNAPSHOT_PATH = "loser_state_v3.json"
 # Bump the version suffix to reset Skull stats when the roster or rules change.
 # v2: standard Skull rules + random-only baseline roster.
-SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v2.json"
+# v3: adds per-bot win-reason breakdown (flowers vs elimination).
+SKULLS_SNAPSHOT_PATH = "skulls_dashboard_state_v3.json"
 SKULLS_LOSER_SNAPSHOT_PATH = "skulls_loser_state_v2.json"
 WINRATE_HISTORY_PATH = "winrate_history.tsv"
 LOSER_WINRATE_HISTORY_PATH = "loser_winrate_history.tsv"
-LOSER_STATS_VERSION = 26
+LOSER_STATS_VERSION = 27   # +1: adds win-reason breakdown (flowers vs kills)
 REPLAY_BUFFER_MAX = 40           # detailed games kept for replay
 RECENT_RESULTS_MAX = 14          # entries in the results feed
 SPARKLINE_MAX = 30               # recent W/L tracked per bot
@@ -212,6 +214,10 @@ class Arena:
         self.bots = {
             b["bot_id"]: {
                 "wins": 0, "games": 0,
+                # Skull-only breakdown of how wins were earned: "points" =
+                # flipped all the flowers (2 safe challenges), "elim" = killed
+                # every opponent (last bot standing). Stay 0 for other games.
+                "wins_by_points": 0, "wins_by_elim": 0,
                 "recent": deque(maxlen=SPARKLINE_MAX),  # 1 win / 0 loss
                 "streak": 0, "best_streak": 0,
                 "deaths": 0, "first_outs": 0,
@@ -342,6 +348,13 @@ class Arena:
                 bd["recent"].append(1 if won else 0)
                 if won:
                     bd["wins"] += 1
+                    # Split the win by how it was earned (Skull only; other
+                    # games omit win_reason, leaving both buckets untouched).
+                    win_reason = result.get("win_reason")
+                    if win_reason == "points":
+                        bd["wins_by_points"] += 1
+                    elif win_reason == "elimination":
+                        bd["wins_by_elim"] += 1
                     bd["streak"] += 1
                     bd["best_streak"] = max(bd["best_streak"], bd["streak"])
                 else:
@@ -439,6 +452,12 @@ class Arena:
                     "avg_place": round(bd["place_sum"] / bd["place_games"], 3) if bd["place_games"] else None,
                     "wins": bd["wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
+                    # Share of all games won each way (sum to win_rate, minus
+                    # the rare timeout win). Skull only; 0 elsewhere.
+                    "wins_by_points": bd["wins_by_points"],
+                    "wins_by_elim": bd["wins_by_elim"],
+                    "win_rate_points": round(bd["wins_by_points"] / games, 4) if games else 0.0,
+                    "win_rate_elim": round(bd["wins_by_elim"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
                     "first_outs": bd["first_outs"],
@@ -532,6 +551,8 @@ class Arena:
                         reset_bids.add(bid)
                         continue
                     self.bots[bid]["wins"] = bd.get("wins", 0)
+                    self.bots[bid]["wins_by_points"] = bd.get("wins_by_points", 0)
+                    self.bots[bid]["wins_by_elim"] = bd.get("wins_by_elim", 0)
                     self.bots[bid]["games"] = bd.get("games", 0)
                     self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
                     self.bots[bid]["deaths"] = bd.get("deaths", 0)
@@ -565,6 +586,8 @@ class Arena:
                 "pairwise": dict(self.pairwise),
                 "bots": {str(b["bot_id"]): {
                     "wins": self.bots[b["bot_id"]]["wins"],
+                    "wins_by_points": self.bots[b["bot_id"]]["wins_by_points"],
+                    "wins_by_elim": self.bots[b["bot_id"]]["wins_by_elim"],
                     "games": self.bots[b["bot_id"]]["games"],
                     "best_streak": self.bots[b["bot_id"]]["best_streak"],
                     "deaths": self.bots[b["bot_id"]]["deaths"],
@@ -613,6 +636,10 @@ class LoserArena:
             b["bot_id"]: {
                 "wins": 0,       # first-to-explode count
                 "no_wins": 0,    # games where bot was NOT last survivor
+                # How the games this bot lost were won by someone else (Skull
+                # only): "points" = a rival flipped all flowers, "elim" = this
+                # bot was killed off / outlasted. Stay 0 for other games.
+                "wins_by_points": 0, "wins_by_elim": 0,
                 "games": 0,
                 "recent": deque(maxlen=SPARKLINE_MAX),
                 "streak": 0, "best_streak": 0,
@@ -679,6 +706,13 @@ class LoserArena:
                 bd["recent"].append(1 if won else 0)
                 if won:
                     bd["wins"] += 1
+                    # Split this loser-win by how the actual game was won
+                    # (Skull only; other games omit win_reason).
+                    win_reason = result.get("win_reason")
+                    if win_reason == "points":
+                        bd["wins_by_points"] += 1
+                    elif win_reason == "elimination":
+                        bd["wins_by_elim"] += 1
                     bd["streak"] += 1
                     bd["best_streak"] = max(bd["best_streak"], bd["streak"])
                 else:
@@ -745,6 +779,11 @@ class LoserArena:
                     "wins": bd["wins"], "no_wins": bd["no_wins"], "games": games,
                     "win_rate": round(bd["wins"] / games, 4) if games else 0.0,
                     "no_win_rate": round(bd["no_wins"] / games, 4) if games else 0.0,
+                    # How this bot's losses broke down (Skull only; 0 elsewhere).
+                    "wins_by_points": bd["wins_by_points"],
+                    "wins_by_elim": bd["wins_by_elim"],
+                    "win_rate_points": round(bd["wins_by_points"] / games, 4) if games else 0.0,
+                    "win_rate_elim": round(bd["wins_by_elim"] / games, 4) if games else 0.0,
                     "recent": list(bd["recent"]),
                     "streak": bd["streak"], "best_streak": bd["best_streak"],
                     "disabled": b["bot_id"] in self.disabled,
@@ -805,6 +844,8 @@ class LoserArena:
                         continue
                     self.bots[bid]["wins"] = bd.get("wins", 0)
                     self.bots[bid]["no_wins"] = bd.get("no_wins", 0)
+                    self.bots[bid]["wins_by_points"] = bd.get("wins_by_points", 0)
+                    self.bots[bid]["wins_by_elim"] = bd.get("wins_by_elim", 0)
                     self.bots[bid]["games"] = bd.get("games", 0)
                     self.bots[bid]["best_streak"] = bd.get("best_streak", 0)
                     self.bots[bid]["place_sum"] = bd.get("place_sum", 0)
@@ -833,6 +874,8 @@ class LoserArena:
                 "bots": {str(b["bot_id"]): {
                     "wins": self.bots[b["bot_id"]]["wins"],
                     "no_wins": self.bots[b["bot_id"]]["no_wins"],
+                    "wins_by_points": self.bots[b["bot_id"]]["wins_by_points"],
+                    "wins_by_elim": self.bots[b["bot_id"]]["wins_by_elim"],
                     "games": self.bots[b["bot_id"]]["games"],
                     "best_streak": self.bots[b["bot_id"]]["best_streak"],
                     "place_sum": self.bots[b["bot_id"]]["place_sum"],
