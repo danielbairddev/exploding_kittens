@@ -122,6 +122,8 @@ SKULL_PAGE = r'''<!DOCTYPE html>
   .lb-right { text-align:right; }
   .lb-elo { font-weight:800; font-size:1.25rem; font-variant-numeric:tabular-nums; line-height:1.15; }
   .lb-wr { font-weight:700; font-size:1.0rem; color:#cbd5e1; font-variant-numeric:tabular-nums; line-height:1.2; margin-top:1px; }
+  .lb-split { font-size:0.6rem; font-weight:600; color:var(--muted); margin-top:2px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .lb-split .rose { color:var(--rose); } .lb-split .kill { color:var(--red); }
   .lb-unit{ font-size:0.56rem; color:var(--muted); font-weight:700; letter-spacing:0.05em; margin-left:3px; }
   .lb-prov{ font-size:0.6rem; color:var(--yellow); border:1px solid var(--yellow); border-radius:3px; padding:0 3px; margin-left:3px; vertical-align:middle; font-weight:700;}
   .lb-games{ font-size:0.64rem; color:var(--muted); text-align:right; margin-top:2px; }
@@ -217,7 +219,7 @@ SKULL_PAGE = r'''<!DOCTYPE html>
     <!-- LEADERBOARD -->
     <div class="card">
       <h2>Leaderboard</h2>
-      <div class="lb-sub">ranked by win rate · ELO once the roster has 4+ distinct bots</div>
+      <div class="lb-sub">ranked by win rate · <span style="color:var(--rose)">🌹 flowers</span> = won by 2 safe challenges · <span style="color:var(--red)">☠️ kills</span> = won as last bot standing</div>
       <div id="leaderboard"></div>
     </div>
   </div>
@@ -334,6 +336,9 @@ function renderLeaderboard(rows){
       </div>
       <div class="lb-right">
         <div class="lb-elo" style="color:${b.color}">${(b.win_rate*100).toFixed(1)}<span class="lb-unit">% WIN</span></div>
+        <div class="lb-split" title="how this bot's wins were earned: flipping all flowers (2 safe challenges) vs killing every opponent (last bot standing)">
+          <span class="rose">🌹 ${((b.win_rate_points||0)*100).toFixed(1)}%</span> · <span class="kill">☠️ ${((b.win_rate_elim||0)*100).toFixed(1)}%</span>
+        </div>
         <div class="lb-wr">${b.elo}${prov}<span class="lb-unit">ELO · ${b.avg_place??'–'} PLACE</span></div>
         <div class="lb-games">${gl} games</div>
       </div>
@@ -541,7 +546,11 @@ function renderLoserLadder(){
         <div class="lb-blurb" title="${b.blurb}">${b.blurb}</div>
         <div class="lb-bar"><i style="width:${barOf(b).toFixed(1)}%;background:${b.color}"></i></div>
       </div>
-      <div class="lb-right">${big}<div class="lb-games">${gl} games</div></div>
+      <div class="lb-right">${big}
+        <div class="lb-split" title="how the games this bot lost were won: a rival flipping all flowers vs this bot being killed off / outlasted">
+          <span class="rose">🌹 ${((b.win_rate_points||0)*100).toFixed(1)}%</span> · <span class="kill">☠️ ${((b.win_rate_elim||0)*100).toFixed(1)}%</span>
+        </div>
+        <div class="lb-games">${gl} games</div></div>
     </div>`;
   }).join('') || '<div class="lb-blurb">waiting for the first game…</div>';
 }
