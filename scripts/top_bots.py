@@ -14,7 +14,7 @@ Usage:
 
 Importable too:
     from scripts.top_bots import get_top_bots
-    top3 = get_top_bots(n_games=1000)          # list of dicts, best first
+    top3 = get_top_bots(n_games=1000)          # list of bot types, best first
 """
 import argparse
 import contextlib
@@ -61,6 +61,7 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
     per game it appears in and credited at most one win, matching the arena.
     """
     roster = roster if roster is not None else SKULL_BOTS
+    cls_by_name = {_bot_name(b): b for b in roster}
     rng = random.Random(seed)
     wins = defaultdict(int)
     games = defaultdict(int)
@@ -92,6 +93,7 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
         w = wins.get(name, 0)
         pg = place_games.get(name, 0)
         table.append({
+            "cls": cls_by_name.get(name),
             "name": name,
             "wins": w,
             "games": g,
@@ -103,8 +105,9 @@ def run_tournament(n_games=DEFAULT_GAMES, roster=None,
 
 
 def get_top_bots(n_games=DEFAULT_GAMES, top=DEFAULT_TOP, **kwargs):
-    """The ``top`` strongest bots by win rate over ``n_games`` games."""
-    return run_tournament(n_games=n_games, **kwargs)[:top]
+    """The ``top`` strongest bot types by win rate over ``n_games`` games,
+    sorted best first."""
+    return [row["cls"] for row in run_tournament(n_games=n_games, **kwargs)[:top]]
 
 
 def main():
