@@ -27,19 +27,21 @@ class DanBot(SkullAgent):
     def analyze_full_game(self, gamelog: list[Event]):
         for event in gamelog:
             if isinstance(event, PlaceEvent):
-                print(event)
+                pass
+                #print(event)
 
     def return_normal_action(self, action, valid_actions):
         self.last_action_say_say = False
         if action is RANDOM_ACTION:
             random_action = self.rng.choice(valid_actions)
-            print("Intended Random. ", random_action)
+            #print("Intended Random. ", random_action)
             return random_action
         if action.action_type == ActionType.SAY:
             raise Exception(f"Attempting to say a non-say action {action!r}")
         if action not in valid_actions:
-            print("Invalid action ", valid_actions, action)
-        print(action)
+            pass
+            #print("Invalid action ", valid_actions, action)
+        #print(action)
         return action
 
     def has_bomb(self, discs: list[DiscType]):
@@ -99,11 +101,12 @@ class DanBot(SkullAgent):
         elif state.phase == Phase.REVEAL:
             return self.return_normal_action(self.handle_reveal(state), valid_actions)
 
-        print("Missing handling for ", state.phase)
+        #print("Missing handling for ", state.phase)
         return self.return_normal_action(self.rng.choice(valid_actions), valid_actions)
 
     def game_over(self, state: ObservableState, won: bool) -> Action | None:
         return Action.say("Yehaw") if won else None
 
     def observe(self, state: ObservableState, player: int, action: Action) -> None:
-        print("!! ", action)
+        pass
+        #print("!! ", action)
