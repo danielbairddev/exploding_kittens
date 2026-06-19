@@ -70,6 +70,8 @@ class StacksBot(SkullAgent):
             safety_stacker_bonus = state.stack_sizes[SafetyStackerID] if SafetyStackerID != None else 0
 
             base_bid = len(state.my_stack) + safety_stacker_bonus
+            if base_bid >= state.total_on_table:   # can't bid this high safely -> pass
+                return Action(action_type=ActionType.PASS)
             aggressiveness = self.rng.choice(range(state.total_on_table - base_bid))
             shouldBid = base_bid + aggressiveness < state.total_on_table
             return bid(base_bid + aggressiveness) if shouldBid else Action(action_type=ActionType.PASS)
