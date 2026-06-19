@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Find the strongest Skull bots by head-to-head win rate.
+"""Find the strongest Skull bots — using the real arena's own code.
 
-Runs a tournament of random lineups drawn from the live Skull roster
-(``SKULL_BOTS``), tallies per-bot win rate + average finishing place, and
-reports the top bots. Mirrors how the arena actually seats games (4 distinct
-bots per game, random seat order) so the ranking matches the dashboard.
+This drives the same `Arena` the live dashboard uses: the same matchmaking
+(`rated_lineup` — top bots by average place + a rotating challenger), the same
+per-bot accounting (`record_game`), and the same leaderboard (`stats_payload`).
+Running here vs. on the server differs only in how many games have accumulated,
+so the rankings can't contradict each other by construction.
 
 Usage:
     python scripts/top_bots.py                 # 1000 games (default)
-    python scripts/top_bots.py --games 5000    # more games, less noise
-    python scripts/top_bots.py --games 200     # quick, noisier
+    python scripts/top_bots.py --games 20000   # more games, closer to the live board
     python scripts/top_bots.py --top 5         # show the top 5 instead of 3
 
 Importable too:
@@ -22,121 +22,78 @@ import io
 import os
 import random
 import sys
-from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from web.dashboard_server import (
-    SKULL_BOTS, SKULL_PLAYERS_PER_GAME, _GuardedAgent, BotCrash,
+    Arena, SKULL_ROSTER, SKULL_BOTS, SKULL_PLAYERS_PER_GAME,
+    _GuardedAgent, BotCrash,
 )
 from skull.engine import SkullEngine
 
 DEFAULT_GAMES = 1000
 DEFAULT_TOP = 3
 
-
-def _bot_name(cls) -> str:
-    """Display name from the bot's ARENA metadata (falls back to the class name)."""
-    arena = getattr(cls, "ARENA", {})
-    return arena.get("name", getattr(cls, "__name__", repr(cls)))
+# A snapshot path that never exists, so the scratch Arena starts empty and is
+# never persisted (we never call save_snapshot) — the live stats are untouched.
+_SCRATCH_SNAPSHOT = "top_bots_scratch_DO_NOT_PERSIST.json"
 
 
-def _draw_lineup(rng, roster, players_per_game):
-    """A random lineup of distinct bots, randomly seated — same scheme the arena
-    uses (distinct agents first; repeat only if the roster is smaller than the
-    ring)."""
-    lineup, bag = [], []
-    while len(lineup) < players_per_game:
-        if not bag:                       # refill once we run out of distinct bots
-            bag = list(roster)
-            rng.shuffle(bag)
-        lineup.append(bag.pop())
-    rng.shuffle(lineup)                    # randomize seat order
-    return lineup
+def run_tournament(n_games=DEFAULT_GAMES, players_per_game=SKULL_PLAYERS_PER_GAME,
+                   seed=None):
+    """Play ``n_games`` Skull games through a fresh arena and return its
+    leaderboard (list of stats rows), sorted by win rate then ELO — exactly how
+    the live dashboard ranks the board.
 
-
-def run_tournament(n_games=DEFAULT_GAMES, roster=None,
-                   players_per_game=SKULL_PLAYERS_PER_GAME, seed=None):
-    """Play ``n_games`` Skull games and return a leaderboard (best first).
-
-    Each row: {name, wins, games, win_rate, avg_place}. A bot is counted once
-    per game it appears in and credited at most one win, matching the arena.
+    A bot that crashes mid-game is benched for the rest of the run, mirroring the
+    arena's quarantine. Returns the same row dicts as ``Arena.stats_payload``.
     """
-    roster = list(roster if roster is not None else SKULL_BOTS)
-    cls_by_name = {_bot_name(b): b for b in roster}
     rng = random.Random(seed)
-    wins = defaultdict(int)
-    games = defaultdict(int)
-    place_sum = defaultdict(int)
-    place_games = defaultdict(int)
+    failures = 0
 
-    disabled = set()      # names of bots that threw mid-game — benched, like the arena
-    failures = 0          # games dropped because a bot crashed
-
-    # Some bots print on every move; swallow it so only the leaderboard shows.
+    # Construction + simulation are stdout-silenced: the Arena logs on load and
+    # some bots print on every move; only the leaderboard should reach the user.
     with contextlib.redirect_stdout(io.StringIO()):
+        arena = Arena(_SCRATCH_SNAPSHOT, roster=SKULL_ROSTER,
+                      players_per_game=players_per_game)
         for _ in range(n_games):
-            active = [b for b in roster if _bot_name(b) not in disabled]
-            if len(active) < 2:           # not enough working bots left to play
+            seats = arena.rated_lineup(rng)          # same matchmaking as the server
+            if not seats:                            # every bot quarantined
                 break
-            lineup = _draw_lineup(rng, active, players_per_game)
-            # Wrap each seat so a crash is attributed to its bot instead of
-            # killing the whole tournament (mirrors the live arena).
-            agents = [_GuardedAgent(b(name=_bot_name(b)), i)
-                      for i, b in enumerate(lineup)]
+            seat_agents = [_GuardedAgent(b["cls"](name=b["name"]), i)
+                           for i, b in enumerate(seats)]
             try:
-                result = SkullEngine(agents).play_game(len(agents))
+                result = SkullEngine(seat_agents, collect_events=True).play_game(len(seats))
             except BotCrash as crash:
-                disabled.add(_bot_name(lineup[crash.seat]))
+                arena.disable_bot(seats[crash.seat]["bot_id"], repr(crash.original))
                 failures += 1
                 continue
-            except Exception:             # unattributable engine error — skip the game
+            except Exception:                        # unattributable engine error
                 failures += 1
                 continue
+            arena.record_game(seats, result, result["events"])
 
-            winner = result["winner"]
-            winner_name = _bot_name(lineup[winner]) if winner >= 0 else None
-            for name in {_bot_name(b) for b in lineup}:
-                games[name] += 1
-            if winner_name is not None:
-                wins[winner_name] += 1
-
-            # Average finishing place (1 = best), when the engine reports order.
-            for place, seat in enumerate(result.get("finish_order", [])):
-                name = _bot_name(lineup[seat])
-                place_sum[name] += place + 1
-                place_games[name] += 1
+    leaderboard = arena.stats_payload()["leaderboard"]
+    leaderboard.sort(key=lambda r: (r["win_rate"], r["elo"]), reverse=True)
 
     if failures:
+        benched = sorted(arena.roster[bid]["name"] for bid in arena.disabled)
         msg = f"[top_bots] skipped {failures} game(s) due to bot crashes"
-        if disabled:
-            msg += "; benched: " + ", ".join(sorted(disabled))
+        if benched:
+            msg += "; benched: " + ", ".join(benched)
         print(msg, file=sys.stderr)
-
-    table = []
-    for name, g in games.items():
-        w = wins.get(name, 0)
-        pg = place_games.get(name, 0)
-        table.append({
-            "cls": cls_by_name.get(name),
-            "name": name,
-            "wins": w,
-            "games": g,
-            "win_rate": w / g if g else 0.0,
-            "avg_place": (place_sum[name] / pg) if pg else None,
-        })
-    table.sort(key=lambda r: r["win_rate"], reverse=True)
-    return table
+    return leaderboard
 
 
 def get_top_bots(n_games=DEFAULT_GAMES, top=DEFAULT_TOP, **kwargs):
     """The ``top`` strongest bot types by win rate over ``n_games`` games,
     sorted best first."""
-    return [row["cls"] for row in run_tournament(n_games=n_games, **kwargs)[:top]]
+    cls_by_id = {b["bot_id"]: b["cls"] for b in SKULL_ROSTER}
+    return [cls_by_id[row["bot_id"]] for row in run_tournament(n_games=n_games, **kwargs)[:top]]
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Rank Skull bots by win rate.")
+    ap = argparse.ArgumentParser(description="Rank Skull bots by win rate (live-arena code).")
     ap.add_argument("--games", type=int, default=DEFAULT_GAMES,
                     help=f"number of games to simulate (default {DEFAULT_GAMES})")
     ap.add_argument("--top", type=int, default=DEFAULT_TOP,
