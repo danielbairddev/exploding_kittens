@@ -14,7 +14,7 @@ class Guido(SkullAgent):
     the part of the bid it can prove and risks only a little on top.
     """
 
-    ARENA = {"name": "Guido", "emoji": "\U0001F40D", "color": "#3776ab",
+    ARENA = {"name": "Guido", "emoji": "\U0001F431", "color": "#3776ab",
              "blurb": "Bids on what it can prove, gambles only on the margin.",
              "author": "kirsten"}
 
