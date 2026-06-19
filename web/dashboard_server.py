@@ -1028,8 +1028,8 @@ class ServerBackGroundThreadExecutor:
                 self._quarantine(seats, crash)
                 continue
             self.arena.record_game(seats, result, result["events"])
-            if GAME_SLEEP:
-                time.sleep(GAME_SLEEP)
+            if self.game_sleep:
+                time.sleep(self.game_sleep)
 
 
     def rate_loop(self):
@@ -1117,8 +1117,8 @@ class ServerBackGroundThreadExecutor:
                 self._quarantine(seats, crash)
                 continue
             self.loser_arena.record_game(seats, result, result["events"])
-            if GAME_SLEEP:
-                time.sleep(GAME_SLEEP)
+            if self.game_sleep:
+                time.sleep(self.game_sleep)
 
 
     def loser_snapshot_loop(self):
@@ -1331,14 +1331,14 @@ def main():
             SKULL_PLAYERS_PER_GAME,
             Arena(SKULLS_SNAPSHOT_PATH, roster=SKULL_ROSTER,
                   players_per_game=SKULL_PLAYERS_PER_GAME),
-            SKULL_BOTS, GAME_SLEEP,
+            SKULL_BOTS, 0,                          # skulls: no delay between games
             LoserArena(SKULLS_LOSER_SNAPSHOT_PATH, roster=SKULL_ROSTER,
                        players_per_game=SKULL_PLAYERS_PER_GAME),
             log_prefix="skulls_", engine_cls=SkullEngine,
         )
     else:
         sever_background_thread_executor = ServerBackGroundThreadExecutor(
-            EK_PLAYERS_PER_GAME, ARENA, ARENA_BOTS, GAME_SLEEP, LOSER_ARENA
+            EK_PLAYERS_PER_GAME, ARENA, ARENA_BOTS, 5.0, LOSER_ARENA  # EK: 5s per game
         )
 
     sever_background_thread_executor.dashboard_page = SKULL_PAGE if game == "skulls" else PAGE
