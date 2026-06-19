@@ -47,7 +47,7 @@ class Simulator:
         agents = self.get_initial_agents()
         for generation in range(NUMBER_OF_GENERATIONS):
             print(f"-------GENERATION {generation}-------")
-            fitness_map = self.get_generation_fitness_against_one_agent(agents, base_line_agent_type=DanBot)
+            fitness_map = self.get_generation_fitness_against_representative_arena_sample(agents)
             sorted_fitness_map: list[tuple[Ian1, float]] = sorted(fitness_map.items(),
                                                                   key= lambda item: item[1], reverse=True)
             sampled_agents = sorted_fitness_map[:GENERATION_SAMPLE_SIZE]
@@ -158,7 +158,9 @@ class Simulator:
             return fitness_map
 
     def get_fitness_against_representative_arena_sample(self, agent: Ian1) -> float:
-        agents = [agent, *self.top_bots]
+        agents = [agent]
+        for top_bot_type in self.top_bots:
+            agents.append(top_bot_type())
         engine = SkullEngine(agents)
 
         wins = 0
