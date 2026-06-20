@@ -26,6 +26,15 @@ class SafeStackerBot(SkullAgent):
             return self.rng.choice(valid_actions)
         if action.action_type == ActionType.SAY:
             raise Exception(f"Attempting to say a non-say action {action!r}")
+        # Hey Tanner, I added this default move so your bot doesn't crash. Do fix.
+        # handle_bidding can return an illegal bid (it bids len(my_stack) without
+        # checking it beats the current bid), which the arena now disables bots
+        # for. Until that's fixed, fall back to PASS / any legal move.
+        if action not in valid_actions:
+            for fallback in valid_actions:
+                if fallback.action_type == ActionType.PASS:
+                    return fallback
+            return self.rng.choice(valid_actions)
         return action
 
     def has_bomb(self, discs: list[DiscType]):
