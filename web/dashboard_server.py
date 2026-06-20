@@ -54,7 +54,7 @@ from agents.kaushal_player_1 import KaushalPlayer1
 from game.engine import GameEngine
 
 # Skull — the second game, served on the alternate port (6767).
-from skull.engine import SkullEngine
+from skull.engine import SkullEngine, ChatLoopError, InvalidMoveError
 from skull.agents.random_agent import RandomSkullAgent
 from skull.agents.ian_losing_agent import IanLosingAgent
 from skull.agents.ian1 import Ian1
@@ -999,11 +999,15 @@ class ServerBackGroundThreadExecutor:
         return lineup
 
 
-    def _quarantine(self, seats, crash: "BotCrash"):
+    def _quarantine(self, seats, crash, reason: str | None = None):
         """Cross a crashed bot off every ladder so one buggy bot can't stall the
-        arena. Disables in both the main and loser arenas (they share a roster)."""
+        arena. Disables in both the main and loser arenas (they share a roster).
+
+        ``reason`` defaults to the repr of the original exception; pass it
+        explicitly for non-exception crashes (e.g. an infinite chat loop)."""
         bot = seats[crash.seat]
-        reason = repr(crash.original)
+        if reason is None:
+            reason = repr(crash.original)
         self.arena.disable_bot(bot["bot_id"], reason)
         self.loser_arena.disable_bot(bot["bot_id"], reason)
         print(f"[arena{(' ' + self.log_prefix) if self.log_prefix else ''}] "
@@ -1028,6 +1032,12 @@ class ServerBackGroundThreadExecutor:
                 result = engine.play_game(len(seats))
             except BotCrash as crash:
                 self._quarantine(seats, crash)
+                continue
+            except ChatLoopError as crash:
+                self._quarantine(seats, crash, reason="Infinite chat loop")
+                continue
+            except InvalidMoveError as crash:
+                self._quarantine(seats, crash, reason="Invalid move")
                 continue
             self.arena.record_game(seats, result, result["events"])
             if self.game_sleep:
@@ -1117,6 +1127,12 @@ class ServerBackGroundThreadExecutor:
                 result = engine.play_game(len(seats))
             except BotCrash as crash:
                 self._quarantine(seats, crash)
+                continue
+            except ChatLoopError as crash:
+                self._quarantine(seats, crash, reason="Infinite chat loop")
+                continue
+            except InvalidMoveError as crash:
+                self._quarantine(seats, crash, reason="Invalid move")
                 continue
             self.loser_arena.record_game(seats, result, result["events"])
             if self.game_sleep:

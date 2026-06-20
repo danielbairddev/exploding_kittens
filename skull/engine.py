@@ -12,8 +12,29 @@ from .events import (
 
 POINTS_TO_WIN = 2          # two successful challenges wins the game
 MAX_ROUNDS = 300           # safety valve against a pathological game never ending
-MAX_CHAT_PER_TURN = 1      # chat messages a bot may post per decision point
+MAX_CHAT_PER_TURN = 10     # chat messages a bot may post per decision point
 MAX_CHAT_LEN = 200         # chat messages are truncated to this many characters
+
+
+class ChatLoopError(Exception):
+    """Raised when a seat emits more than ``MAX_CHAT_PER_TURN`` chat messages in a
+    row at a single decision point without ever returning a real move — i.e. it is
+    stuck in an infinite chat loop. The arena treats this exactly like a crash and
+    crosses the offending bot out (see web/dashboard_server.py)."""
+
+    def __init__(self, seat: int):
+        self.seat = seat
+        super().__init__("Infinite chat loop")
+
+
+class InvalidMoveError(Exception):
+    """Raised when a seat returns a move that isn't one of the legal actions it was
+    offered (or ``None``), violating the ``choose_action`` contract. The arena
+    treats this exactly like a crash and crosses the offending bot out."""
+
+    def __init__(self, seat: int):
+        self.seat = seat
+        super().__init__("Invalid move")
 
 
 class SkullEngine:
@@ -149,13 +170,17 @@ class SkullEngine:
             obs = self._observable(state, pid)
             action = self.agents[pid].choose_action(obs, valid)
             if action is not None and action.action_type == ActionType.SAY:
-                if chats < MAX_CHAT_PER_TURN and action.message:
-                    self._say(pid, action.message)
-                    chats += 1
-                    continue
-                return valid[0]   # out of chat budget (or empty) -> just play
+                if chats >= MAX_CHAT_PER_TURN:
+                    # Said its fill and still won't make a move -> infinite chat
+                    # loop. Treat it as a crash and let the arena cross it out.
+                    raise ChatLoopError(pid)
+                self._say(pid, action.message)   # empty message -> empty bubble
+                chats += 1
+                continue
             if action is None or action.key() not in keys:
-                return valid[0]   # default to the first legal action
+                # Bot returned nothing or an illegal move -> treat it as a crash
+                # and let the arena cross it out.
+                raise InvalidMoveError(pid)
             return action
 
     @staticmethod
@@ -197,7 +222,7 @@ class SkullEngine:
                 self._say(pid, action.message)
 
     def _say(self, pid: int, message: str) -> None:
-        text = str(message)[:MAX_CHAT_LEN]
+        text = ("" if message is None else str(message))[:MAX_CHAT_LEN]
         self._log(f"  {self._pname(pid)} says: {text}")
         self._event("chat", player=pid, message=text)
         self._emit(ChatEvent(player=pid, message=text))
@@ -292,7 +317,9 @@ class SkullEngine:
 
     def _open_bid(self, state: GameState, pid: int, amount: int) -> None:
         total = state.discs_on_table
-        amount = max(1, min(amount, total))
+        if amount is None or amount < 1 or amount > total:
+            # Opening bid out of the legal [1, total] range -> disable the bot.
+            raise InvalidMoveError(pid)
         state.current_bid = amount
         state.highest_bidder = pid
         state.phase = Phase.BIDDING
@@ -376,7 +403,8 @@ class SkullEngine:
         for disc in cp.hand:
             if disc.disc_type == action.disc_type:
                 return disc
-        return self.rng.choice(cp.hand)
+        # Picked a disc type it doesn't hold -> disable the bot.
+        raise InvalidMoveError(challenger)
 
     def _fail(self, state: GameState, challenger: int, own_skull: bool = False) -> None:
         cp = state.players[challenger]
