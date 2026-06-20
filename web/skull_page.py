@@ -111,6 +111,8 @@ SKULL_PAGE = r'''<!DOCTYPE html>
   .lb-crashed { display:inline-block; margin-left:0.35rem; padding:0 0.3rem; border-radius:4px;
     background:#7f1d1d; color:#fecaca; font-size:0.6rem; font-weight:700; vertical-align:middle;
     text-decoration:none; letter-spacing:0.03em; }
+  .lb-crashed.lb-invalid { background:#78350f; color:#fed7aa; }   /* illegal move */
+  .lb-crashed.lb-chatloop { background:#374151; color:#e5e7eb; }  /* infinite chat loop */
   .lb-rank { font-size:0.8rem; color:var(--muted); width:18px; text-align:center; font-weight:700;}
   .lb-av { font-size:1.4rem; }
   .lb-main { flex:1; min-width:0; }
@@ -291,6 +293,18 @@ const $ = id => document.getElementById(id);
 // bot threw ReferenceError and blanked the whole leaderboard.
 const esc = s => (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+// A disabled bot's badge. Rule violations we enforce (an illegal move, an
+// infinite chat loop) read as their own label/colour rather than the alarming
+// red CRASHED reserved for an actual unhandled exception.
+function disabledBadge(b){
+  if(!b.disabled) return '';
+  const reason = b.disabled_reason || 'crashed during a game';
+  let label = 'CRASHED', cls = 'lb-crashed';
+  if(reason === 'Invalid move'){ label = 'INVALID MOVE'; cls = 'lb-crashed lb-invalid'; }
+  else if(reason === 'Infinite chat loop'){ label = 'CHAT LOOP'; cls = 'lb-crashed lb-chatloop'; }
+  return `<span class="${cls}" title="${esc(reason)}">${label}</span>`;
+}
+
 function fmtUptime(s){
   const h=Math.floor(s/3600), m=Math.floor(s%3600/60);
   if(h>0) return `${h}h ${m}m`;
@@ -329,7 +343,7 @@ function renderLeaderboard(rows){
     const prov = b.provisional ? `<span class="lb-prov" title="provisional (<10 rated games)">?</span>` : '';
     const gl = b.games >= 1000 ? `${(b.games/1000).toFixed(1)}k` : `${b.games}`;
     const form = (b.recent||[]).slice(-12).map(w=>`<i class="${w?'w':''}"></i>`).join('');
-    const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    const crashed = disabledBadge(b);
     // Split as a share of this bot's decisive wins, so flowers + kills = 100%.
     const decisive = (b.wins_by_points||0) + (b.wins_by_elim||0);
     const flowersPct = decisive ? (b.wins_by_points/decisive*100) : 0;
@@ -545,7 +559,7 @@ function renderLoserLadder(){
          <div class="lb-wr">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN · ${b.avg_place??'–'} PLACE</span></div>`
       : `<div class="lb-elo" style="color:${b.color}">${(b.no_win_rate*100).toFixed(1)}<span class="lb-unit">% NO-WIN</span></div>
          <div class="lb-wr">${b.elo}<span class="lb-unit">LOSER ELO · ${b.avg_place??'–'} PLACE</span></div>`;
-    const crashed = b.disabled ? `<span class="lb-crashed" title="${esc(b.disabled_reason||'crashed during a game')}">CRASHED</span>` : '';
+    const crashed = disabledBadge(b);
     // Split as a share of this bot's losses, so flowers + kills = 100%.
     const decisive = (b.wins_by_points||0) + (b.wins_by_elim||0);
     const flowersPct = decisive ? (b.wins_by_points/decisive*100) : 0;
