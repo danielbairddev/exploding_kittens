@@ -342,13 +342,64 @@
          + W.wellSums      * wells;
   }
 
+  // Board after locking `type` at (rot, ox, oy) and clearing lines.
+  // Returns null if any cell lands above the board (a losing placement —
+  // the player would never choose it, so it's excluded from their options).
+  function placeAndClear(grid, type, rot, ox, oy) {
+    const g = grid.map(r => r.slice());
+    for (const [cx, cy] of cellsOf(type, rot)) {
+      const x = ox + cx, y = oy + cy;
+      if (y < 0) return null;
+      g[y][x] = 1;
+    }
+    for (let y = ROWS - 1; y >= 0; y--) {
+      let full = true;
+      for (let x = 0; x < COLS; x++) if (!g[y][x]) { full = false; break; }
+      if (full) { g.splice(y, 1); g.unshift(new Array(COLS).fill(0)); y++; }
+    }
+    return g;
+  }
+
+  // Every board reachable by hard-dropping `type` (each rotation × column).
+  function placementBoards(grid, type) {
+    const boards = [];
+    const rots = rotCount(type);
+    for (let rot = 0; rot < rots; rot++) {
+      const cells = cellsOf(type, rot);
+      let minX = 99, maxX = -99, maxCy = 0;
+      for (const [cx, cy] of cells) { if (cx < minX) minX = cx; if (cx > maxX) maxX = cx; if (cy > maxCy) maxCy = cy; }
+      for (let ox = -minX; ox <= COLS - 1 - maxX; ox++) {
+        let oy = -maxCy - 1;
+        while (!collides(grid, type, rot, ox, oy + 1)) oy++;
+        if (collides(grid, type, rot, ox, oy)) continue;
+        const g = placeAndClear(grid, type, rot, ox, oy);
+        if (g) boards.push(g);
+      }
+    }
+    return boards;
+  }
+
   // From a set of candidate pieces, pick the one whose optimal play is worst
   // for the player (tie-break randomly among equally-cruel options).
-  function worstOf(grid, candidates) {
+  //
+  // The dealer commits the preview piece while `curType` is still falling and
+  // the player plans both pieces together, so each candidate is scored with a
+  // 2-ply minimax: max over (placement of the current piece, then best reply
+  // with the candidate). Scoring against the pre-drop board would be stale by
+  // one placement and blind to the preview interaction.
+  function worstOf(grid, candidates, curType) {
+    const uniq = [...new Set(candidates)];
+    if (uniq.length === 1) return uniq[0];
+    const boards = curType ? placementBoards(grid, curType) : [];
+    if (boards.length === 0) boards.push(grid); // game start / nowhere to place: fall back to 1-ply
     let worstVal = Infinity;
     let worstTypes = [];
-    for (const t of candidates) {
-      const v = bestValueFor(grid, t);
+    for (const t of uniq) {
+      let v = -Infinity;
+      for (const b of boards) {
+        const bv = bestValueFor(b, t);
+        if (bv > v) v = bv;
+      }
       if (v < worstVal - 1e-9) { worstVal = v; worstTypes = [t]; }
       else if (Math.abs(v - worstVal) <= 1e-9) { worstTypes.push(t); }
     }
@@ -367,10 +418,10 @@
     ? localStorage.getItem("unluckyDealer") : "pure";
   let bag = [];
 
-  function dealNext(grid) {
-    if (dealerMode === "pure") return worstOf(grid, TYPES);
+  function dealNext(grid, curType) {
+    if (dealerMode === "pure") return worstOf(grid, TYPES, curType);
     if (bag.length === 0) bag = (dealerMode === "bag14") ? TYPES.concat(TYPES) : TYPES.slice();
-    const pick = worstOf(grid, bag);
+    const pick = worstOf(grid, bag, curType);
     bag.splice(bag.indexOf(pick), 1);
     return pick;
   }
@@ -414,7 +465,9 @@
 
   function nextPiece() {
     spawn(nextType);
-    nextType = dealNext(grid);
+    // Deal knowing the piece that just started falling — the player will
+    // place it while seeing this choice in the preview.
+    nextType = dealNext(grid, cur ? cur.type : null);
     drawNext();
   }
 
@@ -609,7 +662,7 @@
     bag = [];
     drawHold();
     updateStats();
-    nextType = dealNext(grid);
+    nextType = dealNext(grid, null); // no piece falling yet — 1-ply
     nextPiece();
     document.getElementById("overlay").classList.add("hidden");
     running = true; lastTime = 0; dropAcc = 0;
