@@ -79,8 +79,8 @@
   canvas#hold.used { opacity: .4; }
   .seg { display: flex; gap: 6px; margin-bottom: 10px; }
   .seg button {
-    flex: 1; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .5px;
-    cursor: pointer; padding: 6px 4px; border-radius: 7px;
+    flex: 1; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .3px;
+    cursor: pointer; padding: 6px 2px; border-radius: 7px; white-space: nowrap;
     border: 1px solid var(--panel-line); background: #1b1b28; color: var(--muted);
   }
   .seg button.active {
@@ -153,8 +153,9 @@
       <div class="card">
         <h2>Dealer</h2>
         <div class="seg">
-          <button id="dealer-pure" data-dealer="pure">Pure Evil</button>
+          <button id="dealer-pure" data-dealer="pure">Pure</button>
           <button id="dealer-bag" data-dealer="bag">7-Bag</button>
+          <button id="dealer-bag14" data-dealer="bag14">14-Bag</button>
         </div>
         <div class="keys" id="dealerhint"></div>
       </div>
@@ -356,19 +357,22 @@
 
   // Dealer modes:
   //  - "pure": the worst of all 7 pieces, every time (can repeat forever).
-  //  - "bag":  a real 7-bag (each piece once per 7), but greedily dealt worst
-  //            available first — respects the bag while ordering it cruelly.
-  let dealerMode = localStorage.getItem("unluckyDealer") === "bag" ? "bag" : "pure";
+  //  - "bag":   a real 7-bag (each piece once per 7), greedily dealt worst
+  //             available first — respects the bag while ordering it cruelly.
+  //  - "bag14": a double bag (each piece twice per 14). Same greedy ordering,
+  //             but with two of each it can serve the same nasty piece twice
+  //             in a row while still guaranteeing balance over 14.
+  const VALID_DEALERS = new Set(["pure", "bag", "bag14"]);
+  let dealerMode = VALID_DEALERS.has(localStorage.getItem("unluckyDealer"))
+    ? localStorage.getItem("unluckyDealer") : "pure";
   let bag = [];
 
   function dealNext(grid) {
-    if (dealerMode === "bag") {
-      if (bag.length === 0) bag = TYPES.slice();
-      const pick = worstOf(grid, bag);
-      bag.splice(bag.indexOf(pick), 1);
-      return pick;
-    }
-    return worstOf(grid, TYPES);
+    if (dealerMode === "pure") return worstOf(grid, TYPES);
+    if (bag.length === 0) bag = (dealerMode === "bag14") ? TYPES.concat(TYPES) : TYPES.slice();
+    const pick = worstOf(grid, bag);
+    bag.splice(bag.indexOf(pick), 1);
+    return pick;
   }
 
   // ---- Game state ---------------------------------------------------------
@@ -679,20 +683,22 @@
 
   const DEALER_HINT = {
     pure: "The worst of all 7 pieces, every time. Expect the same nasty piece again and again.",
-    bag: "A real 7-bag — each piece once per 7 — but dealt worst-first for the cruelest legal order."
+    bag: "A real 7-bag — each piece once per 7 — but dealt worst-first for the cruelest legal order.",
+    bag14: "A 14-bag — each piece twice per 14 — dealt worst-first, so it can even serve the same nasty piece twice in a row."
   };
+  const DEALER_IDS = ["pure", "bag", "bag14"];
   function updateDealerUI() {
     document.getElementById("dealerhint").textContent = DEALER_HINT[dealerMode];
-    for (const id of ["pure", "bag"])
+    for (const id of DEALER_IDS)
       document.getElementById("dealer-" + id).classList.toggle("active", dealerMode === id);
   }
   function setDealer(d) {
-    dealerMode = (d === "bag") ? "bag" : "pure";
+    dealerMode = VALID_DEALERS.has(d) ? d : "pure";
     localStorage.setItem("unluckyDealer", dealerMode);
     bag = []; // restart the bag under the new mode
     updateDealerUI();
   }
-  for (const id of ["pure", "bag"])
+  for (const id of DEALER_IDS)
     document.getElementById("dealer-" + id).addEventListener("click", () => setDealer(id));
 
   document.addEventListener("keydown", (e) => {
