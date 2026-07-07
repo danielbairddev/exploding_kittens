@@ -151,6 +151,14 @@
         <div class="stat"><span class="k">Level</span><span class="v" id="level">1</span></div>
       </div>
       <div class="card">
+        <h2>Dealer</h2>
+        <div class="seg">
+          <button id="dealer-pure" data-dealer="pure">Pure Evil</button>
+          <button id="dealer-bag" data-dealer="bag">7-Bag</button>
+        </div>
+        <div class="keys" id="dealerhint"></div>
+      </div>
+      <div class="card">
         <h2>Controls</h2>
         <div class="seg">
           <button id="scheme-normal" data-scheme="normal">Normal</button>
@@ -333,26 +341,55 @@
          + W.wellSums      * wells;
   }
 
-  // The malevolent dealer: pick the piece whose optimal play is worst.
-  function chooseWorstPiece(grid) {
+  // From a set of candidate pieces, pick the one whose optimal play is worst
+  // for the player (tie-break randomly among equally-cruel options).
+  function worstOf(grid, candidates) {
     let worstVal = Infinity;
-    const worstTypes = [];
-    for (const t of TYPES) {
+    let worstTypes = [];
+    for (const t of candidates) {
       const v = bestValueFor(grid, t);
-      if (v < worstVal - 1e-9) { worstVal = v; worstTypes.length = 0; worstTypes.push(t); }
+      if (v < worstVal - 1e-9) { worstVal = v; worstTypes = [t]; }
       else if (Math.abs(v - worstVal) <= 1e-9) { worstTypes.push(t); }
     }
-    // tie-break randomly among equally-cruel options
     return worstTypes[(Math.random() * worstTypes.length) | 0];
+  }
+
+  // Dealer modes:
+  //  - "pure": the worst of all 7 pieces, every time (can repeat forever).
+  //  - "bag":  a real 7-bag (each piece once per 7), but greedily dealt worst
+  //            available first — respects the bag while ordering it cruelly.
+  let dealerMode = localStorage.getItem("unluckyDealer") === "bag" ? "bag" : "pure";
+  let bag = [];
+
+  function dealNext(grid) {
+    if (dealerMode === "bag") {
+      if (bag.length === 0) bag = TYPES.slice();
+      const pick = worstOf(grid, bag);
+      bag.splice(bag.indexOf(pick), 1);
+      return pick;
+    }
+    return worstOf(grid, TYPES);
   }
 
   // ---- Game state ---------------------------------------------------------
   let grid, cur, nextType, score, lines, level, over, paused, running;
   let hold = null, holdUsed = false;
   let softDropping = false, softAcc = 0;
+  let lockTimer = 0, lockResets = 0;
   let dropAcc = 0, lastTime = 0, rafId = null;
 
-  const SOFT_INTERVAL = 22; // ms per cell while soft drop is held (~45 cells/s)
+  const SOFT_INTERVAL = 22;    // ms per cell while soft drop is held (~45 cells/s)
+  const LOCK_DELAY = 500;      // ms grounded before the piece locks (unless hard-dropped)
+  const MAX_LOCK_RESETS = 15;  // cap moves/rotations that refresh the lock delay
+
+  // Piece is resting on the stack/floor (can't fall further).
+  function grounded() { return collides(grid, cur.type, cur.rot, cur.x, cur.y + 1); }
+  // A successful downward step reaches a new row: fresh lock delay + reset budget.
+  function lockDrop() { lockTimer = 0; lockResets = 0; }
+  // A move/rotate while grounded refreshes the lock delay, up to a cap.
+  function lockReset() {
+    if (grounded() && lockResets < MAX_LOCK_RESETS) { lockTimer = 0; lockResets++; }
+  }
 
   function emptyGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
   function dropInterval() { return Math.max(70, 800 - (level - 1) * 65); }
@@ -362,6 +399,7 @@
     const ox = Math.floor((COLS - size) / 2);
     const oy = -topPad(type, 0);
     cur = { type, rot: 0, x: ox, y: oy };
+    lockTimer = 0; lockResets = 0;
     if (collides(grid, cur.type, cur.rot, cur.x, cur.y)) { gameOver(); return; }
   }
   function topPad(type, rot) {
@@ -372,7 +410,7 @@
 
   function nextPiece() {
     spawn(nextType);
-    nextType = chooseWorstPiece(grid);
+    nextType = dealNext(grid);
     drawNext();
   }
 
@@ -414,7 +452,7 @@
     const nr = (cur.rot + (dir > 0 ? 1 : 3)) & 3;
     for (const kick of [0, -1, 1, -2, 2]) {
       if (!collides(grid, cur.type, nr, cur.x + kick, cur.y)) {
-        cur.rot = nr; cur.x += kick; return;
+        cur.rot = nr; cur.x += kick; lockReset(); return;
       }
     }
   }
@@ -423,7 +461,7 @@
     const nr = (cur.rot + 2) & 3;
     for (const kick of [0, -1, 1, -2, 2]) {
       if (!collides(grid, cur.type, nr, cur.x + kick, cur.y)) {
-        cur.rot = nr; cur.x += kick; return;
+        cur.rot = nr; cur.x += kick; lockReset(); return;
       }
     }
   }
@@ -443,7 +481,9 @@
     drawHold();
   }
 
-  function softDrop() { if (tryMove(0, 1)) { score += 1; updateStats(); } else lockPiece(); }
+  // Soft/gravity moves DON'T lock on contact — the lock delay (in the loop)
+  // gives you time at the bottom to shuffle. Hard drop still locks instantly.
+  function softDrop() { if (tryMove(0, 1)) { score += 1; updateStats(); lockDrop(); } }
   function hardDrop() {
     let d = 0;
     while (tryMove(0, 1)) d++;
@@ -451,7 +491,7 @@
     lockPiece();
   }
 
-  function tick(dy) { if (!tryMove(0, 1)) lockPiece(); }
+  function gravityFall() { if (tryMove(0, 1)) lockDrop(); }
 
   // ---- Rendering ----------------------------------------------------------
   function roundRectCell(c, px, py, color) {
@@ -546,7 +586,11 @@
         while (softDropping && softAcc >= SOFT_INTERVAL) { softAcc -= SOFT_INTERVAL; softDrop(); }
       }
       dropAcc += dt;
-      if (dropAcc >= dropInterval()) { dropAcc = 0; tick(); }
+      if (dropAcc >= dropInterval()) { dropAcc = 0; gravityFall(); }
+      // Lock delay: once grounded, wait a moment before locking so the piece
+      // can still be slid/rotated (move-reset above refreshes this).
+      if (grounded()) { lockTimer += dt; if (lockTimer >= LOCK_DELAY) lockPiece(); }
+      else { lockTimer = 0; }
     }
     draw();
     rafId = requestAnimationFrame(loop);
@@ -557,9 +601,11 @@
     score = 0; lines = 0; level = 1; over = false; paused = false;
     hold = null; holdUsed = false;
     softDropping = false; softAcc = 0;
+    lockTimer = 0; lockResets = 0;
+    bag = [];
     drawHold();
     updateStats();
-    nextType = chooseWorstPiece(grid);
+    nextType = dealNext(grid);
     nextPiece();
     document.getElementById("overlay").classList.add("hidden");
     running = true; lastTime = 0; dropAcc = 0;
@@ -631,6 +677,24 @@
   for (const id of ["normal", "daniel"])
     document.getElementById("scheme-" + id).addEventListener("click", () => setScheme(id));
 
+  const DEALER_HINT = {
+    pure: "The worst of all 7 pieces, every time. Expect the same nasty piece again and again.",
+    bag: "A real 7-bag — each piece once per 7 — but dealt worst-first for the cruelest legal order."
+  };
+  function updateDealerUI() {
+    document.getElementById("dealerhint").textContent = DEALER_HINT[dealerMode];
+    for (const id of ["pure", "bag"])
+      document.getElementById("dealer-" + id).classList.toggle("active", dealerMode === id);
+  }
+  function setDealer(d) {
+    dealerMode = (d === "bag") ? "bag" : "pure";
+    localStorage.setItem("unluckyDealer", dealerMode);
+    bag = []; // restart the bag under the new mode
+    updateDealerUI();
+  }
+  for (const id of ["pure", "bag"])
+    document.getElementById("dealer-" + id).addEventListener("click", () => setDealer(id));
+
   document.addEventListener("keydown", (e) => {
     const action = SCHEMES[scheme].keys[e.code];
     if (action || PREVENT.has(e.code)) e.preventDefault();
@@ -642,8 +706,8 @@
     if (!running || over || paused) return;
 
     switch (action) {
-      case "left": tryMove(-1, 0); break;
-      case "right": tryMove(1, 0); break;
+      case "left": if (tryMove(-1, 0)) lockReset(); break;
+      case "right": if (tryMove(1, 0)) lockReset(); break;
       case "soft": softDropping = true; softAcc = 0; softDrop(); break; // held → fast drop via loop
       case "cw": rotate(1); break;
       case "ccw": rotate(-1); break;
@@ -661,6 +725,7 @@
   window.addEventListener("blur", () => { softDropping = false; softAcc = 0; });
 
   updateSchemeUI();
+  updateDealerUI();
   document.getElementById("startBtn").addEventListener("click", startGame);
 
   // initial idle render
