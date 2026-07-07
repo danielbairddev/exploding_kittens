@@ -360,9 +360,11 @@
     return g;
   }
 
-  // Every board reachable by hard-dropping `type` (each rotation × column).
-  function placementBoards(grid, type) {
-    const boards = [];
+  // Every board reachable by hard-dropping `type`, scored by placement value.
+  // Losing placements (piece sticks out the top) are excluded — a rational
+  // player would never choose them.
+  function scoredPlacements(grid, type) {
+    const out = [];
     const rots = rotCount(type);
     for (let rot = 0; rot < rots; rot++) {
       const cells = cellsOf(type, rot);
@@ -372,33 +374,79 @@
         let oy = -maxCy - 1;
         while (!collides(grid, type, rot, ox, oy + 1)) oy++;
         if (collides(grid, type, rot, ox, oy)) continue;
+        const v = evaluatePlacement(grid, type, rot, ox, oy);
+        if (v <= -1e8) continue;
         const g = placeAndClear(grid, type, rot, ox, oy);
-        if (g) boards.push(g);
+        if (g) out.push({ board: g, v });
       }
     }
-    return boards;
+    return out;
   }
 
   // From a set of candidate pieces, pick the one whose optimal play is worst
   // for the player (tie-break randomly among equally-cruel options).
   //
-  // The dealer commits the preview piece while `curType` is still falling and
-  // the player plans both pieces together, so each candidate is scored with a
-  // 2-ply minimax: max over (placement of the current piece, then best reply
-  // with the candidate). Scoring against the pre-drop board would be stale by
-  // one placement and blind to the preview interaction.
-  function worstOf(grid, candidates, curType) {
+  // Hold-aware, 3-ply beam minimax. When the dealer commits the preview piece
+  // the player's hand is really {current piece, hold piece, candidate}: they
+  // can place any two of those over the next two turns and keep the third in
+  // hold. And the dealer knows it deals AGAIN after that, so the horizon ends
+  // with its own counter-move:
+  //   ply 1 (player): place the falling piece, or swap and place the held one
+  //   ply 2 (player): place the candidate, or the other piece still in hand
+  //   ply 3 (dealer): worst future piece (`futureOf`, bag-constrained), which
+  //                   the player may answer with whatever stayed in hold
+  // Plies 1–2 are beam-pruned by placement value to keep deals fast. Tight
+  // beams measured out both crueler AND cheaper than wide ones (they model a
+  // strong-but-greedy player instead of hedging against lines nobody plays).
+  const BEAM1 = 6, BEAM2 = 4;
+  function worstOf(grid, candidates, curType, holdType, futureOf) {
     const uniq = [...new Set(candidates)];
     if (uniq.length === 1) return uniq[0];
-    const boards = curType ? placementBoards(grid, curType) : [];
-    if (boards.length === 0) boards.push(grid); // game start / nowhere to place: fall back to 1-ply
+
+    // Ply 1 is candidate-independent: compute once. `rem` = known pieces
+    // still in hand afterwards (the candidate joins at ply 2).
+    let states1 = [];
+    if (curType) {
+      for (const p of scoredPlacements(grid, curType))
+        states1.push({ board: p.board, v: p.v, rem: holdType ? [holdType] : [] });
+      if (holdType)
+        for (const p of scoredPlacements(grid, holdType))
+          states1.push({ board: p.board, v: p.v, rem: [curType] });
+      states1.sort((a, b) => b.v - a.v);
+      states1 = states1.slice(0, BEAM1);
+    }
+
     let worstVal = Infinity;
     let worstTypes = [];
     for (const t of uniq) {
-      let v = -Infinity;
-      for (const b of boards) {
-        const bv = bestValueFor(b, t);
-        if (bv > v) v = bv;
+      let v;
+      if (states1.length === 0) {
+        v = bestValueFor(grid, t); // game start / no surviving first move: 1-ply
+      } else {
+        // Ply 2: from each kept state, place the candidate or a remaining
+        // hand piece; whatever isn't placed is the hold leftover for ply 3.
+        let states2 = [];
+        for (const s of states1) {
+          const opts = s.rem.concat([t]);
+          for (let i = 0; i < opts.length; i++) {
+            const leftover = opts.length === 2 ? opts[1 - i] : null;
+            for (const p of scoredPlacements(s.board, opts[i]))
+              states2.push({ board: p.board, v: p.v, leftover });
+          }
+        }
+        states2.sort((a, b) => b.v - a.v);
+        states2 = states2.slice(0, BEAM2);
+        // Ply 3: dealer answers with its worst legal piece; the player may
+        // play it or fall back to the leftover in hold.
+        v = -Infinity;
+        for (const s of states2) {
+          let minNext = Infinity;
+          for (const ft of futureOf(t)) minNext = Math.min(minNext, bestValueFor(s.board, ft));
+          let pv = minNext;
+          if (s.leftover) pv = Math.max(pv, bestValueFor(s.board, s.leftover));
+          if (pv > v) v = pv;
+        }
+        if (v === -Infinity) v = -1e9; // no plan survives two turns: lethal candidate
       }
       if (v < worstVal - 1e-9) { worstVal = v; worstTypes = [t]; }
       else if (Math.abs(v - worstVal) <= 1e-9) { worstTypes.push(t); }
@@ -419,9 +467,16 @@
   let bag = [];
 
   function dealNext(grid, curType) {
-    if (dealerMode === "pure") return worstOf(grid, TYPES, curType);
+    if (dealerMode === "pure") return worstOf(grid, TYPES, curType, hold, () => TYPES);
     if (bag.length === 0) bag = (dealerMode === "bag14") ? TYPES.concat(TYPES) : TYPES.slice();
-    const pick = worstOf(grid, bag, curType);
+    // Ply-3 candidates are whatever would remain in the bag after dealing t
+    // (a fresh bag of all 7 if t empties it).
+    const futureOf = (t) => {
+      const rest = bag.slice();
+      rest.splice(rest.indexOf(t), 1);
+      return rest.length ? [...new Set(rest)] : TYPES;
+    };
+    const pick = worstOf(grid, bag, curType, hold, futureOf);
     bag.splice(bag.indexOf(pick), 1);
     return pick;
   }
