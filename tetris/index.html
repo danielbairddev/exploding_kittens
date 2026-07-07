@@ -75,6 +75,17 @@
     border-bottom-width: 2px; border-radius: 5px; padding: 0 6px;
     font-family: inherit; font-size: 11px; color: var(--ink); min-width: 14px; text-align: center;
   }
+  canvas#hold { display: block; margin: 0 auto; }
+  canvas#hold.used { opacity: .4; }
+  .seg { display: flex; gap: 6px; margin-bottom: 10px; }
+  .seg button {
+    flex: 1; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    cursor: pointer; padding: 6px 4px; border-radius: 7px;
+    border: 1px solid var(--panel-line); background: #1b1b28; color: var(--muted);
+  }
+  .seg button.active {
+    background: linear-gradient(90deg, #ff4d6d, #ffb84d); color: #0a0a12; border-color: transparent;
+  }
   .flavor {
     min-height: 34px; font-size: 12.5px; color: var(--accent);
     font-style: italic; text-align: center; transition: opacity .2s;
@@ -126,6 +137,10 @@
 
     <div class="side">
       <div class="card">
+        <h2>Hold</h2>
+        <canvas id="hold" width="120" height="80"></canvas>
+      </div>
+      <div class="card">
         <h2>Next (dreaded)</h2>
         <canvas id="next" width="120" height="80"></canvas>
       </div>
@@ -137,19 +152,17 @@
       </div>
       <div class="card">
         <h2>Controls</h2>
-        <div class="keys">
-          <b>Move</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd><br>
-          <b>Rotate</b> <kbd>&uarr;</kbd> / <kbd>X</kbd>, <kbd>Z</kbd> ccw<br>
-          <b>Soft drop</b> <kbd>&darr;</kbd><br>
-          <b>Hard drop</b> <kbd>Space</kbd><br>
-          <b>Pause</b> <kbd>P</kbd>
+        <div class="seg">
+          <button id="scheme-normal" data-scheme="normal">Normal</button>
+          <button id="scheme-daniel" data-scheme="daniel">Daniel</button>
         </div>
+        <div class="keys" id="keyhints"></div>
       </div>
     </div>
   </div>
 
   <div class="flavor" id="flavor"></div>
-  <footer>No hold. No mercy. The bag is rigged against you on purpose.</footer>
+  <footer>No mercy. The bag is rigged against you on purpose.</footer>
 </div>
 
 <script>
@@ -161,6 +174,8 @@
   const ctx = board.getContext("2d");
   const nextCv = document.getElementById("next");
   const nctx = nextCv.getContext("2d");
+  const holdCv = document.getElementById("hold");
+  const hctx = holdCv.getContext("2d");
 
   const COLORS = {
     I: "#33e1ff", J: "#4b6bff", L: "#ff9e3d",
@@ -333,6 +348,7 @@
 
   // ---- Game state ---------------------------------------------------------
   let grid, cur, nextType, score, lines, level, over, paused, running;
+  let hold = null, holdUsed = false;
   let dropAcc = 0, lastTime = 0, rafId = null;
 
   function emptyGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
@@ -378,7 +394,9 @@
       if (cleared === 4) flash("A TETRIS?! It won't let that happen again.");
       else flash(["Nice — for now.", "It's just getting warmed up.", "Enjoy that. Truly."][cleared - 1] || "");
     }
+    holdUsed = false; // new piece — hold is available again
     nextPiece();
+    drawHold();
   }
 
   function tryMove(dx, dy) {
@@ -395,6 +413,30 @@
         cur.rot = nr; cur.x += kick; return;
       }
     }
+  }
+
+  function rotate180() {
+    const nr = (cur.rot + 2) & 3;
+    for (const kick of [0, -1, 1, -2, 2]) {
+      if (!collides(grid, cur.type, nr, cur.x + kick, cur.y)) {
+        cur.rot = nr; cur.x += kick; return;
+      }
+    }
+  }
+
+  // Swap the falling piece with the held one (once per piece).
+  function doHold() {
+    if (holdUsed) return;
+    holdUsed = true;
+    if (hold === null) {
+      hold = cur.type;
+      nextPiece(); // pull in the (adversarially chosen) next piece
+    } else {
+      const swap = hold;
+      hold = cur.type;
+      spawn(swap);
+    }
+    drawHold();
   }
 
   function softDrop() { if (tryMove(0, 1)) { score += 1; updateStats(); } else lockPiece(); }
@@ -452,16 +494,21 @@
     }
   }
 
-  function drawNext() {
-    nctx.clearRect(0, 0, nextCv.width, nextCv.height);
-    if (!nextType) return;
-    const cells = cellsOf(nextType, 0);
+  function drawMiniPiece(c, cv, type) {
+    c.clearRect(0, 0, cv.width, cv.height);
+    if (!type) return;
+    const cells = cellsOf(type, 0);
     let minX = 9, maxX = -9, minY = 9, maxY = -9;
     for (const [x, y] of cells) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
     const w = (maxX - minX + 1), h = (maxY - minY + 1), s = 22;
-    const offX = (nextCv.width - w * s) / 2, offY = (nextCv.height - h * s) / 2;
+    const offX = (cv.width - w * s) / 2, offY = (cv.height - h * s) / 2;
     for (const [x, y] of cells)
-      roundRectCell22(nctx, offX + (x - minX) * s, offY + (y - minY) * s, s, COLORS[nextType]);
+      roundRectCell22(c, offX + (x - minX) * s, offY + (y - minY) * s, s, COLORS[type]);
+  }
+  function drawNext() { drawMiniPiece(nctx, nextCv, nextType); }
+  function drawHold() {
+    drawMiniPiece(hctx, holdCv, hold);
+    holdCv.classList.toggle("used", holdUsed && hold !== null);
   }
   function roundRectCell22(c, px, py, s, color) {
     c.fillStyle = color; c.fillRect(px + 1, py + 1, s - 2, s - 2);
@@ -500,6 +547,8 @@
   function startGame() {
     grid = emptyGrid();
     score = 0; lines = 0; level = 1; over = false; paused = false;
+    hold = null; holdUsed = false;
+    drawHold();
     updateStats();
     nextType = chooseWorstPiece(grid);
     nextPiece();
@@ -528,24 +577,75 @@
     flash(paused ? "Paused. The horror waits patiently." : "");
   }
 
-  // ---- Input --------------------------------------------------------------
-  const HANDLED = new Set(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," ","Spacebar"]);
+  // ---- Input / control schemes -------------------------------------------
+  // Keyed by KeyboardEvent.code (layout-independent). Daniel's scheme mirrors
+  // the bindings from the settings screen: WASD move/soft, arrows rotate
+  // (left=ccw, right=cw, up=180), LeftShift holds, R retries.
+  const SCHEMES = {
+    normal: {
+      keys: {
+        ArrowLeft: "left", ArrowRight: "right", ArrowDown: "soft",
+        ArrowUp: "cw", KeyX: "cw", KeyZ: "ccw",
+        Space: "hard", KeyC: "hold", KeyP: "pause", KeyR: "retry"
+      },
+      hint: `<b>Move</b> <kbd>&larr;</kbd> <kbd>&rarr;</kbd> &nbsp; <b>Soft</b> <kbd>&darr;</kbd><br>
+             <b>Rotate</b> <kbd>&uarr;</kbd>/<kbd>X</kbd> cw, <kbd>Z</kbd> ccw<br>
+             <b>Hard</b> <kbd>Space</kbd> &nbsp; <b>Hold</b> <kbd>C</kbd><br>
+             <b>Retry</b> <kbd>R</kbd> &nbsp; <b>Pause</b> <kbd>P</kbd>`
+    },
+    daniel: {
+      keys: {
+        KeyA: "left", KeyD: "right", KeyS: "soft", Space: "hard",
+        ArrowLeft: "ccw", ArrowRight: "cw", ArrowUp: "flip",
+        ShiftLeft: "hold", KeyR: "retry", KeyP: "pause"
+      },
+      hint: `<b>Move</b> <kbd>A</kbd> <kbd>D</kbd> &nbsp; <b>Soft</b> <kbd>S</kbd><br>
+             <b>Rotate</b> <kbd>&larr;</kbd> ccw <kbd>&rarr;</kbd> cw <kbd>&uarr;</kbd> 180<br>
+             <b>Hard</b> <kbd>Space</kbd> &nbsp; <b>Hold</b> <kbd>Shift</kbd><br>
+             <b>Retry</b> <kbd>R</kbd> &nbsp; <b>Pause</b> <kbd>P</kbd>`
+    }
+  };
+  let scheme = localStorage.getItem("unluckyScheme") === "daniel" ? "daniel" : "normal";
+  const REPEATABLE = new Set(["left", "right", "soft"]);
+  const PREVENT = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+
+  function updateSchemeUI() {
+    document.getElementById("keyhints").innerHTML = SCHEMES[scheme].hint;
+    for (const id of ["normal", "daniel"])
+      document.getElementById("scheme-" + id).classList.toggle("active", scheme === id);
+  }
+  function setScheme(s) {
+    scheme = (s === "daniel") ? "daniel" : "normal";
+    localStorage.setItem("unluckyScheme", scheme);
+    updateSchemeUI();
+  }
+  for (const id of ["normal", "daniel"])
+    document.getElementById("scheme-" + id).addEventListener("click", () => setScheme(id));
+
   document.addEventListener("keydown", (e) => {
-    if (HANDLED.has(e.key)) e.preventDefault();
-    if (!running || over) return;
-    if (e.key === "p" || e.key === "P") { togglePause(); return; }
-    if (paused) return;
-    switch (e.key) {
-      case "ArrowLeft": tryMove(-1, 0); break;
-      case "ArrowRight": tryMove(1, 0); break;
-      case "ArrowDown": softDrop(); break;
-      case "ArrowUp": case "x": case "X": rotate(1); break;
-      case "z": case "Z": rotate(-1); break;
-      case " ": case "Spacebar": hardDrop(); break;
+    const action = SCHEMES[scheme].keys[e.code];
+    if (action || PREVENT.has(e.code)) e.preventDefault();
+    if (!action) return;
+    if (e.repeat && !REPEATABLE.has(action)) return;
+
+    if (action === "retry") { startGame(); return; }
+    if (action === "pause") { togglePause(); return; }
+    if (!running || over || paused) return;
+
+    switch (action) {
+      case "left": tryMove(-1, 0); break;
+      case "right": tryMove(1, 0); break;
+      case "soft": softDrop(); break;
+      case "cw": rotate(1); break;
+      case "ccw": rotate(-1); break;
+      case "flip": rotate180(); break;
+      case "hard": hardDrop(); break;
+      case "hold": doHold(); break;
     }
     draw();
   }, { passive: false });
 
+  updateSchemeUI();
   document.getElementById("startBtn").addEventListener("click", startGame);
 
   // initial idle render
