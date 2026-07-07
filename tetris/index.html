@@ -349,7 +349,10 @@
   // ---- Game state ---------------------------------------------------------
   let grid, cur, nextType, score, lines, level, over, paused, running;
   let hold = null, holdUsed = false;
+  let softDropping = false, softAcc = 0;
   let dropAcc = 0, lastTime = 0, rafId = null;
+
+  const SOFT_INTERVAL = 22; // ms per cell while soft drop is held (~45 cells/s)
 
   function emptyGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
   function dropInterval() { return Math.max(70, 800 - (level - 1) * 65); }
@@ -395,6 +398,7 @@
       else flash(["Nice — for now.", "It's just getting warmed up.", "Enjoy that. Truly."][cleared - 1] || "");
     }
     holdUsed = false; // new piece — hold is available again
+    softDropping = false; softAcc = 0; // require a fresh press for the next piece
     nextPiece();
     drawHold();
   }
@@ -535,8 +539,12 @@
   function loop(t) {
     if (!running) return;
     if (!lastTime) lastTime = t;
-    const dt = t - lastTime; lastTime = t;
+    const dt = Math.min(100, t - lastTime); lastTime = t; // clamp frame-gap spikes
     if (!paused && !over) {
+      if (softDropping) {
+        softAcc += dt;
+        while (softDropping && softAcc >= SOFT_INTERVAL) { softAcc -= SOFT_INTERVAL; softDrop(); }
+      }
       dropAcc += dt;
       if (dropAcc >= dropInterval()) { dropAcc = 0; tick(); }
     }
@@ -548,6 +556,7 @@
     grid = emptyGrid();
     score = 0; lines = 0; level = 1; over = false; paused = false;
     hold = null; holdUsed = false;
+    softDropping = false; softAcc = 0;
     drawHold();
     updateStats();
     nextType = chooseWorstPiece(grid);
@@ -606,7 +615,7 @@
     }
   };
   let scheme = localStorage.getItem("unluckyScheme") === "daniel" ? "daniel" : "normal";
-  const REPEATABLE = new Set(["left", "right", "soft"]);
+  const REPEATABLE = new Set(["left", "right"]); // soft drop is held-driven by the loop
   const PREVENT = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 
   function updateSchemeUI() {
@@ -635,7 +644,7 @@
     switch (action) {
       case "left": tryMove(-1, 0); break;
       case "right": tryMove(1, 0); break;
-      case "soft": softDrop(); break;
+      case "soft": softDropping = true; softAcc = 0; softDrop(); break; // held → fast drop via loop
       case "cw": rotate(1); break;
       case "ccw": rotate(-1); break;
       case "flip": rotate180(); break;
@@ -644,6 +653,12 @@
     }
     draw();
   }, { passive: false });
+
+  document.addEventListener("keyup", (e) => {
+    if (SCHEMES[scheme].keys[e.code] === "soft") { softDropping = false; softAcc = 0; }
+  });
+  // Releasing focus (alt-tab, etc.) shouldn't leave the piece dropping forever.
+  window.addEventListener("blur", () => { softDropping = false; softAcc = 0; });
 
   updateSchemeUI();
   document.getElementById("startBtn").addEventListener("click", startGame);
