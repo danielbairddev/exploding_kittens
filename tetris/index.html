@@ -86,6 +86,8 @@
   .seg button.active {
     background: linear-gradient(90deg, #ff4d6d, #ffb84d); color: #0a0a12; border-color: transparent;
   }
+  .seg.tight { gap: 4px; }
+  .seg.tight button { font-size: 10px; padding: 6px 0; letter-spacing: 0; }
   .flavor {
     min-height: 34px; font-size: 12.5px; color: var(--accent);
     font-style: italic; text-align: center; transition: opacity .2s;
@@ -152,10 +154,12 @@
       </div>
       <div class="card">
         <h2>Dealer</h2>
-        <div class="seg">
+        <div class="seg tight">
           <button id="dealer-pure" data-dealer="pure">Pure</button>
-          <button id="dealer-bag" data-dealer="bag">7-Bag</button>
-          <button id="dealer-bag14" data-dealer="bag14">14-Bag</button>
+          <button id="dealer-bag7" data-dealer="bag7">7</button>
+          <button id="dealer-bag14" data-dealer="bag14">14</button>
+          <button id="dealer-bag21" data-dealer="bag21">21</button>
+          <button id="dealer-bag28" data-dealer="bag28">28</button>
         </div>
         <div class="keys" id="dealerhint"></div>
       </div>
@@ -461,14 +465,21 @@
   //  - "bag14": a double bag (each piece twice per 14). Same greedy ordering,
   //             but with two of each it can serve the same nasty piece twice
   //             in a row while still guaranteeing balance over 14.
-  const VALID_DEALERS = new Set(["pure", "bag", "bag14"]);
-  let dealerMode = VALID_DEALERS.has(localStorage.getItem("unluckyDealer"))
-    ? localStorage.getItem("unluckyDealer") : "pure";
+  // "bagN" refills with N/7 copies of each piece. Bigger bags let the dealer
+  // cluster nasties harder, but it still owes every good piece by bag's end.
+  const BAG_COPIES = { bag7: 1, bag14: 2, bag21: 3, bag28: 4 };
+  const VALID_DEALERS = new Set(["pure", ...Object.keys(BAG_COPIES)]);
+  const storedDealer = localStorage.getItem("unluckyDealer");
+  let dealerMode = storedDealer === "bag" ? "bag7" // migrate pre-multiples name
+    : (VALID_DEALERS.has(storedDealer) ? storedDealer : "pure");
   let bag = [];
 
   function dealNext(grid, curType) {
     if (dealerMode === "pure") return worstOf(grid, TYPES, curType, hold, () => TYPES);
-    if (bag.length === 0) bag = (dealerMode === "bag14") ? TYPES.concat(TYPES) : TYPES.slice();
+    if (bag.length === 0) {
+      bag = [];
+      for (let i = 0; i < BAG_COPIES[dealerMode]; i++) bag = bag.concat(TYPES);
+    }
     // Ply-3 candidates are whatever would remain in the bag after dealing t
     // (a fresh bag of all 7 if t empties it).
     const futureOf = (t) => {
@@ -791,10 +802,12 @@
 
   const DEALER_HINT = {
     pure: "The worst of all 7 pieces, every time. Expect the same nasty piece again and again.",
-    bag: "A real 7-bag — each piece once per 7 — but dealt worst-first for the cruelest legal order.",
-    bag14: "A 14-bag — each piece twice per 14 — dealt worst-first, so it can even serve the same nasty piece twice in a row."
+    bag7: "A real 7-bag — each piece once per 7 — dealt worst-first for the cruelest legal order.",
+    bag14: "Each piece twice per 14, dealt worst-first — the nasties come doubled up.",
+    bag21: "Each piece three times per 21 — long runs of misery before the bag owes you anything.",
+    bag28: "Each piece four times per 28 — nearly Pure early, with a brief amnesty when the bag runs dry."
   };
-  const DEALER_IDS = ["pure", "bag", "bag14"];
+  const DEALER_IDS = ["pure", "bag7", "bag14", "bag21", "bag28"];
   function updateDealerUI() {
     document.getElementById("dealerhint").textContent = DEALER_HINT[dealerMode];
     for (const id of DEALER_IDS)
