@@ -182,7 +182,11 @@
 (() => {
   "use strict";
 
-  const COLS = 10, ROWS = 20, CELL = 30;
+  // The board keeps HIDDEN buffer rows above the visible field (standard
+  // Tetris): the stack can overflow into them, and you only top out when a
+  // spawn is blocked up there (block-out) or a piece locks entirely above
+  // the visible field (lock-out).
+  const COLS = 10, VISIBLE = 20, HIDDEN = 3, ROWS = VISIBLE + HIDDEN, CELL = 30;
   const board = document.getElementById("board");
   const ctx = board.getContext("2d");
   const nextCv = document.getElementById("next");
@@ -518,15 +522,13 @@
   function spawn(type) {
     const size = PIECE[type][0].size;
     const ox = Math.floor((COLS - size) / 2);
-    const oy = -topPad(type, 0);
-    cur = { type, rot: 0, x: ox, y: oy };
+    // Bottom row of the piece lands on the top visible row: the piece is
+    // immediately visible, with the rest of it in the hidden buffer.
+    let maxCy = 0;
+    for (const [, cy] of cellsOf(type, 0)) if (cy > maxCy) maxCy = cy;
+    cur = { type, rot: 0, x: ox, y: HIDDEN - maxCy };
     lockTimer = 0; lockResets = 0;
-    if (collides(grid, cur.type, cur.rot, cur.x, cur.y)) { gameOver(); return; }
-  }
-  function topPad(type, rot) {
-    let minY = 99;
-    for (const [, cy] of cellsOf(type, rot)) if (cy < minY) minY = cy;
-    return minY;
+    if (collides(grid, cur.type, cur.rot, cur.x, cur.y)) { gameOver(); return; } // block-out
   }
 
   function nextPiece() {
@@ -538,10 +540,14 @@
   }
 
   function lockPiece() {
+    let lockOut = true;
     for (const [cx, cy] of cellsOf(cur.type, cur.rot)) {
       const x = cur.x + cx, y = cur.y + cy;
       if (y >= 0) grid[y][x] = cur.type;
+      if (y >= HIDDEN) lockOut = false;
     }
+    // Lock-out: the piece settled entirely above the visible field.
+    if (lockOut) { gameOver(); return; }
     // clear lines
     let cleared = 0;
     for (let y = ROWS - 1; y >= 0; y--) {
@@ -628,35 +634,35 @@
 
   function draw() {
     ctx.clearRect(0, 0, board.width, board.height);
-    // grid backdrop
-    for (let y = 0; y < ROWS; y++) {
+    // grid backdrop (visible rows only; grid row y+HIDDEN maps to canvas row y)
+    for (let y = 0; y < VISIBLE; y++) {
       for (let x = 0; x < COLS; x++) {
         ctx.fillStyle = ((x + y) & 1) ? "#16161f" : "#191922";
         ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
       }
     }
     // settled blocks
-    for (let y = 0; y < ROWS; y++)
+    for (let y = 0; y < VISIBLE; y++)
       for (let x = 0; x < COLS; x++)
-        if (grid[y][x]) roundRectCell(ctx, x * CELL, y * CELL, COLORS[grid[y][x]]);
+        if (grid[y + HIDDEN][x]) roundRectCell(ctx, x * CELL, y * CELL, COLORS[grid[y + HIDDEN][x]]);
 
     if (cur && running && !over) {
       // ghost
       let gy = cur.y;
       while (!collides(grid, cur.type, cur.rot, cur.x, gy + 1)) gy++;
       for (const [cx, cy] of cellsOf(cur.type, cur.rot)) {
-        const x = cur.x + cx, y = gy + cy;
-        if (y >= 0) {
+        const x = cur.x + cx, vy = gy + cy - HIDDEN;
+        if (vy >= 0) {
           ctx.fillStyle = "rgba(255,255,255,.08)";
-          ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+          ctx.fillRect(x * CELL + 1, vy * CELL + 1, CELL - 2, CELL - 2);
           ctx.strokeStyle = "rgba(255,255,255,.16)";
-          ctx.strokeRect(x * CELL + 1.5, y * CELL + 1.5, CELL - 3, CELL - 3);
+          ctx.strokeRect(x * CELL + 1.5, vy * CELL + 1.5, CELL - 3, CELL - 3);
         }
       }
       // active piece
       for (const [cx, cy] of cellsOf(cur.type, cur.rot)) {
-        const x = cur.x + cx, y = cur.y + cy;
-        if (y >= 0) roundRectCell(ctx, x * CELL, y * CELL, COLORS[cur.type]);
+        const x = cur.x + cx, vy = cur.y + cy - HIDDEN;
+        if (vy >= 0) roundRectCell(ctx, x * CELL, vy * CELL, COLORS[cur.type]);
       }
     }
   }
